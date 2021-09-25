@@ -1,7 +1,7 @@
 ## `TODO: To fix the file paths in this document and update the explanations.`
 
 
-#codeChallenge
+# codeChallenge
 This repository serves as a storage location for scripts needed to for the SPF Code Challenge. This README.md file 
 serves as a guide on how to set up the environment and to run the scripts.
 

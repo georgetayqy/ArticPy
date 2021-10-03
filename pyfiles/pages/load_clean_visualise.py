@@ -88,21 +88,28 @@ def app():
 
     st.title('Load, Clean and Visualise Data')
     st.markdown('## Init\n'
-                'Since this process uses the nltk stopword corpus, you need to download the corpus into your Conda '
-                'Virtual Environment. To do so, activate the your previously created environment on your terminal or '
-                'IDE. Then, key in the following commands:')
+                'Since this process uses the nltk stopword corpus, you need to download the corpus onto your system. '
+                'To do so, activate the your previously created Conda environment on your terminal or IDE. Then, key '
+                'in the following commands:')
     st.code('>>> python\n'
-            '>>> import texthero\n')
-    st.markdown('The above code will then pull the corpus and download it onto your machine.Note that the outputs on '
-                'your machine may differ based on the Python version used, the time you executed the code, your CPU '
-                'Manufacturer and your OS.\n\n')
-    st.markdown('For the cleaning process, all non-ASCII characters will be removed, and all non-English text will '
-                'be translated to English.')
-
+            '>>> import texthero\n'
+            '>>> exit()\n')
+    st.markdown('The above code will then pull the corpus and download it onto your machine and exit once you are '
+                'done. For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
+                'will be removed. Multi-language support has not been implemented into this module as of yet.')
     st.markdown('## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. If your files are larger than 200 MB, please select "Large File(s)" and select the '
-                'CSP you are using to host and store your data. Next, select the file format you wish to upload.')
+                'with the widget. If your file is larger than 200 MB, you may choose to rerun the app with the tag '
+                '`--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the `streamlit run app.py` command and '
+                'define the maximum size of file you can upload onto Streamlit, or use the Large File option to pull '
+                'your dataset from any one of the three supported Cloud Service Providers into the app. Note that '
+                'modifying the command you use to run the app is not available if you are using the web interface for '
+                'the app and you will be limited to using the Large File option to pull datasets larger than 200 MB '
+                'in size.\n\n'
+                'Next, select the file format you wish to upload.\n\n'
+                'Use the "CONTENT" template on the left to key in and process your data. If you do not wish to use '
+                'the template for any reason, ensure that the column name "CONTENT" is in your dataset, and that '
+                'your data is stored in the column under that name.')
     FILE = st.selectbox('Select the type of file to load', ('Select File Mode', 'Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the data input format', ('CSV', 'XLSX'))
 
@@ -116,7 +123,6 @@ def app():
     if VERBOSE:
         VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
     if CLEAN:
-        # TODO(MAYBE): ALLOW USERS TO CREATE THEIR OWN PIPELINES
         st.markdown('## Preprocessing\n'
                     'The below options will allow you to specify whether to conduct a simple cleaning (whereby '
                     'sentence structures and context is retained, while any wrongly encoded characters will be '

@@ -10,30 +10,13 @@ import numpy as np
 import torch.nn as nn
 import streamlit as st
 import torch
+import pathlib
 
 from pytorch_pretrained_bert import BertTokenizer, BertModel
 from keras.preprocessing.sequence import pad_sequences
 from sklearn.metrics import classification_report
 from utils import csp_downloaders
 from utils.helper import readFile
-
-
-class BERTBinaryClassifier(nn.Module):
-    def __init__(self, dropout=DROPOUT_VALUE):
-        super(BERTBinaryClassifier, self).__init__()
-
-        self.bert = BertModel.from_pretrained('bert-base-uncased')
-        self.dropout = nn.Dropout(dropout)
-        self.linear = nn.Linear(LINEAR_IN, LINEAR_OUT)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, tokens, masks=None):
-        _, pooled_output = self.bert(tokens, attention_mask=masks, output_all_encoded_layers=False)
-        dropout_output = self.dropout(pooled_output)
-        linear_output = self.linear(dropout_output)
-        probability = self.sigmoid(linear_output)
-        return probability
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                      FLAGS                                                       | #
@@ -56,7 +39,7 @@ def app():
     # |                                             GLOBAL VARIABLES                                                 | #
     # ---------------------------------------------------------------------------------------------------------------- #
     global FILE_MODE, FILE_FORMAT, DATA_PATH, DATA, CSP, SAVE, VERBOSE, MODE, CONCATED_DATA, DATA_FIELD, \
-        BERTBinaryClassifier, DOWNLOAD_PATH
+        BERTBinaryClassifier, DOWNLOAD_PATH, DROPOUT_VALUE, LINEAR_IN, LINEAR_OUT, LEARNING_RATE, BATCH_SIZE, EPOCH
 
     # ---------------------------------------------------------------------------------------------------------------- #
     # |                                                  INIT                                                        | #
@@ -239,8 +222,8 @@ def app():
                                                 dtype="int")
 
                 # CREATE 2ND DIMENSION OF ARRAY
-                y_train = np.array(train_labels) == 'fake'
-                y_test = np.array(test_labels) == 'fake'
+                y_train = np.array(train_label) == 'fake'
+                y_test = np.array(test_label) == 'fake'
 
                 # DEFINE MASKS AND TENSORS FOR THE TOKENIZED TRAINING VALUES
                 train_masks = [[float(i > 0) for i in ii] for ii in train_tokens_ids]
@@ -268,12 +251,29 @@ def app():
                                                               sampler=test_sample,
                                                               batch_size=BATCH_SIZE)
 
+                # CREATE THE CLASSIFIER CLASS
+                class BERTBinaryClassifier(nn.Module):
+                    def __init__(self, dropout=DROPOUT_VALUE):
+                        super(BERTBinaryClassifier, self).__init__()
+
+                        self.bert = BertModel.from_pretrained('bert-base-uncased')
+                        self.dropout = nn.Dropout(dropout)
+                        self.linear = nn.Linear(LINEAR_IN, LINEAR_OUT)
+                        self.sigmoid = nn.Sigmoid()
+
+                    def forward(self, tokens, masks=None):
+                        _, pooled_output = self.bert(tokens, attention_mask=masks, output_all_encoded_layers=False)
+                        dropout_output = self.dropout(pooled_output)
+                        linear_output = self.linear(dropout_output)
+                        probability = self.sigmoid(linear_output)
+                        return probability
+
                 # INIT MODEL AND DEFINE PARAMETERS
-                bert = BertBinaryClassifier()
+                bert = BERTBinaryClassifier()
                 optimizer = torch.optim.Adam(bert.parameters(), lr=LEARNING_RATE)
 
                 # TRAINING
-                for epoch_num in range(EPOCHS):
+                for epoch_num in range(EPOCH):
                     bert.train()
                     train_loss = 0
                     for step_num, batch_data in enumerate(train_dataloader):
@@ -286,7 +286,8 @@ def app():
                         batch_loss.backward()
                         optimizer.step()
                         st.info('Epoch: ', epoch_num + 1)
-                        st.info('\r' + f'{step_num}/{len(train_data) / BATCH_SIZE} loss: {train_loss / (step_num + 1)}')
+                        st.info('\r' + f'{step_num}/{len(x_train_data) / BATCH_SIZE} loss: '
+                                       f'{train_loss / (step_num + 1)}')
 
                 # EVALUATE THE MODEL PRODUCED
                 bert.eval()
@@ -317,3 +318,4 @@ def app():
                 st.error('Warning: You have not defined your model parameters and submitted it. Try again.')
     elif MODE == 'Novel Data Evaluation Mode':
         st.markdown('## Novel Data Evaluation Mode')
+        raise NotImplemented

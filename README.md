@@ -24,9 +24,16 @@ download the code through the web interface on Github.
 
 #### Running Streamlit
 After activating the Virtual Environment of your choice, navigate to the file location where you stored the local copy 
-of this repository through your terminal. Run the command `pip install -r requirements.txt` on your terminal to 
-download and install all dependencies. If you are using Conda to manage your Python packages, ensure that the Conda 
-environment you created is activated in this step.
+of this repository through your terminal.
+
+Note that there are two different requirements.txt file you may run. Note that due to conflicting dependencies within 
+the code that cannot be easily resolved, we have decided to split the Machine Learning portion of the app into a 
+separate requirements.txt file. Run the command `pip install -r requirements.txt` on your terminal to 
+download and install all dependencies for the main functionality of the app. Run the command 
+`pip install -r requirements_gpu.txt` on your terminal to download and install all dependencies for the machine 
+learning functionality of the app. If you are using Conda to manage your Python packages, ensure that the Conda 
+environment you created is activated in this step. You must install these requirements in different Conda 
+environments or you will run into errors.
 
 After installing the dependencies, run the command `streamlit run app.py` in the same folder as above on your terminal to 
 initialise the app.

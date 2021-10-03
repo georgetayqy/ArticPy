@@ -11,8 +11,10 @@ botocore
 azure-storage-blob
 google-cloud-storage
 bertopic
-texthero
-spacy
-numpy
+texthero~=1.1.0
+spacy~=2.3.7
+numpy~=1.20.3
 six
-pyldavis
+pyldavis~=3.3.1
+gensim~=3.8.3
+wordcloud~=1.8.1

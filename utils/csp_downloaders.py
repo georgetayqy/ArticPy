@@ -2,6 +2,7 @@
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
 import os
+import io
 import shutil
 
 import boto3
@@ -9,10 +10,17 @@ import botocore
 import streamlit as st
 from azure.storage.blob import BlobServiceClient
 from google.cloud import storage
+from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             GLOBAL VARIABLES                                                     | #
 # -------------------------------------------------------------------------------------------------------------------- #
+
+
 AWS_ACCESS_KEY_ID = ''
 AWS_SECRET_ACCESS_KEY = ''
 AWS_BUCKET_NAME = 'codechallengebucket'
@@ -193,7 +201,7 @@ class GoogleDownloader:
     ----------------
     GOOGLE_APPLICATION_CREDENTIALS:                 Represents the path to the JSON file containing the credentials
     GOOGLE_BUCKET_NAME:                             Name of your GCS bucket
-    GOOGLE_STORAGE_OBJECT_NAME:                     Name of the file you stored in the GCS bucket
+    GOOGLE_STORAGE_OBJECT_NAME:                     Name of the file you stored in the GCC bucket
     GOOGLE_DESTINATION_FILE_NAME:                   Path of the downloaded file, defaults to Current Working Directory
     ----------------
     """
@@ -202,9 +210,9 @@ class GoogleDownloader:
         global GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_BUCKET_NAME, GOOGLE_STORAGE_OBJECT_NAME, \
             GOOGLE_DESTINATION_FILE_NAME
         st.title('Google Downloader')
-        if st.checkbox('Define Custom GCS Parameters'):
-            GOOGLE_BUCKET_NAME = st.text_input('ID of GCS Bucket')
-            GOOGLE_STORAGE_OBJECT_NAME = st.text_input('ID of GCS Object')
+        if st.checkbox('Define Custom GCC Parameters'):
+            GOOGLE_BUCKET_NAME = st.text_input('ID of GCC Bucket')
+            GOOGLE_STORAGE_OBJECT_NAME = st.text_input('ID of GCC Object')
             GOOGLE_DESTINATION_FILE_NAME = os.path.join(os.getcwd(), st.text_input('Downloaded Filename (with '
                                                                                    'extensions). The file will always '
                                                                                    'be downloaded to the current '
@@ -246,3 +254,63 @@ class GoogleDownloader:
             st.error(e)
         else:
             st.success('File Downloaded!')
+
+
+class GoogleDriveDownloader:
+    """
+    This class manages the downloading of files stored on Google Drive. This is offered as an alternative for users who
+    uses Google products to store their data but does not wish to use Google Cloud Console.
+
+    Global Variables
+    ----------------
+    GOOGLE_DRIVE_CREDENTIALS:
+
+    ----------------
+    """
+
+    def __init__(self):
+        global GOOGLE_DRIVE_CREDENTIALS_TOKEN, GOOGLE_DRIVE_CREDENTIALS_SECRET, GOOGLE_DRIVE_FILEID, \
+            GOOGLE_DRIVE_CREDENTIALS, GOOGLE_DRIVE_SVC, SCOPE_STR, SCOPES, GOOGLE_DRIVE_SUBMIT, GOOGLE_DRIVE_REQUEST, \
+            GOOGLE_DRIVE_DOWNLOADER
+
+        SCOPES = list()
+
+        st.title('Google Drive Downloader')
+        with st.form(key='googleDrive'):
+            SCOPE_STR = st.text_input('Key in Scope of Download')
+            GOOGLE_DRIVE_CREDENTIALS_TOKEN = st.file_uploader('Load Google Drive Credentials', type=['JSON'])
+            GOOGLE_DRIVE_CREDENTIALS_SECRET = st.file_uploader('Load Google Drive Secret', type=['JSON'])
+            GOOGLE_DRIVE_FILEID = st.text_input('Key in Google Drive File ID')
+            GOOGLE_DRIVE_SUBMIT = st.form_submit_button('Submit')
+
+        if GOOGLE_DRIVE_SUBMIT:
+            SCOPES.append(SCOPE_STR)
+            st.info('Credentials Loaded!')
+
+        GOOGLE_DRIVE_CREDENTIALS = None
+        if os.path.exists('token.json'):
+            GOOGLE_DRIVE_CREDENTIALS = Credentials.from_authorized_user_file(GOOGLE_DRIVE_CREDENTIALS_TOKEN, SCOPES)
+        # If there are no (valid) credentials available, let the user log in.
+        if not GOOGLE_DRIVE_CREDENTIALS or not GOOGLE_DRIVE_CREDENTIALS.valid:
+            if GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_CREDENTIALS.expired and GOOGLE_DRIVE_CREDENTIALS.refresh_token:
+                GOOGLE_DRIVE_CREDENTIALS.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    GOOGLE_DRIVE_CREDENTIALS_SECRET, SCOPES)
+                GOOGLE_DRIVE_CREDENTIALS = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open(GOOGLE_DRIVE_CREDENTIALS_TOKEN, 'w') as token:
+                token.write(GOOGLE_DRIVE_CREDENTIALS.to_json())
+
+        GOOGLE_DRIVE_SVC = build('drive', 'v3', credentials=GOOGLE_DRIVE_CREDENTIALS)
+        GOOGLE_DRIVE_REQUEST = GOOGLE_DRIVE_SVC.files().get_media(fileId=GOOGLE_DRIVE_FILEID)
+        file_handler = io.BytesIO()
+        GOOGLE_DRIVE_DOWNLOADER = MediaIoBaseDownload(file_handler, GOOGLE_DRIVE_REQUEST)
+
+        status = False
+        download_bar = st.progress(0)
+        while status is False:
+            download_status, status = GOOGLE_DRIVE_DOWNLOADER.next_chunk()
+            download_bar.progress(int(download_status.progress() * 100))
+
+        raise NotImplemented('WIP')

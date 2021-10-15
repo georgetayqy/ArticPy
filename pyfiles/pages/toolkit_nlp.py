@@ -70,7 +70,6 @@ DATAPOINT_SELECTOR = 0
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             MAIN APP FUNCTIONALITY                                               | #
 # -------------------------------------------------------------------------------------------------------------------- #
-# noinspection SqlDialectInspection,SqlNoDataSourceInspection
 def app():
     """
     Main function that will be called when the app is run
@@ -109,43 +108,77 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload the file that you wish to analyse')
-        DATA_PATH = st.file_uploader('Load up a CSV/XLSX File containing the cleaned data', type=[MODE])
+        st.markdown('### Upload the file that you wish to analyse:\n')
+        DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
-            if not DATA.empty:
+            if not DATA.empty or not DATA:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success('Data Loaded!')
 
     elif FILE == 'Large File(s)':
-        CSP = st.selectbox('CSP', ('None', 'Azure', 'Amazon', 'Google'))
+        st.info(f'File Format Selected: {MODE}')
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
-            if st.button('Continue', key='az'):
-                azure.downloadBlob()
-                DATA = readFile(csp_downloaders.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='az'):
+                if azure.SUCCESSFUL:
+                    try:
+                        azure.downloadBlob()
+                        DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
-            if st.button('Continue', key='aws'):
-                aws.downloadFile()
-                DATA = readFile(csp_downloaders.AWS_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='aws'):
+                if aws.SUCCESSFUL:
+                    try:
+                        aws.downloadFile()
+                        DATA = readFile(aws.AWS_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
-            if st.button('Continue', key='gcs'):
-                gcs.downloadBlob()
-                DATA = readFile(csp_downloaders.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='gcs'):
+                if gcs.SUCCESSFUL:
+                    try:
+                        gcs.downloadBlob()
+                        DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+
+        elif CSP == 'Google Drive':
+            gd = csp_downloaders.GoogleDriveDownloader()
+            if st.button('Read File', key='gd'):
+                if gd.SUCCESSFUL:
+                    try:
+                        gd.downloadBlob()
+                        DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              FUNCTION SELECTOR                                                   | #

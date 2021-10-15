@@ -72,10 +72,9 @@ def app():
 
     st.title('Document-Term Matrix and Word Frequency Analysis')
     st.markdown('## Init\n'
-                'Before proceeding, you will need to download the corpus needed to process your data. To do so, run '
-                'the following command on your terminal. Please ensure that you have at least 3 GB of free disk space '
-                'available so that you are able to download the corpus onto your system. Click on the following button '
-                'to begin the download.')
+                'Before proceeding, you will need to download the corpus needed to process your data. To do so, click '
+                'on the "Begin Download" button below. Please ensure that you have at least 3 GB of free disk space '
+                'available so that you are able to download the corpus onto your system.')
     if st.button('Begin Download', key='download-model'):
         os.system('python -m nltk.downloader all')
     st.markdown('## Data Format')
@@ -102,7 +101,7 @@ def app():
         DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
-            if not DATA.empty:
+            if not DATA.empty or not DATA:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success('Data Loaded!')
 
@@ -110,43 +109,70 @@ def app():
 # |                                                    LARGE FILES                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif SIZE == 'Large File(s)':
-        st.markdown('## Load Data\n'
-                    'Note that the data passed into this function should be cleaned and most preferably lemmatized or '
-                    'stemmed before proceeding to produce the best results. Failure to do so may result in some '
-                    'inconsistent or erroneous data outputs.\n\n'
-                    'In the selection boxes below, select the Cloud Service Provider which you have stored the data '
-                    'you wish to analyse.')
-        CSP = st.selectbox('CSP', ('Choose a CSP', 'Azure', 'Amazon', 'Google'))
+        st.info(f'File Format Selected: {MODE}')
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
 
-        # FUNCTIONALITY FOR FILE RETRIEVAL
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
-            if st.button('Continue', key='az'):
-                azure.downloadBlob()
-                DATA = readFile(csp_downloaders.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='az'):
+                if azure.SUCCESSFUL:
+                    try:
+                        azure.downloadBlob()
+                        DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
-            if st.button('Continue', key='aws'):
-                aws.downloadFile()
-                DATA = readFile(csp_downloaders.AWS_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='aws'):
+                if aws.SUCCESSFUL:
+                    try:
+                        aws.downloadFile()
+                        DATA = readFile(aws.AWS_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
-            if st.button('Continue', key='gcs'):
-                gcs.downloadBlob()
-                DATA = readFile(csp_downloaders.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='gcs'):
+                if gcs.SUCCESSFUL:
+                    try:
+                        gcs.downloadBlob()
+                        DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
-# -------------------------------------------------------------------------------------------------------------------- #
+        elif CSP == 'Google Drive':
+            gd = csp_downloaders.GoogleDriveDownloader()
+            if st.button('Read File', key='gd'):
+                if gd.SUCCESSFUL:
+                    try:
+                        gd.downloadBlob()
+                        DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+
+    # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                      FLAGS                                                       | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## Flags\n'
@@ -191,6 +217,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('## Analysis Operation')
     if st.button('Proceed', key='doc'):
         if not DATA.empty:
             with st.spinner('Working to create a Document-Term Matrix...'):

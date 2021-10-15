@@ -4,13 +4,14 @@ Load, Clean and Visualise is one of the core modules of this app.
 This module is responsible for the loading, cleaning and visualising of the data to be used for further NLP analysis in
 the other modules in this app.
 
-The loading of data part is handled by pandas and openpyxl, while the cleaning part is largely being handled by
-Texthero and pandas. The visualisation part is handled by streamlit and pandas.
+The loading of data part is handled by pandas, while the cleaning part is largely being handled by Texthero. The
+visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_profiling and pandas.
 """
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import os
 import pathlib
 import nltk
 import numpy as np
@@ -24,7 +25,7 @@ import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report
 from texthero import preprocessing
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText
+from utils.helper import readFile, lemmatizeText, downloadCorpora
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                  INITIAL SETUP                                                   | #
@@ -33,11 +34,9 @@ STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
 DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
 
 # DOWNLOAD THE NECESSARY CORPUS
-try:
-    nltk.download('words')
-except Exception as e:
-    st.error(f'Error: {e}')
-    st.info('Proceeding with the assumption that the data has already been downloaded...')
+downloadCorpora('words')
+downloadCorpora('wordnet')
+downloadCorpora('vader_lexicon')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            GLOBAL VARIABLE DEFINITION                                            | #
@@ -185,49 +184,87 @@ def app():
         DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
-            if not DATA.empty:
+            if not DATA.empty or not DATA:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success('Data Loaded!')
 
     elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
-        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
-            if st.button('Continue', key='az'):
-                azure.downloadBlob()
-                DATA = readFile(csp_downloaders.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='az'):
+                if azure.SUCCESSFUL:
+                    try:
+                        azure.downloadBlob()
+                        DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
-            if st.button('Continue', key='aws'):
-                aws.downloadFile()
-                DATA = readFile(csp_downloaders.AWS_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='aws'):
+                if aws.SUCCESSFUL:
+                    try:
+                        aws.downloadFile()
+                        DATA = readFile(aws.AWS_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
-            if st.button('Continue', key='gcs'):
-                gcs.downloadBlob()
-                DATA = readFile(csp_downloaders.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                if not DATA.empty:
-                    DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                    st.info('File Read!')
+            if st.button('Read File', key='gcs'):
+                if gcs.SUCCESSFUL:
+                    try:
+                        gcs.downloadBlob()
+                        DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+
+        elif CSP == 'Google Drive':
+            gd = csp_downloaders.GoogleDriveDownloader()
+            if st.button('Read File', key='gd'):
+                if gd.SUCCESSFUL:
+                    try:
+                        gd.downloadBlob()
+                        DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
+                        if not DATA.empty:
+                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                            st.info('File Read!')
+                    except AttributeError:
+                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
+                else:
+                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                           DATA LOADING AND PROCESSING                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    if st.button('Analyse Data', key='runner'):
+    st.markdown('## Analysis Operation\n'
+                'Ensure that you have successfully uploaded the required data before clicking on the "Begin Analysis" '
+                'button.')
+
+    if st.button('Begin Analysis', key='runner'):
         if DATA_PATH:
             try:
                 DATA = DATA[[DATA_COLUMN]]
-                DATA = pd.DataFrame(data=DATA[DATA_COLUMN].str.encode('ascii', 'ignore').str.decode('ascii'))
+                DATA[DATA_COLUMN] = DATA[DATA_COLUMN].str.encode('ascii', 'ignore').str.decode('ascii')
+                DATA = pd.DataFrame(data=DATA)
                 DATA = DATA.dropna()
             except Exception as ex:
                 st.error(f'Error: {ex}')
@@ -384,56 +421,52 @@ def app():
 # +                                          VISUALISE THE DATA: RAW DATA                                            + #
 # -------------------------------------------------------------------------------------------------------------------- #
                     else:
-                        if DATA_COLUMN in DATA.columns:
-                            if VERBOSITY != 0:
-                                try:
-                                    if not DATA.empty:
-                                        st.markdown('## DataFrame Output')
-                                        st.dataframe(DATA.head(VERBOSITY), height=400, width=800)
-
-                                        if ADVANCED_ANALYSIS:
-                                            with st.expander('Advanced Profile Report'):
-                                                st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                                    explorative=True,
-                                                    minimal=True))
-                                except RuntimeError:
-                                    st.warning(
-                                        'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                    st.dataframe(DATA.head(10), height=400, width=800)
-
-                                    if ADVANCED_ANALYSIS:
-                                        with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                                explorative=True,
-                                                minimal=True))
-                                except KeyError:
-                                    st.error('Warning: Your data was not processed properly. Try again.')
-
-                            else:
-                                try:
+                        if VERBOSITY != 0:
+                            try:
+                                if not DATA.empty:
                                     st.markdown('## DataFrame Output')
-                                    st.dataframe(DATA, height=400, width=800)
+                                    st.dataframe(DATA.head(VERBOSITY), height=400, width=800)
 
                                     if ADVANCED_ANALYSIS:
                                         with st.expander('Advanced Profile Report'):
                                             st_profile_report(DATA[[DATA_COLUMN]].profile_report(
                                                 explorative=True,
                                                 minimal=True))
-                                except RuntimeError:
-                                    st.warning(
-                                        'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                    st.dataframe(DATA.head(10), height=400, width=800)
+                            except RuntimeError:
+                                st.warning(
+                                    'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                                st.dataframe(DATA.head(10), height=400, width=800)
 
-                                    if ADVANCED_ANALYSIS:
-                                        with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                                explorative=True,
-                                                minimal=True))
-                                except KeyError:
-                                    st.error('Warning: Your data was not processed properly. Try again.')
+                                if ADVANCED_ANALYSIS:
+                                    with st.expander('Advanced Profile Report'):
+                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
+                                            explorative=True,
+                                            minimal=True))
+                            except KeyError:
+                                st.error('Warning: Your data was not processed properly. Try again.')
+
                         else:
-                            st.error('Error: KeyError -> CONTENT column is missing data. Check your data source to '
-                                     'ensure that CONTENT is the column header and that there is data in the column.')
+                            try:
+                                st.markdown('## DataFrame Output')
+                                st.dataframe(DATA, height=400, width=800)
+
+                                if ADVANCED_ANALYSIS:
+                                    with st.expander('Advanced Profile Report'):
+                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
+                                            explorative=True,
+                                            minimal=True))
+                            except RuntimeError:
+                                st.warning(
+                                    'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                                st.dataframe(DATA.head(10), height=400, width=800)
+
+                                if ADVANCED_ANALYSIS:
+                                    with st.expander('Advanced Profile Report'):
+                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
+                                            explorative=True,
+                                            minimal=True))
+                            except KeyError:
+                                st.error('Warning: Your data was not processed properly. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                   SAVE THE DATA                                                  + #

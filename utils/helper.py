@@ -9,6 +9,7 @@ import streamlit as st
 import nltk
 import spacy
 import gensim
+import os
 
 from nltk.corpus import stopwords
 from gensim.utils import simple_preprocess
@@ -155,3 +156,40 @@ def stopwordRemover(text):
     stop_words = stopwords.words('english')
     return [[word for word in simple_preprocess(str(doc))
              if word not in stop_words] for doc in text]
+
+
+def modelIterator(model, vectoriser, top_n=10):
+    for id_, topic in enumerate(model.components_):
+        st.markdown(f'**Topic {id_}**:\n\n'
+                    f'{[(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n -1:-1]]}')
+
+
+def downloadCorpora(model: str):
+    """
+    This function allows users to quickly and iteratively download corpora for nltk processing
+
+    Parameter
+    ----------
+    models:          A list of names of models the user is trying to download
+    ----------
+    """
+    usr_dir = os.path.expanduser(os.getcwd())
+    test_dirs = []
+    if not isinstance(model, str):
+        st.error('Error: Parameter passed in is not of type "str".')
+    else:
+        new_path = os.path.join(usr_dir, f'nltk_data/corpora/{model}')
+
+        if os.path.exists(new_path):
+            if not os.listdir(new_path):
+                try:
+                    nltk.download(model)
+                except Exception as ex:
+                    st.error(f'Error: {ex}')
+            else:
+                st.info('Corpora downloaded')
+        else:
+            try:
+                nltk.download(model)
+            except Exception as ex:
+                st.error(f'Error: {ex}')

@@ -1,6 +1,6 @@
 # CUSTOM PAGE IMPORTS
 from pyfiles.multipage import MultiPage
-from pyfiles.pages import load_clean_visualise, document_term_matrix, toolkit_nlp, toolkit_discriminator
+from pyfiles.pages import load_clean_visualise, document_term_matrix, toolkit_nlp
 
 # INSTANTIATE THE APP
 app = MultiPage()

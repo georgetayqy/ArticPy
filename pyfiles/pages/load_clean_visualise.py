@@ -194,63 +194,51 @@ def app():
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
-            if st.button('Read File', key='az'):
-                if azure.SUCCESSFUL:
-                    try:
-                        azure.downloadBlob()
-                        DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                        if not DATA.empty:
-                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                            st.info('File Read!')
-                    except AttributeError:
-                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
-                else:
-                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+            if azure.SUCCESSFUL:
+                try:
+                    azure.downloadBlob()
+                    DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
+                    if not DATA.empty:
+                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                        st.info('File Read!')
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
-            if st.button('Read File', key='aws'):
-                if aws.SUCCESSFUL:
-                    try:
-                        aws.downloadFile()
-                        DATA = readFile(aws.AWS_FILE_NAME, MODE)
-                        if not DATA.empty:
-                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                            st.info('File Read!')
-                    except AttributeError:
-                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
-                else:
-                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+            if aws.SUCCESSFUL:
+                try:
+                    aws.downloadFile()
+                    DATA = readFile(aws.AWS_FILE_NAME, MODE)
+                    if not DATA.empty:
+                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                        st.info('File Read!')
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
-            if st.button('Read File', key='gcs'):
-                if gcs.SUCCESSFUL:
-                    try:
-                        gcs.downloadBlob()
-                        DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                        if not DATA.empty:
-                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                            st.info('File Read!')
-                    except AttributeError:
-                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
-                else:
-                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+            if gcs.SUCCESSFUL:
+                try:
+                    gcs.downloadBlob()
+                    DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
+                    if not DATA.empty:
+                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                        st.info('File Read!')
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
 
         elif CSP == 'Google Drive':
             gd = csp_downloaders.GoogleDriveDownloader()
-            if st.button('Read File', key='gd'):
-                if gd.SUCCESSFUL:
-                    try:
-                        gd.downloadBlob()
-                        DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
-                        if not DATA.empty:
-                            DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                            st.info('File Read!')
-                    except AttributeError:
-                        st.error(f'Error: {AttributeError}, one or more parameters are not loaded properly. Try again.')
-                else:
-                    st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
+            if gd.SUCCESSFUL:
+                try:
+                    gd.downloadBlob()
+                    DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
+                    if not DATA.empty:
+                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                        st.info('File Read!')
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                           DATA LOADING AND PROCESSING                                            | #

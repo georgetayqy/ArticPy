@@ -159,9 +159,15 @@ def stopwordRemover(text):
 
 
 def modelIterator(model, vectoriser, top_n=10):
+    id_list = []
+    feature_list = []
+
     for id_, topic in enumerate(model.components_):
         st.markdown(f'**Topic {id_}**:\n\n'
-                    f'{[(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n -1:-1]]}')
+                    f'{[(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]}')
+        id_list.append(id_)
+        feature_list.append([(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]])
+    return list(zip(id_list, feature_list))
 
 
 def downloadCorpora(model: str):

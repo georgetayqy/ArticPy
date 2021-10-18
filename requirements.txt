@@ -21,3 +21,5 @@ wordcloud==1.8.1
 textblob==0.15.3
 openpyxl==3.0.9
 scikit-learn==0.24.2
+chart-studio==1.1.0
+kaleido==0.2.1

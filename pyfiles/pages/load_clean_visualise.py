@@ -53,13 +53,6 @@ VERBOSE = False
 VERBOSITY = False
 CLEANED_DATA = pd.DataFrame()
 CLEANED_DATA_TOKENIZED = pd.DataFrame()
-TF_IDF = False
-K_MEANS = False
-N_CLUSTER = 2
-PCA = False
-TF_IDF_DATA = pd.DataFrame()
-K_MEANS_DATA = pd.DataFrame()
-PCA_DATA = pd.DataFrame()
 ADVANCED_ANALYSIS = False
 SIMPLE_PIPELINE = [
     preprocessing.remove_html_tags,
@@ -97,8 +90,7 @@ def app():
 # |                                               GLOBAL VARIABLES                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
-        CLEANED_DATA_TOKENIZED, TF_IDF, K_MEANS, N_CLUSTER, PCA, SIMPLE_PIPELINE, TF_IDF_DATA, \
-        K_MEANS_DATA, PCA_DATA, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY
+        CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -153,28 +145,7 @@ def app():
                     'sentence structures and context is retained, while any wrongly encoded characters will be '
                     'removed), a complex cleaning (a process to lemmatize words and remove stopwords) and '
                     'advanced cleaning (advanced NLP techniques will be used to process the data).')
-        CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex', 'Advanced'))
-        if CLEAN_MODE == 'Advanced':
-            st.markdown('### Advanced Processing\n'
-                        'The following section details advanced text analysis methods such as Term Frequency-Inverse '
-                        'Document Frequency and K-means Analysis. You are warned that your system must be configured '
-                        'in a way to allow TextHero to use a significant amount of disk space as a paging file or it '
-                        'may run into MemoryError exceptions, which occurs due to the system not being able to '
-                        'allocate sufficient memory to process the data. However, this is largely dependent on the '
-                        'size of the dataset you want to process. From our experience, a dataset containing 100k '
-                        'news articles required a paging file size of around 400 GiB, though it may differ from your '
-                        'use case. If your data requires large amounts of memory, we strongly recommend using a Spot '
-                        'Virtual Machine on any CSP and running the app there for a faster processing time and '
-                        'minimal system modifications on your own personal device.')
-            TF_IDF = st.checkbox('Term Frequency-Inverse Document Frequency')
-            K_MEANS = st.checkbox('K-means Analysis')
-            if K_MEANS:
-                N_CLUSTER = st.number_input('Maximum Neighbours for K-means Analysis',
-                                            min_value=1,
-                                            max_value=100,
-                                            value=2)
-                if TF_IDF:
-                    PCA = st.checkbox('PCA Analysis')
+        CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -272,7 +243,7 @@ def app():
                             CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], SIMPLE_PIPELINE)
                             CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             CLEANED_DATA.dropna(inplace=True, subset=['CLEANED CONTENT'])
-                            CLEANED_DATA = CLEANED_DATA.astype(str)
+                            CLEANED_DATA = CLEANED_DATA.astype(str).to_frame()
                         except Exception as ex:
                             st.error(ex)
 
@@ -302,36 +273,15 @@ def app():
 
                             # FINAL TOKENIZATION THE DATA
                             CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
-                            CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.astype(str)
+                            CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
 
-                            # ADVANCED PREPROCESSING
-                            if CLEAN_MODE == 'Advanced':
-                                # TERM-FREQUENCY-INVERSE-DOCUMENT
-                                if TF_IDF:
-                                    CLEANED_DATA['TF-IDF'] = (
-                                        CLEANED_DATA['CLEANED CONTENT'].pipe(hero.tfidf))
-                                    TF_IDF_DATA = CLEANED_DATA[['TF-IDF']]
-                                # K-MEANS ANALYSIS
-                                if K_MEANS:
-                                    CLEANED_DATA['K-MEANS'] = (
-                                        CLEANED_DATA['CLEANED CONTENT'].pipe(hero.representation.kmeans,
-                                                                             n_cluster=N_CLUSTER))
-                                    K_MEANS_DATA = CLEANED_DATA[['K-MEANS']]
-                                if TF_IDF and K_MEANS:
-                                    # PCA ANALYSIS
-                                    if PCA:
-                                        CLEANED_DATA['PCA'] = (CLEANED_DATA['TF-IDF'].pipe(hero.pca))
-                                    PCA_DATA = CLEANED_DATA[['PCA']]
                         except Exception as ex:
                             st.error(ex)
 
                 FINALISED_DATA_LIST = [
                     (DATA, 'Raw Data', 'raw_ascii_data.csv'),
                     (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv'),
-                    (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv'),
-                    (TF_IDF_DATA, 'TF-IDF', 'tf_idf.csv'),
-                    (K_MEANS_DATA, 'K-Means Data', 'k_means.csv'),
-                    (PCA_DATA, 'PCA Data', 'pca.csv')
+                    (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv')
                 ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -401,10 +351,6 @@ def app():
                                      'source to ensure that CONTENT is the column header and that there is data '
                                      'in the column.')
 
-                        if TF_IDF and K_MEANS and PCA:
-                            st.markdown('## TF-IDF, K-means and PCA Visualisation')
-                            st.write(hero.scatterplot(CLEANED_DATA, 'PCA', color='K-MEANS', title='K-means'))
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                          VISUALISE THE DATA: RAW DATA                                            + #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -467,7 +413,7 @@ def app():
                                 st.markdown(f'### {data[1]}\n'
                                             f'Download data from [downloads/{data[2]}]'
                                             f'(downloads/{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'))
+                                data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
                     except KeyError:
                         st.error('Warning: Your data was not processed properly. Try again.')
                     except Exception as ex:

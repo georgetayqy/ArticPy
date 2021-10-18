@@ -18,6 +18,7 @@ import streamlit as st
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 import pandas_profiling
+import kaleido
 
 from streamlit_pandas_profiling import st_profile_report
 from utils import csp_downloaders
@@ -31,7 +32,7 @@ DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
 DTM = pd.DataFrame()
 pd.options.plotting.backend = 'plotly'
 SIZE = 'Small File(s)'
-DATA = None
+DATA = pd.DataFrame()
 DATA_PATH = None
 ANALYSIS = False
 VERBOSE_DTM = False
@@ -47,6 +48,7 @@ CSP = None
 ADVANCED_ANALYSIS = False
 FINALISED_DATA_LIST = []
 DATA_COLUMN = None
+TOP_N_WORD_FIG = None
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -62,7 +64,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, GRANULARITY, SAVE, SIZE, MODE, \
         STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy_, CSP, ADVANCED_ANALYSIS, \
-        FINALISED_DATA_LIST, DATA_COLUMN
+        FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                     INIT                                                         | #
@@ -81,7 +83,7 @@ def app():
     SIZE = st.selectbox('Define the size of the file to pass into function', ('Select File Size',
                                                                               'Small File(s)',
                                                                               'Large File(s)'))
-    MODE = st.selectbox('Define the data input format', ('CSV', 'XLSX'))
+    MODE = st.selectbox('Define the data input format', ('CSV', ' XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                SMALL FILES                                                       | #
@@ -205,7 +207,8 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Analysis Operation')
+    st.markdown('## Analysis Operation\n'
+                'Begin creation of DTM')
     if st.button('Proceed', key='doc'):
         if not DATA.empty:
             with st.spinner('Working to create a Document-Term Matrix...'):
@@ -214,8 +217,8 @@ def app():
 
                 # CREATE STRING CONTAINING THE BAG OF WORDS
                 word_list = []
-                for index, row in DATA[DATA_COLUMN].iteritems():
-                    word_list.append(str(row))
+                for index, row in DATA.iterrows():
+                    word_list.append(str(row[DATA_COLUMN]))
                 word_string = ' '.join(word_list)
 
                 # CREATE A NEW DF TO PARSE
@@ -256,7 +259,9 @@ def app():
                                 else:
                                     if ADVANCED_ANALYSIS:
                                         with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DTM_copy.profile_report(
+                                            st.markdown('Note that this analysis is done on a version of the DTM '
+                                                        'whereby there are more rows than columns (transposed)')
+                                            st_profile_report(DTM_copy.transpose().profile_report(
                                                 explorative=True,
                                                 minimal=True
                                             ))
@@ -272,7 +277,7 @@ def app():
                                 else:
                                     if ADVANCED_ANALYSIS:
                                         with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DTM_copy.profile_report(
+                                            st_profile_report(DTM_copy.transpose().profile_report(
                                                 explorative=True,
                                                 minimal=True
                                             ))
@@ -293,21 +298,14 @@ def app():
                                              height=400,
                                              width=800)
                             else:
-                                fig = DTM_copy_.head(N).plot.line(title=f'Frequency of top {N} words used',
-                                                                  labels=dict(index='Words',
-                                                                              value='Frequency',
-                                                                              variable='Count'),
-                                                                  width=900,
-                                                                  height=500)
-                                st.plotly_chart(fig, use_container_width=True)
+                                TOP_N_WORD_FIG = DTM_copy_.head(N).plot.line(title=f'Frequency of top {N} words used',
+                                                                             labels=dict(index='Words',
+                                                                                         value='Frequency',
+                                                                                         variable='Count'),
+                                                                             width=900,
+                                                                             height=500)
+                                st.plotly_chart(TOP_N_WORD_FIG, use_container_width=True)
 
-                                with st.expander("See Further Elaboration"):
-                                    describer = DTM_copy_.describe()
-                                    st.write('### Summary of Total Statistics\n\n'
-                                             f'**Total number of unique words**: {describer[0]["count"]}\n\n'
-                                             f'**Average Frequency of Word Use**: {describer[0]["mean"]}\n\n'
-                                             f'**Standard Deviation of Word Use Frequency**: {describer[0]["std"]}\n\n'
-                                             )
                                 if ADVANCED_ANALYSIS:
                                     with st.expander('Advanced Profile Report'):
                                         st_profile_report(DTM_copy_.profile_report(
@@ -316,8 +314,9 @@ def app():
                                         ))
 
                     FINALISED_DATA_LIST = [
-                        (DTM, 'DTM', 'dtm.csv'),
-                        (DTM_copy_, 'Sorted DTM', 'sorted_dtm.csv')
+                        (DTM, 'DTM', 'dtm.csv', 'csv'),
+                        (DTM_copy_, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
+                        (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
                     ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -326,13 +325,18 @@ def app():
                     if SAVE:
                         st.markdown('## Download Data')
                         for data in FINALISED_DATA_LIST:
-                            if not data[0].empty:
-                                st.markdown(f'### {data[1]}')
-                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/{data[2]})')
-                                if VERBOSE_DTM:
+                            if data[3] == 'csv':
+                                if not data[0].empty:
+                                    st.markdown(f'### {data[1]}')
+                                    st.markdown(f'Download requested data from [downloads/{data[2]}]'
+                                                f'(downloads/{data[2]})')
                                     data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
-                                elif VERBOSE_ANALYSIS:
-                                    data[0].to_csv(str(DOWNLOAD_PATH / data[2]))
+                            elif data[3] == 'png':
+                                if data[0]:
+                                    st.markdown(f'### {data[1]}')
+                                    st.markdown(f'Download requested data from [downloads/{data[2]}]'
+                                                f'(downloads/{data[2]})')
+                                    data[0].write_image(str(DOWNLOAD_PATH / data[2]))
+
         else:
             st.error('Error: No files are loaded.')

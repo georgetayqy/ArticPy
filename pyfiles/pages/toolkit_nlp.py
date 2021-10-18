@@ -60,6 +60,7 @@ NUM_TOPICS = 10
 TOPIC_LDA = pd.DataFrame()
 TOPIC_LDA_STR = pd.DataFrame()
 LDA_DATA = pd.DataFrame()
+GENSIM_STR = None
 LDA_VIS = None
 LDA_MODEL = None
 TFIDF_MODEL = None
@@ -71,6 +72,8 @@ LSI_DATA = None
 NMF_VIS = None
 MAR_FIG = None
 WORD_FIG = None
+LDA_VIS_STR = None
+NMF_VIS_STR = None
 DOCUMENT_ID = 0  # NOTE THAT DOCUMENT_ID IS ZERO-INDEXED IN THIS CASE, BUT IT CORRESPONDS TO 1 ON THE DATASET
 MODEL = None
 FINALISED_DATA_LIST = []
@@ -89,6 +92,7 @@ CV = None
 VECTORISED = None
 MIN_TOKEN_FREQ = 3
 COLOUR = None
+TOPIC_TEXT = []
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -106,7 +110,8 @@ def app():
         CONTOUR_WIDTH, DATA, SENT_LEN, NUM_TOPICS, LDA_MODEL, MODEL, DOCUMENT_ID, TOPIC_LDA, TOPIC_LDA_STR, \
         FINALISED_DATA_LIST, LDA_DATA, LDA_VIS, ADVANCED_ANALYSIS, NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, \
         DATAPOINT_SELECTOR, PIPELINE, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, NMF_MODEL, NMF_DATA, LSI_MODEL, \
-        LSI_DATA, TFIDF_MODEL, TFIDF_VECTORISED, NMF_VIS, MAR_FIG, WORD_FIG, CV, VECTORISED, MIN_TOKEN_FREQ, COLOUR
+        LSI_DATA, TFIDF_MODEL, TFIDF_VECTORISED, NMF_VIS, MAR_FIG, WORD_FIG, CV, VECTORISED, MIN_TOKEN_FREQ, COLOUR, \
+        TOPIC_TEXT, LDA_VIS_STR, NMF_VIS_STR, GENSIM_STR
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -777,11 +782,6 @@ def app():
                                            step=1,
                                            value=10)
             elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
-                MIN_DF = st.number_input('Choose minimum (cardinal) frequency of words to consider',
-                                         min_value=1,
-                                         max_value=100,
-                                         step=1,
-                                         value=5)
                 MAX_ITER = st.number_input('Choose number of iterations of model training',
                                            min_value=1,
                                            max_value=100,
@@ -836,6 +836,11 @@ def app():
                         (LDA_VIS, 'Model Visualisation', 'model_images.html', 'html')
                     ]
 
+                    if VERBOSE:
+                        st.markdown('## LDA')
+                        GENSIM_STR = pyLDAvis.prepared_data_to_html(LDA_VIS)
+                        streamlit.components.v1.html(GENSIM_STR, width=1300, height=800)
+
                     # SAVE DATA
                     if SAVE:
                         st.markdown('## Download Data')
@@ -874,7 +879,23 @@ def app():
                         LDA_DATA = LDA_MODEL.fit_transform(VECTORISED)
 
                         st.markdown('## Model Data')
-                        modelIterator(LDA_MODEL, CV)
+                        TOPIC_TEXT = modelIterator(LDA_MODEL, CV)
+
+                        try:
+                            # CONVERT OUTPUT TO DF
+                            temp_id = []
+                            temp_topic = []
+                            for topic in TOPIC_TEXT:
+                                temp_id.append(topic[0])
+                                temp_topic.append(topic[1])
+                            temp_dict = {
+                                'ID': temp_id,
+                                'Topics': temp_topic
+                            }
+                        except Exception as ex:
+                            st.error(f'Error: {ex}')
+                        else:
+                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
 
                         # GET MOST DOMINANT TOPIC FOR ALL SENTENCES
                         DATA['DOMINANT TOPIC'] = DATA[DATA_COLUMN].apply(lambda x:
@@ -882,43 +903,56 @@ def app():
 
                         # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
                         LDA_VIS = pyLDAvis.sklearn.prepare(LDA_MODEL, VECTORISED, CV, mds='tsne')
-                        LDA_VIS = pyLDAvis.prepared_data_to_html(LDA_VIS)
                         if VERBOSE:
                             st.markdown('## LDA\n'
                                         f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
                                         f'from all the text provided in your dataset.')
-                            streamlit.components.v1.html(LDA_VIS, width=1300, height=800)
+                            LDA_VIS_STR = pyLDAvis.prepared_data_to_html(LDA_VIS)
+                            streamlit.components.v1.html(LDA_VIS_STR, width=1300, height=800)
 
                         if SAVE:
                             st.markdown('## Save Data')
+                            st.markdown('Download Topic List from [downloads/lda_topics.csv](downloads/lda_topics.csv)')
+                            TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'lda_topics.csv'), index=False)
                             st.markdown('Download HTML File from [downloads/lda.html](downloads/lda.html)')
                             pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / 'lda.html'))
 
-                    #TODO: Produces ValidationError: * Not all rows (distributions) in doc_topic_dists sum to 1.
                     elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
-                        TFIDF_MODEL = TfidfVectorizer(stop_words='english',
-                                                      lowercase=True,
-                                                      strip_accents='unicode',
-                                                      use_idf=True,
-                                                      norm='l2',
-                                                      min_df=MIN_DF)
-                        TFIDF_VECTORISED = TFIDF_MODEL.fit_transform(DATA[DATA_COLUMN])
-                        NMF_MODEL = NMF(init='random',
-                                        n_components=NUM_TOPICS,
-                                        max_iter=MAX_ITER,
-                                        random_state=0)
-                        NMF_DATA = NMF_MODEL.fit(TFIDF_VECTORISED)
-                        NMF_VIS = pyLDAvis.sklearn.prepare(NMF_MODEL, TFIDF_VECTORISED, TFIDF_MODEL)
-                        NMF_VIS = pyLDAvis.prepared_data_to_html(NMF_VIS)
+                        NMF_MODEL = NMF(n_components=NUM_TOPICS,
+                                        max_iter=MAX_ITER)
+                        NMF_DATA = NMF_MODEL.fit_transform(VECTORISED)
 
+                        st.markdown('## Model Data')
+                        TOPIC_TEXT = modelIterator(NMF_MODEL, CV)
+
+                        try:
+                            # CONVERT OUTPUT TO DF
+                            temp_id = []
+                            temp_topic = []
+                            for topic in TOPIC_TEXT:
+                                temp_id.append(topic[0])
+                                temp_topic.append(topic[1])
+                            temp_dict = {
+                                'ID': temp_id,
+                                'Topics': temp_topic
+                            }
+                        except Exception as ex:
+                            st.error(f'Error: {ex}')
+                        else:
+                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
+
+                        NMF_VIS = pyLDAvis.sklearn.prepare(NMF_MODEL, VECTORISED, CV, mds='tsne')
                         if VERBOSE:
                             # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
                             st.markdown('## NMF/TFIDF\n'
                                         f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
                                         f'from all the text provided in your dataset.')
-                            streamlit.components.v1.html(NMF_VIS, width=1300, height=800)
+                            NMF_VIS_STR = pyLDAvis.prepared_data_to_html(NMF_VIS)
+                            streamlit.components.v1.html(NMF_VIS_STR, width=1300, height=800)
 
                         if SAVE:
+                            st.markdown('Download Topic List from [downloads/nmf_topics.csv](downloads/nmf_topics.csv)')
+                            TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'nmf_topics.csv'), index=False)
                             st.markdown('Download HTML File from [downloads/nmf.html](downloads/nmf.html)')
                             pyLDAvis.save_html(NMF_VIS, str(DOWNLOAD_PATH / 'nmf.html'))
 
@@ -927,7 +961,23 @@ def app():
                         LSI_DATA = LSI_MODEL.fit_transform(VECTORISED)
 
                         st.markdown('## Model Data')
-                        modelIterator(LSI_MODEL, CV)
+                        TOPIC_TEXT = modelIterator(LSI_MODEL, CV)
+
+                        try:
+                            # CONVERT OUTPUT TO DF
+                            temp_id = []
+                            temp_topic = []
+                            for topic in TOPIC_TEXT:
+                                temp_id.append(topic[0])
+                                temp_topic.append(topic[1])
+                            temp_dict = {
+                                'ID': temp_id,
+                                'Topics': temp_topic
+                            }
+                        except Exception as ex:
+                            st.error(f'Error: {ex}')
+                        else:
+                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
 
                         if VERBOSE:
                             st.markdown('## LSI(SVD) Scatterplot\n'
@@ -977,6 +1027,9 @@ def app():
 
                             if SAVE:
                                 st.markdown('## Save Data')
+                                st.markdown(
+                                    'Download Topic List from [downloads/lda_topics.csv](downloads/lda_topics.csv)')
+                                TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'lsi_topics.csv'), index=False)
                                 st.markdown('Download PNG File from [downloads/marker_figure.png]'
                                             '(downloads/marker_figure.png)')
                                 MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))

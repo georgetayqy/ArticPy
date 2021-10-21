@@ -9,12 +9,12 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 # -------------------------------------------------------------------------------------------------------------------- #
 import os
 import pathlib
-
 import numpy as np
 import pandas as pd
 import spacy
 import streamlit as st
 import plotly.graph_objs as go
+import plotly.figure_factory as ff
 import plotly.express as px
 import nltk
 import kaleido
@@ -27,7 +27,7 @@ import pyLDAvis.sklearn
 import streamlit.components.v1
 
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from streamlit_pandas_profiling import st_profile_report
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from spacy.lang.en.stop_words import STOP_WORDS
@@ -55,6 +55,8 @@ APP_MODE = 'Wordcloud'
 BACKEND_ANALYSER = 'VADER'
 MAX_WORDS = 200
 CONTOUR_WIDTH = 3
+HEIGHT = 400
+WIDTH = 800
 SENT_LEN = 3
 NUM_TOPICS = 10
 TOPIC_LDA = pd.DataFrame()
@@ -93,6 +95,8 @@ VECTORISED = None
 MIN_TOKEN_FREQ = 3
 COLOUR = None
 TOPIC_TEXT = []
+SVG = None
+HAC_PLOT = None
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -111,7 +115,7 @@ def app():
         FINALISED_DATA_LIST, LDA_DATA, LDA_VIS, ADVANCED_ANALYSIS, NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, \
         DATAPOINT_SELECTOR, PIPELINE, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, NMF_MODEL, NMF_DATA, LSI_MODEL, \
         LSI_DATA, TFIDF_MODEL, TFIDF_VECTORISED, NMF_VIS, MAR_FIG, WORD_FIG, CV, VECTORISED, MIN_TOKEN_FREQ, COLOUR, \
-        TOPIC_TEXT, LDA_VIS_STR, NMF_VIS_STR, GENSIM_STR
+        TOPIC_TEXT, LDA_VIS_STR, NMF_VIS_STR, GENSIM_STR, WIDTH, HEIGHT, SVG, HAC_PLOT
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -233,23 +237,29 @@ def app():
                                     min_value=2,
                                     max_value=1000,
                                     value=200)
-        CONTOUR_WIDTH = st.number_input('Key in the contour width of your wordcloud',
+        CONTOUR_WIDTH = st.number_input('Key in the contour width of your WordCloud',
                                         min_value=1,
                                         max_value=10,
                                         value=3)
+        WIDTH = st.number_input('Key in the Width of the WordCloud image generated',
+                                min_value=1,
+                                max_value=100000,
+                                value=800)
+        HEIGHT = st.number_input('Key in the Width of the WordCloud image generated',
+                                 min_value=1,
+                                 max_value=100000,
+                                 value=400)
 
         # MAIN DATA PROCESSING
         if st.button('Generate Word Cloud', key='wc'):
             DATA = DATA[[DATA_COLUMN]]
-            temp_list = DATA[DATA_COLUMN].tolist()
-
-            temp_text = ' '
-            for i in range(len(temp_list)):
-                temp_text = str(temp_list[i]) + temp_text
+            temp_text = ' '.join(DATA[DATA_COLUMN])
 
             wc = WordCloud(background_color='white',
                            max_words=MAX_WORDS,
                            contour_width=CONTOUR_WIDTH,
+                           width=WIDTH,
+                           height=HEIGHT,
                            contour_color='steelblue')
             wc.generate(temp_text)
 
@@ -267,32 +277,50 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Named Entity Recognition':
         st.markdown('# Named Entity Recognition')
+        st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
+                    'large chunks of text, prepare to wait for hours for the NER Tagging process to finish. We are '
+                    'looking to implement multiprocessing into the app to optimise it.\n\n'
+                    'In the meantime, it may be better to process your data in smaller batches to speed up your '
+                    'workflow.')
 
         # FLAGS
         st.markdown('## Flags')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
                     'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
                     'one point. However, you will still be able to download a text/html file containing '
-                    'the outputs for you to save onto your disks.')
-        st.markdown('### NLP Models')
-        st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
+                    'the outputs for you to save onto your disks.\n'
+                    '### NLP Models\n'
+                    'Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
                     'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
         NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'))
         if NLP_MODEL == 'en_core_web_sm':
             try:
-                os.system('python -m spacy download en_core_web_sm')
+                NLP = spacy.load('en_core_web_sm')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_sm')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Efficiency Model Downloaded!')
+                st.info('Efficiency Model Loaded!')
         elif NLP_MODEL == 'en_core_web_lg':
             try:
-                os.system('python -m spacy download en_core_web_lg')
+                NLP = spacy.load('en_core_web_lg')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_lg')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Accuracy Model Downloaded!')
+                st.info('Accuracy Model Loaded!')
         VERBOSE = st.checkbox('Display DataFrames?')
+        SAVE = st.checkbox('Save Data?')
         if VERBOSE:
             VERBOSITY = st.slider('Choose Number of Data Points to Display (Select 0 to display all Data Points)',
                                   min_value=0,
@@ -302,43 +330,44 @@ def app():
         ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
         if ONE_DATAPOINT:
             DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
-            SAVE = st.checkbox('Analyse Entire Dataset and Save NER Output?')
         else:
-            SAVE = True
-            QUERY = st.checkbox('Conduct Query for Explanation for the Labels for Text?')
-            if QUERY:
-                DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
             st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
                     'automatically saved.')
 
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
-            # CLEAN UP AND STANDARDISE DATAFRAMES
-            DATA = DATA[[DATA_COLUMN]]
-            DATA = DATA.astype(str)
-
             if not DATA.empty:
-                if NLP_MODEL == 'en_core_web_sm':
-                    NLP = spacy.load('en_core_web_sm')
-                elif NLP_MODEL == 'en_core_web_lg':
-                    NLP = spacy.load('en_core_web_lg')
+                # CLEAN UP AND STANDARDISE DATAFRAMES
+                DATA = DATA[[DATA_COLUMN]]
 
-                for index, row in DATA.iterrows():
-                    temp_word_list = []
-                    temp_word_label = []
-                    temp_nlp = NLP(row[DATA_COLUMN])
-                    for word in temp_nlp.ents:
-                        temp_word_list.append(word.text)
-                        temp_word_label.append(word.label_)
-                    DATA.at[index, 'NER'] = list(zip(temp_word_list, temp_word_label))
-                    DATA.at[index, 'COMPILED_LABELS'] = set(temp_word_label)
+                if not DATA.empty:
+                    DATA['NER'] = ''
+                    DATA['COMPILED_LABELS'] = ''
+                    DATA = DATA.astype('str')
 
-                if VERBOSE:
-                    if VERBOSITY != 0:
-                        try:
-                            if not DATA.empty:
+                    for index in range(len(DATA)):
+                        temp_nlp = NLP(DATA[DATA_COLUMN][index])
+                        DATA.at[index, 'NER'] = str(list(zip([word.text for word in temp_nlp.ents],
+                                                    [word.label_ for word in temp_nlp.ents])))
+                        DATA.at[index, 'COMPILED_LABELS'] = str(list(set([word.label_ for word in temp_nlp.ents])))
+
+                    if VERBOSE:
+                        if VERBOSITY != 0:
+                            try:
+                                if not DATA.empty:
+                                    st.markdown('## DataFrame')
+                                    st.dataframe(DATA.head(VERBOSITY), height=400, width=800)
+
+                                    if ADVANCED_ANALYSIS:
+                                        with st.expander('Advanced Profile Report'):
+                                            st_profile_report(DATA.profile_report(
+                                                explorative=True,
+                                                minimal=True
+                                            ))
+                            except RuntimeError:
+                                st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
                                 st.markdown('## DataFrame')
-                                st.dataframe(DATA.head(VERBOSITY), height=400, width=800)
+                                st.dataframe(DATA.head(10), height=400, width=800)
 
                                 if ADVANCED_ANALYSIS:
                                     with st.expander('Advanced Profile Report'):
@@ -346,25 +375,25 @@ def app():
                                             explorative=True,
                                             minimal=True
                                         ))
-                        except RuntimeError:
-                            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                            st.markdown('## DataFrame')
-                            st.dataframe(DATA.head(10), height=400, width=800)
+                            except KeyError:
+                                st.error('Warning: Your data was not processed properly. Try again.')
 
-                            if ADVANCED_ANALYSIS:
-                                with st.expander('Advanced Profile Report'):
-                                    st_profile_report(DATA.profile_report(
-                                        explorative=True,
-                                        minimal=True
-                                    ))
-                        except KeyError:
-                            st.error('Warning: Your data was not processed properly. Try again.')
+                        else:
+                            try:
+                                if not DATA.empty:
+                                    st.markdown('## DataFrame')
+                                    st.dataframe(DATA, height=400, width=800)
 
-                    else:
-                        try:
-                            if not DATA.empty:
+                                    if ADVANCED_ANALYSIS:
+                                        with st.expander('Advanced Profile Report'):
+                                            st_profile_report(DATA.profile_report(
+                                                explorative=True,
+                                                minimal=True
+                                            ))
+                            except RuntimeError:
+                                st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
                                 st.markdown('## DataFrame')
-                                st.dataframe(DATA, height=400, width=800)
+                                st.dataframe(DATA.head(10), height=400, width=800)
 
                                 if ADVANCED_ANALYSIS:
                                     with st.expander('Advanced Profile Report'):
@@ -372,70 +401,71 @@ def app():
                                             explorative=True,
                                             minimal=True
                                         ))
-                        except RuntimeError:
-                            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                            st.markdown('## DataFrame')
-                            st.dataframe(DATA.head(10), height=400, width=800)
+                            except KeyError:
+                                st.error('Warning: Your data was not processed properly. Try again.')
 
-                            if ADVANCED_ANALYSIS:
-                                with st.expander('Advanced Profile Report'):
-                                    st_profile_report(DATA.profile_report(
-                                        explorative=True,
-                                        minimal=True
-                                    ))
-                        except KeyError:
-                            st.error('Warning: Your data was not processed properly. Try again.')
-
-                if ONE_DATAPOINT:
-                    verbose_data_copy = DATA.copy()
-                    temp_df = verbose_data_copy.iloc[int(DATAPOINT_SELECTOR)]
-                    st.markdown('## DisplaCy Rendering')
-                    st.markdown(displacy.render(temp_df['PROCESSED_TEXT'], style="ent"), unsafe_allow_html=True)
-                    with st.expander('Get Explanation for Label'):
-                        choice = st.selectbox('Select Label to Explain', verbose_data_copy['COMPILED_LABELS'])
-                        st.info(str(spacy.explain(choice)))
+                    if ONE_DATAPOINT:
+                        verbose_data_copy = DATA.copy()
+                        temp_df = verbose_data_copy[DATA_COLUMN][DATAPOINT_SELECTOR]
+                        st.markdown('## DisplaCy Rendering')
+                        st.info('If rendering is not clean, choose to save files generated and download the rendering '
+                                'in HTML format.')
+                        SVG = displacy.render([sent for sent in NLP(str(temp_df)).sents],
+                                              style='ent',
+                                              page=True)
+                        st.markdown(SVG, unsafe_allow_html=True)
 
                     if SAVE:
                         st.markdown('## Download Data')
                         st.markdown('Download data from [downloads/ner.csv](downloads/ner.csv)')
-                        DATA.to_csv(str(DOWNLOAD_PATH / 'ner.csv'))
-                else:
-                    st.markdown('## Query and Explanation')
-                    data_copy = DATA.copy()
-                    temp_df = data_copy.iloc[DATAPOINT_SELECTOR]
-                    st.markdown(displacy.render(temp_df['PROCESSED_TEXT'], style="ent"), unsafe_allow_html=True)
-                    with st.expander('Get Explanation for Label'):
-                        choice = st.selectbox('Select Label to Explain', data_copy['COMPILED_LABELS'])
-                        st.info(str(spacy.explain(choice)))
-
-                    if SAVE:
-                        st.markdown('## Download Data')
-                        st.markdown('Download data from [downloads/ner.csv](downloads/ner.csv)')
-                        DATA.to_csv(str(DOWNLOAD_PATH / 'ner.csv'))
+                        DATA.to_csv(str(DOWNLOAD_PATH / 'ner.csv'), index=False)
+                        if ONE_DATAPOINT:
+                            st.markdown('Download data from [downloads/rendering.html](downloads/rendering.html)')
+                            with open(pathlib.Path(str(DOWNLOAD_PATH / 'rendering.html')), 'w', encoding='utf-8') as f:
+                                f.write(SVG)
+            else:
+                st.error('Error: Data not loaded properly. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             PART OF SPEECH TAGGING                                               | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'POS Tagging':
         st.markdown('# POS Tagging')
+        st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
+                    'large chunks of text, prepare to wait for hours for the POS tagging process to finish. We are '
+                    'looking to implement multiprocessing into the app to optimise it.\n\n'
+                    'In the meantime, it may be better to process your data in smaller batches to speed up your '
+                    'workflow.')
 
         # FLAGS
         st.markdown('## Flags')
         NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'))
         if NLP_MODEL == 'en_core_web_sm':
             try:
-                os.system('python -m spacy download en_core_web_sm')
+                NLP = spacy.load('en_core_web_sm')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_sm')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Efficiency Model Downloaded!')
+                st.info('Efficiency Model Loaded!')
         elif NLP_MODEL == 'en_core_web_lg':
             try:
-                os.system('python -m spacy download en_core_web_lg')
+                NLP = spacy.load('en_core_web_lg')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_lg')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Accuracy Model Downloaded!')
+                st.info('Accuracy Model Loaded!')
         VERBOSE = st.checkbox('Display DataFrames?')
         if VERBOSE:
             VERBOSITY = st.slider('Choose Number of Data Points to Display (Select 0 to display all Data Points)',
@@ -447,18 +477,13 @@ def app():
 
         if st.button('Start POS Tagging'):
             if not DATA.empty:
-                if NLP_MODEL == 'en_core_web_sm':
-                    NLP = spacy.load('en_core_web_sm')
-                elif NLP_MODEL == 'en_core_web_lg':
-                    NLP = spacy.load('en_core_web_lg')
+                DATA['POS'] = np.nan
+                DATA = DATA.astype(object)
 
-                for index, row in DATA.iterrows():
-                    temp_word_list = []
-                    temp_pos = []
-                    for i in NLP(row[DATA_COLUMN]):
-                        temp_word_list.append(i)
-                        temp_pos.append(i.pos_)
-                    DATA.at[index, 'POS'] = list(zip(temp_word_list, temp_pos))
+                for index in range(len(DATA)):
+                    temp_nlp = NLP(DATA[DATA_COLUMN][index])
+                    DATA.at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
+                                                      [word.pos_ for word in temp_nlp])))
 
                 if VERBOSE:
                     if VERBOSITY != 0:
@@ -516,31 +541,50 @@ def app():
                 if SAVE:
                     st.markdown('## Download Data')
                     st.markdown('Download data from [downloads/pos.csv](downloads/pos.csv)')
-                    DATA.to_csv(str(DOWNLOAD_PATH / 'pos.csv'))
+                    DATA.to_csv(str(DOWNLOAD_PATH / 'pos.csv'), index=False)
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 SUMMARIZATION                                                    | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Summarise':
         st.markdown('# Summarization of Text')
+        st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
+                    'large chunks of text, prepare to wait for hours for the summarization process to finish. We are '
+                    'looking to implement multiprocessing into the app to optimise it.\n\n'
+                    'In the meantime, it may be better to process your data in smaller batches to speed up your '
+                    'workflow.')
+
+        # FLAGS
         st.markdown('## Flags')
         st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
                     'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
         NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'))
         if NLP_MODEL == 'en_core_web_sm':
             try:
-                os.system('python -m spacy download en_core_web_sm')
+                NLP = spacy.load('en_core_web_sm')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_sm')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Efficiency Model Downloaded!')
+                st.info('Efficiency Model Loaded!')
         elif NLP_MODEL == 'en_core_web_lg':
             try:
-                os.system('python -m spacy download en_core_web_lg')
+                NLP = spacy.load('en_core_web_lg')
+            except OSError:
+                st.warning('Model not found, downloading...')
+                try:
+                    os.system('python -m spacy download en_core_web_lg')
+                except Exception as ex:
+                    st.error(f'Unable to download Model. Error: {ex}')
             except Exception as ex:
-                st.error(f'Error: {ex}')
+                st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Accuracy Model Downloaded!')
+                st.info('Accuracy Model Loaded!')
         SENT_LEN = st.number_input('Enter the total number of sentences to summarise text to',
                                    min_value=1,
                                    max_value=100,
@@ -568,10 +612,6 @@ def app():
             if not DATA.empty:
                 stopwords = list(STOP_WORDS)
                 pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
-                if NLP_MODEL == 'en_core_web_sm':
-                    NLP = spacy.load('en_core_web_sm')
-                elif NLP_MODEL == 'en_core_web_lg':
-                    NLP = spacy.load('en_core_web_lg')
 
                 try:
                     DATA['SUMMARY'] = DATA[DATA_COLUMN].apply(lambda x: summarise(x, stopwords, pos_tag, NLP, SENT_LEN))
@@ -617,10 +657,9 @@ def app():
                 st.markdown('## Download Summarised Data')
                 st.markdown('Download summarised data from [downloads/summarised.csv]'
                             '(downloads/summarised.csv)')
-                DATA.to_csv(str(DOWNLOAD_PATH / 'summarised.csv'))
+                DATA.to_csv(str(DOWNLOAD_PATH / 'summarised.csv'), index=False)
             else:
                 st.error('Warning: Data is processed wrongly. Try again.')
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -635,15 +674,21 @@ def app():
         SAVE = st.checkbox('Output to CSV file?')
         VERBOSE = st.checkbox('Print out the outputs to screen?')
         if VERBOSE:
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-        elif VERBOSE and BACKEND_ANALYSER == 'VADER':
             VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
+            COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
 
         # MAIN PROCESSING
         if st.button('Start Analysis', key='analysis'):
             if BACKEND_ANALYSER == 'VADER':
-                DATA['VADER SENTIMENT TEXT'] = DATA[DATA_COLUMN].str.lower().str.replace("'", ''). \
-                    str.replace(r'[^\w\s]', ' ').str.replace(r" \d+", " ").str.replace(' +', ' ').str.strip()
+                replacer = {
+                    r"'": '',
+                    r'[^\w\s]': ' ',
+                    r' \d+': ' ',
+                    r' +': ' '
+                }
+
+                DATA['VADER SENTIMENT TEXT'] = DATA[DATA_COLUMN].replace(to_replace=replacer, regex=True)
 
                 vader_analyser = SentimentIntensityAnalyzer()
                 sent_score_list = list()
@@ -666,13 +711,12 @@ def app():
                 DATA['VADER SCORE'] = sent_score_list
 
             elif BACKEND_ANALYSER == 'TextBlob':
-                # LAMBDA FUNCTION
-                polarity = lambda x: TextBlob(x).sentiment.polarity
-                subjectivity = lambda x: TextBlob(x).sentiment.subjectivity
-
-                # APPLY LAMBDAS ON THE DATAFRAME
-                DATA['POLARITY'] = DATA[DATA_COLUMN].apply(polarity)
-                DATA['SUBJECTIVITY'] = DATA[DATA_COLUMN].apply(subjectivity)
+                if not DATA.empty:
+                    # APPLY LAMBDAS ON THE DATAFRAME
+                    DATA['POLARITY'] = DATA[DATA_COLUMN].apply(lambda x: TextBlob(x).sentiment.polarity)
+                    DATA['SUBJECTIVITY'] = DATA[DATA_COLUMN].apply(lambda x: TextBlob(x).sentiment.subjectivity)
+                else:
+                    st.error('Error: Data file not loaded properly. Try again.')
 
             # SHOW DATA
             if VERBOSE:
@@ -686,6 +730,11 @@ def app():
                                 st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
                                 st.dataframe(DATA.head(10), height=600, width=800)
                             else:
+                                st.markdown('## Kernel Density Plot')
+                                HAC_PLOT = ff.create_distplot([DATA['VADER SCORE'].tolist()], ['VADER'],
+                                                              colors=[COLOUR], show_hist=False, show_rug=False)
+                                HAC_PLOT.update_layout(title_text='Histogram and Curve Plot')
+                                st.plotly_chart(HAC_PLOT)
                                 if ADVANCED_ANALYSIS:
                                     with st.expander('Advanced Profile Report'):
                                         st_profile_report(DATA.profile_report(
@@ -699,6 +748,12 @@ def app():
                                 st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
                                 st.dataframe(DATA.head(10), height=600, width=800)
                             else:
+                                st.markdown('## Kernel Density Plot')
+                                HAC_PLOT = ff.create_distplot([DATA['TextBlob'].tolist()], ['TextBlob'],
+                                                              colors=[COLOUR], show_hist=False, show_rug=False)
+                                HAC_PLOT.update_layout(title_text='Histogram and Curve Plot')
+                                st.plotly_chart(HAC_PLOT)
+
                                 if ADVANCED_ANALYSIS:
                                     with st.expander('Advanced Profile Report'):
                                         st_profile_report(DATA.profile_report(
@@ -706,11 +761,54 @@ def app():
                                             minimal=True))
                     else:
                         st.error('Warning: An error is made in the processing of the data. Try again.')
+
                 elif BACKEND_ANALYSER == 'TextBlob':
                     if 'POLARITY' or 'SUBJECTIVITY' in DATA.columns:
-                        st.markdown('## Visualise Polarity VS Subjectivity')
-                        fig = px.scatter(x=DATA['SUBJECTIVITY'], y=DATA['POLARITY'])
-                        st.plotly_chart(fig, use_container_width=True)
+                        if VERBOSITY != 0:
+                            try:
+                                st.markdown('## DataFrame')
+                                st.dataframe(DATA.head(VERBOSITY), height=600, width=800)
+                            except RuntimeError:
+                                st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                                st.dataframe(DATA.head(10), height=600, width=800)
+                            else:
+                                st.markdown('## Visualise Polarity VS Subjectivity')
+                                HAC_PLOT = px.scatter(DATA[['SUBJECTIVITY', 'POLARITY']],
+                                                      x='SUBJECTIVITY',
+                                                      y='POLARITY',
+                                                      labels={
+                                                          'SUBJECTIVITY': 'Subjectivity',
+                                                          'POLARITY': 'Polarity'
+                                                      })
+                                st.plotly_chart(HAC_PLOT, use_container_width=True)
+                                if ADVANCED_ANALYSIS:
+                                    with st.expander('Advanced Profile Report'):
+                                        st_profile_report(DATA.profile_report(
+                                            explorative=True,
+                                            minimal=True))
+                        else:
+                            try:
+                                st.markdown('## DataFrame')
+                                st.dataframe(DATA, height=600, width=800)
+                            except RuntimeError:
+                                st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                                st.dataframe(DATA.head(10), height=600, width=800)
+                            else:
+                                st.markdown('## Polarity VS Subjectivity')
+                                HAC_PLOT = px.scatter(DATA[['SUBJECTIVITY', 'POLARITY']],
+                                                      x='SUBJECTIVITY',
+                                                      y='POLARITY',
+                                                      labels={
+                                                          'SUBJECTIVITY': 'Subjectivity',
+                                                          'POLARITY': 'Polarity'
+                                                      })
+                                st.plotly_chart(HAC_PLOT, use_container_width=True)
+
+                                if ADVANCED_ANALYSIS:
+                                    with st.expander('Advanced Profile Report'):
+                                        st_profile_report(DATA.profile_report(
+                                            explorative=True,
+                                            minimal=True))
                     else:
                         st.error('Warning: An error is made in the processing of the data. Try again.')
 
@@ -719,8 +817,12 @@ def app():
                 st.markdown('## Download Data')
                 st.markdown('Download sentiment data from [downloads/sentiment_scores.csv]'
                             '(downloads/sentiment_scores.csv)')
-                DATA.to_csv(str(DOWNLOAD_PATH / "sentiment_scores.csv"))
+                DATA.to_csv(str(DOWNLOAD_PATH / "sentiment_scores.csv"), index=False)
 
+                if HAC_PLOT is not None:
+                    st.markdown('## Graph')
+                    st.markdown('Download sentiment data from [downloads/plot.png](downloads/plot.png)')
+                    HAC_PLOT.write_image(str(DOWNLOAD_PATH / 'plot.png'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                TOPIC MODELLING                                                   | #
@@ -759,11 +861,11 @@ def app():
                                          max_value=100,
                                          step=1,
                                          value=10)
-            MIN_TOKEN_FREQ = st.number_input('Choose minimum number of tokens for data point to count',
+            MIN_TOKEN_FREQ = st.number_input('Choose minimum number of tokens for data point to count (default: 1)',
                                              min_value=1,
                                              max_value=100,
                                              step=1,
-                                             value=3)
+                                             value=1)
             if NLP_TOPIC_MODEL == 'Latent Dirichlet Allocation':
                 MIN_DF = st.number_input('Choose minimum (cardinal) frequency of words to consider',
                                          min_value=1,
@@ -850,7 +952,7 @@ def app():
                                 data[0].to_pickle(str(DOWNLOAD_PATH / data[2]))
                             elif data[3] == 'csv':
                                 st.markdown(f'Download {data[1]} from [downloads/{data[2]}](downloads/{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]))
+                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
                             elif data[3] == 'model':
                                 st.markdown(f'Download {data[1]} from [downloads/{data[2]}](downloads/{data[2]})')
                                 data[0].save(str(DOWNLOAD_PATH / data[2]))
@@ -860,16 +962,18 @@ def app():
 
                 elif PIPELINE == 'spaCy and scikit-learn':
                     # FILTER OUT MIN LENGTH OF TOKENS
-                    DATA['TOKEN LENGTH'] = DATA[DATA_COLUMN].apply(lambda x: len(x.split()))
-                    for index, row in DATA.iterrows():
-                        if row['TOKEN LENGTH'] < MIN_TOKEN_FREQ:
-                            DATA.drop([index])
+                    try:
+                        DATA['TOKEN LENGTH'] = DATA[DATA_COLUMN].apply(lambda x: len(x.split()))
+                        DATA = DATA[DATA['TOKEN LENGTH'].astype(int) > MIN_TOKEN_FREQ]
+                    except ValueError:
+                        st.error('The above Minimum Token Count value is invalid as none of your data points fulfills '
+                                 'the specified criteria. Lower the value to silence this error.')
 
                     CV = CountVectorizer(min_df=MIN_DF,
                                          max_df=MAX_DF,
                                          stop_words='english',
                                          lowercase=True,
-                                         token_pattern='[a-zA-Z\-][a-zA-Z\-]{2,}')
+                                         token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}')
                     VECTORISED = CV.fit_transform(DATA[DATA_COLUMN])
 
                     if NLP_TOPIC_MODEL == 'Latent Dirichlet Allocation':
@@ -880,22 +984,6 @@ def app():
 
                         st.markdown('## Model Data')
                         TOPIC_TEXT = modelIterator(LDA_MODEL, CV)
-
-                        try:
-                            # CONVERT OUTPUT TO DF
-                            temp_id = []
-                            temp_topic = []
-                            for topic in TOPIC_TEXT:
-                                temp_id.append(topic[0])
-                                temp_topic.append(topic[1])
-                            temp_dict = {
-                                'ID': temp_id,
-                                'Topics': temp_topic
-                            }
-                        except Exception as ex:
-                            st.error(f'Error: {ex}')
-                        else:
-                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
 
                         # GET MOST DOMINANT TOPIC FOR ALL SENTENCES
                         DATA['DOMINANT TOPIC'] = DATA[DATA_COLUMN].apply(lambda x:
@@ -911,9 +999,14 @@ def app():
                             streamlit.components.v1.html(LDA_VIS_STR, width=1300, height=800)
 
                         if SAVE:
-                            st.markdown('## Save Data')
-                            st.markdown('Download Topic List from [downloads/lda_topics.csv](downloads/lda_topics.csv)')
-                            TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'lda_topics.csv'), index=False)
+                            st.markdown('## Save Data\n'
+                                        '### Topics')
+                            for i in range(len(TOPIC_TEXT)):
+                                st.markdown(f'Download Topic List from [downloads/lda_topics_{i}.csv]'
+                                            f'(downloads/lda_topics_{i}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lda_topics_{i}.csv'), index=False)
+
+                            st.markdown('### Other Requested Data')
                             st.markdown('Download HTML File from [downloads/lda.html](downloads/lda.html)')
                             pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / 'lda.html'))
 
@@ -925,34 +1018,24 @@ def app():
                         st.markdown('## Model Data')
                         TOPIC_TEXT = modelIterator(NMF_MODEL, CV)
 
-                        try:
-                            # CONVERT OUTPUT TO DF
-                            temp_id = []
-                            temp_topic = []
-                            for topic in TOPIC_TEXT:
-                                temp_id.append(topic[0])
-                                temp_topic.append(topic[1])
-                            temp_dict = {
-                                'ID': temp_id,
-                                'Topics': temp_topic
-                            }
-                        except Exception as ex:
-                            st.error(f'Error: {ex}')
-                        else:
-                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
-
                         NMF_VIS = pyLDAvis.sklearn.prepare(NMF_MODEL, VECTORISED, CV, mds='tsne')
                         if VERBOSE:
                             # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
-                            st.markdown('## NMF/TFIDF\n'
+                            st.markdown('## NMF\n'
                                         f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
                                         f'from all the text provided in your dataset.')
                             NMF_VIS_STR = pyLDAvis.prepared_data_to_html(NMF_VIS)
                             streamlit.components.v1.html(NMF_VIS_STR, width=1300, height=800)
 
                         if SAVE:
-                            st.markdown('Download Topic List from [downloads/nmf_topics.csv](downloads/nmf_topics.csv)')
-                            TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'nmf_topics.csv'), index=False)
+                            st.markdown('## Save Data\n'
+                                        '### Topics')
+                            for i in range(len(TOPIC_TEXT)):
+                                st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
+                                            f'(downloads/nmf_topics_{i}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
+
+                            st.markdown('### Other Requested Data')
                             st.markdown('Download HTML File from [downloads/nmf.html](downloads/nmf.html)')
                             pyLDAvis.save_html(NMF_VIS, str(DOWNLOAD_PATH / 'nmf.html'))
 
@@ -962,22 +1045,6 @@ def app():
 
                         st.markdown('## Model Data')
                         TOPIC_TEXT = modelIterator(LSI_MODEL, CV)
-
-                        try:
-                            # CONVERT OUTPUT TO DF
-                            temp_id = []
-                            temp_topic = []
-                            for topic in TOPIC_TEXT:
-                                temp_id.append(topic[0])
-                                temp_topic.append(topic[1])
-                            temp_dict = {
-                                'ID': temp_id,
-                                'Topics': temp_topic
-                            }
-                        except Exception as ex:
-                            st.error(f'Error: {ex}')
-                        else:
-                            TOPIC_TEXT = pd.DataFrame(data=temp_dict, index=temp_dict['ID'])
 
                         if VERBOSE:
                             st.markdown('## LSI(SVD) Scatterplot\n'
@@ -1026,10 +1093,14 @@ def app():
                                 st.plotly_chart(WORD_FIG)
 
                             if SAVE:
-                                st.markdown('## Save Data')
-                                st.markdown(
-                                    'Download Topic List from [downloads/lda_topics.csv](downloads/lda_topics.csv)')
-                                TOPIC_TEXT.to_csv(str(DOWNLOAD_PATH / 'lsi_topics.csv'), index=False)
+                                st.markdown('## Save Data\n'
+                                            '### Topics')
+                                for i in range(len(TOPIC_TEXT)):
+                                    st.markdown(f'Download Topic List from [downloads/lda_topic_{i}.csv]'
+                                                f'(downloads/lda_topic_{i}.csv)')
+                                    TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+
+                                st.markdown('### Other Requested Data')
                                 st.markdown('Download PNG File from [downloads/marker_figure.png]'
                                             '(downloads/marker_figure.png)')
                                 MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))

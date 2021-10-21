@@ -208,18 +208,16 @@ def app():
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## Analysis Operation\n'
-                'Begin creation of DTM')
+                'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
+                'before proceeding.')
     if st.button('Proceed', key='doc'):
         if not DATA.empty:
+            DATA = DATA.astype(str)
             with st.spinner('Working to create a Document-Term Matrix...'):
-                # INIT COUNTVECTORISER OBJECT -> USED FOR COUNTING THE FREQUENCY OF WORDS THAT APPEAR
                 counter_object = CountVectorizer(stop_words=stopwords.words('english'))
 
-                # CREATE STRING CONTAINING THE BAG OF WORDS
-                word_list = []
-                for index, row in DATA.iterrows():
-                    word_list.append(str(row[DATA_COLUMN]))
-                word_string = ' '.join(word_list)
+                # CONCATENATE ALL STR VALUES INTO LIST: OPTIMISED
+                word_string = ' '.join(DATA[DATA_COLUMN])
 
                 # CREATE A NEW DF TO PARSE
                 dict_data = {

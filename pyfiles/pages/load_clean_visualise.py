@@ -25,7 +25,7 @@ import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report
 from texthero import preprocessing
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText, downloadCorpora
+from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                  INITIAL SETUP                                                   | #
@@ -111,41 +111,21 @@ def app():
                 'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n'
                 '## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. If your file is larger than 200 MB, you may choose to rerun the app with the tag '
-                '`--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the `streamlit run app.py` command and '
-                'define the maximum size of file you can upload onto Streamlit, or use the Large File option to pull '
-                'your dataset from any one of the three supported Cloud Service Providers into the app. Note that '
-                'modifying the command you use to run the app is not available if you are using the web interface for '
-                'the app and you will be limited to using the Large File option to pull datasets larger than 200 MB '
-                'in size. For Docker, you will need to append the tag above behind the Docker Image name when running '
-                'the *run* command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
-                'Select the file format you wish to upload. You are warned that if you fail to define the correct file '
-                'format you wish to upload, the app will not let you upload it (if you are using the Small File module '
-                'and may result in errors (for Large File module).\n\n')
-    FILE = st.selectbox('Select the type of file to load', ('Select File Mode', 'Small File(s)', 'Large File(s)'))
+                'with the widget. If your files are larger than 200 MB, please select "Large File(s)" and select the '
+                'CSP you are using to host and store your data. To circumvent this limitation, you may choose to '
+                'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
+                '`streamlit run app.py` command and define the maximum size of file you can upload '
+                'onto Streamlit, or use the Large File option to pull your dataset from any one of the three supported '
+                'Cloud Service Providers into the app. Note that modifying the command you use to run the app is not '
+                'available if you are using the **web interface** for the app and you will be limited to using the '
+                'Large File option to pull datasets larger than 200 MB in size. For Docker, you will need to append '
+                'the tag above behind the Docker Image name when running the *run* command, e.g. '
+                '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
+                'After uploading your files, select the file format you wish to upload. You are warned that if you '
+                'fail to define the correct file format you wish to upload, the app will not let you upload it'
+                '(if you are using the Small File module and may result in errors (for Large File module).\n\n')
+    FILE = st.selectbox('Select the type of file to load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the data input format', ('CSV', 'XLSX'))
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                               PROCESSING FLAGS                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Flags')
-    CLEAN = st.checkbox('Clean the data?')
-    SAVE = st.checkbox('Output to CSV file?')
-    VERBOSE = st.checkbox('Print out DataFrames?')
-    if VERBOSE:
-        VERBOSITY = st.slider('Data points',
-                              key='Data points to display?',
-                              min_value=1,
-                              max_value=1000,
-                              value=20)
-        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-    if CLEAN:
-        st.markdown('## Preprocessing\n'
-                    'The below options will allow you to specify whether to conduct a simple cleaning ('
-                    'sentence structures and context is retained, while any wrongly encoded characters will be '
-                    'removed), a complex cleaning (a process to lemmatize words and remove stopwords) and '
-                    'advanced cleaning (advanced NLP techniques will be used to process the data).')
-        CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -212,12 +192,39 @@ def app():
                     st.error(f'Error: {ex}. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
+# |                                               PROCESSING FLAGS                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('## Flags\n'
+                'Note that there is an inherent size limit (50 MB) for the DataFrames that are printed to screen. If '
+                'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the number '
+                'of data points you wish to visualise or download the file and visualise it through Excel or any other '
+                'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
+                'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
+                'over to and from the Streamlit server.')
+    CLEAN = st.checkbox('Clean the data?')
+    SAVE = st.checkbox('Output to CSV file?')
+    VERBOSE = st.checkbox('Print out DataFrames?')
+    if VERBOSE:
+        VERBOSITY = st.slider('Data points',
+                              key='Data points to display?',
+                              min_value=1,
+                              max_value=1000,
+                              value=20)
+        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+    if CLEAN:
+        st.markdown('## Preprocessing\n'
+                    'The below options will allow you to specify whether to conduct a simple cleaning ('
+                    'sentence structures and context is retained, while any wrongly encoded characters will be '
+                    'removed) or a complex cleaning (a process to lemmatize words and remove stopwords) and '
+                    'advanced cleaning (advanced NLP techniques will be used to process the data).')
+        CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex'))
+
+# -------------------------------------------------------------------------------------------------------------------- #
 # |                                           DATA LOADING AND PROCESSING                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Analysis Operation\n'
+    st.markdown('## Data Cleaning and Visualisation\n'
                 'Ensure that you have successfully uploaded the required data before clicking on the "Begin Analysis" '
-                'button.')
-
+                'button. If you failed to upload your file, errors may be raised.')
     if st.button('Begin Analysis', key='runner'):
         if DATA_PATH:
             try:
@@ -243,7 +250,7 @@ def app():
                             CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], SIMPLE_PIPELINE)
                             CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             CLEANED_DATA.dropna(inplace=True, subset=['CLEANED CONTENT'])
-                            CLEANED_DATA = CLEANED_DATA.astype(str).to_frame()
+                            CLEANED_DATA = CLEANED_DATA.astype(str)
                         except Exception as ex:
                             st.error(ex)
 
@@ -289,118 +296,14 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
                 if VERBOSE:
                     if CLEAN:
-                        if 'CLEANED CONTENT' in CLEANED_DATA.columns:
-                            if VERBOSITY != 0:
-                                try:
-                                    for data in FINALISED_DATA_LIST:
-                                        if not data[0].empty:
-                                            st.markdown(f'## {data[1]}')
-                                            st.dataframe(data[0].head(VERBOSITY), height=400, width=800)
-
-                                            if ADVANCED_ANALYSIS:
-                                                with st.expander('Advanced Profile Report'):
-                                                    st_profile_report(data[0].profile_report(
-                                                        explorative=True,
-                                                        minimal=True
-                                                    ))
-                                except RuntimeError:
-                                    st.warning(
-                                        'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                    for data in FINALISED_DATA_LIST:
-                                        if not data[0].empty:
-                                            st.markdown(f'## {data[1]}')
-                                            st.dataframe(data[0].head(10), height=400, width=800)
-
-                                            if ADVANCED_ANALYSIS:
-                                                with st.expander('Advanced Profile Report'):
-                                                    st_profile_report(data[0].profile_report(
-                                                        explorative=True,
-                                                        minimal=True))
-                                except KeyError:
-                                    st.error('Warning: Your data was not processed properly. Try again.')
-
-                            else:
-                                try:
-                                    for data in FINALISED_DATA_LIST:
-                                        if not data[0].empty:
-                                            st.markdown(f'## {data[1]}')
-                                            st.dataframe(data[0], height=400, width=800)
-
-                                            if ADVANCED_ANALYSIS:
-                                                with st.expander('Advanced Profile Report'):
-                                                    st_profile_report(data[0].profile_report(
-                                                        explorative=True,
-                                                        minimal=True))
-                                except RuntimeError:
-                                    st.warning(
-                                        'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                    for data in FINALISED_DATA_LIST:
-                                        if not data[0].empty:
-                                            st.markdown(f'## {data[1]}')
-                                            st.dataframe(data[0].head(10), height=400, width=800)
-
-                                            if ADVANCED_ANALYSIS:
-                                                with st.expander('Advanced Profile Report'):
-                                                    st_profile_report(data[0].profile_report(
-                                                        explorative=True,
-                                                        minimal=True))
-                                except KeyError:
-                                    st.error('Warning: Your data was not processed properly. Try again.')
-                        else:
-                            st.error('Error: KeyError -> CLEANED CONTENT column is missing data. Check your data '
-                                     'source to ensure that CONTENT is the column header and that there is data '
-                                     'in the column.')
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# +                                          VISUALISE THE DATA: RAW DATA                                            + #
-# -------------------------------------------------------------------------------------------------------------------- #
+                        st.markdown('## Cleaned DataFrame')
+                        printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                        st.markdown('## Cleaned Tokenized DataFrame')
+                        printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
+                                       advanced=ADVANCED_ANALYSIS)
                     else:
-                        if VERBOSITY != 0:
-                            try:
-                                if not DATA.empty:
-                                    st.markdown('## DataFrame Output')
-                                    st.dataframe(DATA.head(VERBOSITY), height=400, width=800)
-
-                                    if ADVANCED_ANALYSIS:
-                                        with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                                explorative=True,
-                                                minimal=True))
-                            except RuntimeError:
-                                st.warning(
-                                    'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                st.dataframe(DATA.head(10), height=400, width=800)
-
-                                if ADVANCED_ANALYSIS:
-                                    with st.expander('Advanced Profile Report'):
-                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                            explorative=True,
-                                            minimal=True))
-                            except KeyError:
-                                st.error('Warning: Your data was not processed properly. Try again.')
-
-                        else:
-                            try:
-                                st.markdown('## DataFrame Output')
-                                st.dataframe(DATA, height=400, width=800)
-
-                                if ADVANCED_ANALYSIS:
-                                    with st.expander('Advanced Profile Report'):
-                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                            explorative=True,
-                                            minimal=True))
-                            except RuntimeError:
-                                st.warning(
-                                    'Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                                st.dataframe(DATA.head(10), height=400, width=800)
-
-                                if ADVANCED_ANALYSIS:
-                                    with st.expander('Advanced Profile Report'):
-                                        st_profile_report(DATA[[DATA_COLUMN]].profile_report(
-                                            explorative=True,
-                                            minimal=True))
-                            except KeyError:
-                                st.error('Warning: Your data was not processed properly. Try again.')
+                        printDataFrame(data=DATA, extract_from=DATA_COLUMN, verbose_level=VERBOSITY,
+                                       advanced=ADVANCED_ANALYSIS)
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                   SAVE THE DATA                                                  + #

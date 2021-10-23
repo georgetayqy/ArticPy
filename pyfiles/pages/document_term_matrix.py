@@ -14,6 +14,7 @@ import pathlib
 
 import openpyxl
 import pandas as pd
+import plotly.express
 import streamlit as st
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
@@ -22,7 +23,7 @@ import kaleido
 
 from streamlit_pandas_profiling import st_profile_report
 from utils import csp_downloaders
-from utils.helper import readFile
+from utils.helper import readFile, printDataFrame
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                           GLOBAL VARIABLE DECLARATION                                            | #
@@ -38,7 +39,6 @@ ANALYSIS = False
 VERBOSE_DTM = False
 VERBOSITY_DTM = False
 VERBOSE_ANALYSIS = False
-GRANULARITY = 1
 SAVE = False
 MODE = 'CSV'
 DTM_copy = pd.DataFrame()
@@ -62,7 +62,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                GLOBAL VARIABLES                                                  | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, GRANULARITY, SAVE, SIZE, MODE, \
+    global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, SAVE, SIZE, MODE, \
         STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy_, CSP, ADVANCED_ANALYSIS, \
         FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG
 
@@ -76,30 +76,29 @@ def app():
     st.markdown('## Init\n'
                 'Before proceeding, you will need to download the corpus needed to process your data. To do so, click '
                 'on the "Begin Download" button below. Please ensure that you have at least 3 GB of free disk space '
-                'available so that you are able to download the corpus onto your system.')
+                'available so that you are able to download the corpus onto your system and that your device is '
+                'connected to the Internet.')
     if st.button('Begin Download', key='download-model'):
         os.system('python -m nltk.downloader all')
-    st.markdown('## Data Format')
-    SIZE = st.selectbox('Define the size of the file to pass into function', ('Select File Size',
-                                                                              'Small File(s)',
-                                                                              'Large File(s)'))
+    st.markdown('## Upload Data\n'
+                'For this mode, ensure that your file is smaller than 200 MB in size. If your file is larger than '
+                '200 MB, you may choose to rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` '
+                'appended behind the `streamlit run app.py` command and define the maximum size of file you can '
+                'upload onto Streamlit, or use the Large File option to pull your dataset from any one of the '
+                'three supported Cloud Service Providers into the app. Note that modifying the command you use '
+                'to run the app is not available if you are using the web interface for the app and you will be '
+                'limited to using the Large File option to pull datasets larger than 200 MB in size.\n\n'
+                'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
+                'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
+                'data before proceeding.')
+    SIZE = st.selectbox('Define the size of the file to pass into function', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the data input format', ('CSV', ' XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# |                                                SMALL FILES                                                       | #
+# |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('### Upload the file that you wish to analyse:\n')
     if SIZE == 'Small File(s)':
-        st.markdown('## Load Data\n'
-                    'For this mode, ensure that your file is smaller than 200 MB in size. If your file is larger than '
-                    '200 MB, you may choose to rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` '
-                    'appended behind the `streamlit run app.py` command and define the maximum size of file you can '
-                    'upload onto Streamlit, or use the Large File option to pull your dataset from any one of the '
-                    'three supported Cloud Service Providers into the app. Note that modifying the command you use '
-                    'to run the app is not available if you are using the web interface for the app and you will be '
-                    'limited to using the Large File option to pull datasets larger than 200 MB in size.\n\n'
-                    'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
-                    'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
-                    'data before proceeding.')
         DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -107,9 +106,6 @@ def app():
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success('Data Loaded!')
 
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                    LARGE FILES                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
     elif SIZE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
         CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
@@ -186,18 +182,6 @@ def app():
         ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
         VERBOSE_ANALYSIS = st.checkbox('Display top N words in Document-Term Matrix?')
         if VERBOSE_ANALYSIS:
-            st.markdown('Note that the following options will allow you to modify the minimum frequency of words to '
-                        'consider in your dataset. This feature is added to allow you to remove outliers in your data '
-                        '(e.g. words that appear once in the entire document and never again, spelling errors that '
-                        'does not appear anywhere else in the text, etc.) that you may not want to '
-                        'analyse. If you do not wish to incorporate this behaviour into your data, leave the minimum '
-                        'frequency setting at 1 and modify only the top N words to display.')
-            GRANULARITY = st.number_input('Key in the minimum frequency of words to consider [WARNING: MODIFIES '
-                                          'OUTPUT]',
-                                          key='granularity',
-                                          min_value=1,
-                                          max_value=1000,
-                                          value=1)
             N = st.slider('Key in the top N number of words to display',
                           key='N',
                           min_value=1,
@@ -236,105 +220,59 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                 VISUALISE THE DATA                                               + #
 # -------------------------------------------------------------------------------------------------------------------- #
-                if not DTM.empty:
-                    if ANALYSIS:
-                        if VERBOSE_DTM:
-                            # VISUALISE THE DATA
-                            st.markdown('## Visualise Data\n'
-                                        'The Document-Term Matrix will now be displayed on screen.')
-                            DTM_copy = DTM.copy()
-                            if VERBOSITY_DTM != 0:
-                                try:
-                                    st.dataframe(DTM_copy.transpose().head(VERBOSITY_DTM).transpose(),
-                                                 height=400,
-                                                 width=800)
-                                except RuntimeError:
-                                    st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data '
-                                               'points...')
-                                    st.dataframe(DTM_copy.transpose().head(10).transpose(),
-                                                 height=400,
-                                                 width=800)
-                                else:
-                                    if ADVANCED_ANALYSIS:
-                                        with st.expander('Advanced Profile Report'):
-                                            st.markdown('Note that this analysis is done on a version of the DTM '
-                                                        'whereby there are more rows than columns (transposed)')
-                                            st_profile_report(DTM_copy.transpose().profile_report(
-                                                explorative=True,
-                                                minimal=True
-                                            ))
-                            else:
-                                try:
-                                    st.dataframe(DTM_copy)
-                                except RuntimeError:
-                                    st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data '
-                                               'points...')
-                                    st.dataframe(DTM_copy.transpose().head(10).transpose(),
-                                                 height=400,
-                                                 width=800)
-                                else:
-                                    if ADVANCED_ANALYSIS:
-                                        with st.expander('Advanced Profile Report'):
-                                            st_profile_report(DTM_copy.transpose().profile_report(
-                                                explorative=True,
-                                                minimal=True
-                                            ))
-                        if VERBOSE_ANALYSIS:
-                            DTM_copy_ = DTM.copy()
-                            DTM_copy_ = DTM_copy.transpose()
-                            DTM_copy_.sort_values(by=[0], ascending=False, inplace=True)
-                            try:
-                                st.markdown('The following DataFrame contains the sorted Document-Term Matrix, '
-                                            f'displaying the top {N} words of the Document-Term Matrix.')
-                                st.dataframe(DTM_copy_.head(N),
-                                             height=400,
-                                             width=800)
-                            except RuntimeError:
-                                st.warning('Warning: DataFrame is too large to display. '
-                                           'Defaulting to 10 data points...')
-                                st.dataframe(DTM_copy_.head(10),
-                                             height=400,
-                                             width=800)
-                            else:
-                                TOP_N_WORD_FIG = DTM_copy_.head(N).plot.line(title=f'Frequency of top {N} words used',
-                                                                             labels=dict(index='Words',
-                                                                                         value='Frequency',
-                                                                                         variable='Count'),
-                                                                             width=900,
-                                                                             height=500)
-                                st.plotly_chart(TOP_N_WORD_FIG, use_container_width=True)
+            if not DTM.empty:
+                if ANALYSIS:
+                    if VERBOSE_DTM:
+                        # VISUALISE THE DATA
+                        st.markdown('## Visualise Data\n'
+                                    'The Document-Term Matrix will now be displayed on screen.')
+                        DTM_copy = DTM.copy()
+                        try:
+                            st.dataframe(DTM_copy.head(N), width=900, height=500)
+                        except RuntimeError:
+                            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                            st.dataframe(DTM_copy.head(10), height=600, width=800)
+                        except Exception as ex:
+                            st.error(f'Error: {ex}')
 
-                                if ADVANCED_ANALYSIS:
-                                    with st.expander('Advanced Profile Report'):
-                                        st_profile_report(DTM_copy_.profile_report(
-                                            explorative=True,
-                                            minimal=True
-                                        ))
+                    if VERBOSE_ANALYSIS:
+                        DTM_copy_ = DTM.copy().transpose()
+                        DTM_copy_.columns = ['Word Frequency']
+                        DTM_copy_.sort_values(by=['Word Frequency'], ascending=False, inplace=True)
+                        st.markdown('The following DataFrame contains the sorted Document-Term Matrix, '
+                                    f'displaying the top {N} words of the Document-Term Matrix.')
+                        printDataFrame(data=DTM_copy_, verbose_level=VERBOSITY_DTM, advanced=ADVANCED_ANALYSIS)
+                        TOP_N_WORD_FIG = DTM_copy_.head(N).plot.line(title=f'Frequency of top {N} words used',
+                                                                     labels=dict(index='Word',
+                                                                                 value='Frequency',
+                                                                                 variable='Count'),
+                                                                     width=900,
+                                                                     height=500)
+                        st.plotly_chart(TOP_N_WORD_FIG, use_container_width=True)
 
-                    FINALISED_DATA_LIST = [
-                        (DTM, 'DTM', 'dtm.csv', 'csv'),
-                        (DTM_copy_, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
-                        (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
-                    ]
+                FINALISED_DATA_LIST = [
+                    (DTM, 'DTM', 'dtm.csv', 'csv'),
+                    (DTM_copy_, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
+                    (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
+                ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                   SAVE THE DATA                                                  + #
 # -------------------------------------------------------------------------------------------------------------------- #
-                    if SAVE:
-                        st.markdown('## Download Data')
-                        for data in FINALISED_DATA_LIST:
-                            if data[3] == 'csv':
-                                if not data[0].empty:
-                                    st.markdown(f'### {data[1]}')
-                                    st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                                f'(downloads/{data[2]})')
-                                    data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
-                            elif data[3] == 'png':
-                                if data[0]:
-                                    st.markdown(f'### {data[1]}')
-                                    st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                                f'(downloads/{data[2]})')
-                                    data[0].write_image(str(DOWNLOAD_PATH / data[2]))
-
+                if SAVE:
+                    st.markdown('## Download Data')
+                    for data in FINALISED_DATA_LIST:
+                        if data[3] == 'csv':
+                            if not data[0].empty:
+                                st.markdown(f'### {data[1]}')
+                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
+                                            f'(downloads/{data[2]})')
+                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
+                        elif data[3] == 'png':
+                            if data[0]:
+                                st.markdown(f'### {data[1]}')
+                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
+                                            f'(downloads/{data[2]})')
+                                data[0].write_image(str(DOWNLOAD_PATH / data[2]))
         else:
             st.error('Error: No files are loaded.')

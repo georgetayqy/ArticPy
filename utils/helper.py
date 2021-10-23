@@ -4,20 +4,18 @@ This file is used to store some of the basic helper functions that is used in th
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import numpy as np
+import pandas
 import pandas as pd
 import streamlit as st
 import nltk
-import spacy
-import gensim
 import os
 
-from nltk.corpus import stopwords
-from gensim.utils import simple_preprocess
-from spacy.lang.en.stop_words import STOP_WORDS
 from string import punctuation
 from collections import Counter
 from heapq import nlargest
 from nltk.stem import WordNetLemmatizer
+from streamlit_pandas_profiling import st_profile_report
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             DOWNLOAD DEPENDENCIES                                                | #
@@ -48,33 +46,6 @@ def readFile(filepath, fformat):
     if fformat == 'CSV':
         try:
             return pd.read_csv(filepath, low_memory=False, encoding='iso-8859-1')
-        except Exception as e:
-            st.error(f'Error: {e}')
-    elif fformat == 'XLSX':
-        try:
-            return pd.read_excel(filepath, engine='openpyxl')
-        except Exception as e:
-            st.error(f'Error: {e}')
-    elif fformat == 'PKL':
-        try:
-            return pd.read_pickle(filepath)
-        except Exception as e:
-            st.error(f'Error: {e}')
-
-
-def readFile_dtm(filepath, fformat):
-    """
-        This is a helper function to read the data
-
-        Attributes
-        ----------
-        filepath:                   A path-like or file-like object
-        fformat:                    The format of the file to read
-        ----------
-        """
-    if fformat == 'CSV':
-        try:
-            return pd.read_csv(filepath, low_memory=False, encoding='iso-8859-1', index_col=0)
         except Exception as e:
             st.error(f'Error: {e}')
     elif fformat == 'XLSX':
@@ -147,27 +118,29 @@ def summarise(text, stopwords, pos_tag, nlp, sent_count):
         return summary
 
 
-def sent2word(sent):
-    for sentence in sent:
-        yield gensim.utils.simple_preprocess(str(sentence), deacc=True)
-
-
-def stopwordRemover(text):
-    stop_words = stopwords.words('english')
-    return [[word for word in simple_preprocess(str(doc))
-             if word not in stop_words] for doc in text]
-
-
-def modelIterator(model, vectoriser, top_n=10):
-    id_list = []
-    feature_list = []
+def modelIterator(model, vectoriser, top_n):
+    frame_list = []
 
     for id_, topic in enumerate(model.components_):
-        st.markdown(f'**Topic {id_}**:\n\n'
-                    f'{[(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]}')
-        id_list.append(id_)
-        feature_list.append([(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]])
-    return list(zip(id_list, feature_list))
+        lister = [(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]
+
+        st.markdown(f'### Topic {id_}')
+        df = pd.DataFrame(data=lister,
+                          index=range(len(lister)),
+                          columns=['word', 'weight']).astype(str)
+        st.dataframe(df)
+        frame_list.append(df)
+
+    return frame_list
+
+
+def modelNMFIterator(model, vectoriser, top_n):
+    kw = np.array(vectoriser.get_feature_names())
+    topic_kw = []
+    for weights in model.components_:
+        loc = (-weights).argsort()[:top_n]
+        topic_kw.append(kw.take(loc))
+    return topic_kw
 
 
 def downloadCorpora(model: str):
@@ -180,7 +153,6 @@ def downloadCorpora(model: str):
     ----------
     """
     usr_dir = os.path.expanduser(os.getcwd())
-    test_dirs = []
     if not isinstance(model, str):
         st.error('Error: Parameter passed in is not of type "str".')
     else:
@@ -199,3 +171,81 @@ def downloadCorpora(model: str):
                 nltk.download(model)
             except Exception as ex:
                 st.error(f'Error: {ex}')
+
+
+def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
+                   extract_from: object = None):
+    """
+    Takes in a Pandas DataFrame and prints out the DataFrame
+
+    Parameter
+    ----------
+    data:                            Pandas DataFrame or Series object
+    extract_from:                    Name of column to extract data from
+    verbose_level:                   The number of rows of data to display
+    advanced:                        Conduct Advanced Analysis on the DataFrame
+    dtm:                             Special processing for DTMs
+    ----------
+    """
+
+    if verbose_level != 0:
+        try:
+            st.dataframe(data.head(verbose_level), height=600, width=800)
+        except RuntimeError:
+            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+            st.dataframe(data.head(10), height=600, width=800)
+        except KeyError:
+            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
+        except Exception as ex:
+            st.error(f'Error: {ex}')
+        else:
+            if advanced:
+                if extract_from is not None:
+                    with st.expander('Advanced Profile Report'):
+                        st_profile_report(data[[extract_from]].profile_report(
+                            explorative=True,
+                            minimal=True))
+                else:
+                    with st.expander('Advanced Profile Report'):
+                        st_profile_report(data.profile_report(
+                            explorative=True,
+                            minimal=True))
+    else:
+        try:
+            st.dataframe(data, height=600, width=800)
+        except RuntimeError:
+            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+            st.dataframe(data.head(10), height=600, width=800)
+        except KeyError:
+            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
+        except Exception as ex:
+            st.error(f'Error: {ex}')
+        else:
+            if advanced:
+                if extract_from is not None:
+                    with st.expander('Advanced Profile Report'):
+                        st_profile_report(data[[extract_from]].profile_report(
+                            explorative=True,
+                            minimal=True))
+                else:
+                    with st.expander('Advanced Profile Report'):
+                        st_profile_report(data.profile_report(
+                            explorative=True,
+                            minimal=True))
+
+
+def dominantTopic(vect, model, n_words):
+    """
+    Returns the topic text
+    """
+    kw = np.array(vect.get_feature_names())
+    topic_kw = []
+    for weights in model.components_:
+        top_kw = (-weights).argsort()[:n_words]
+        topic_kw.append(kw.take(top_kw))
+
+    return topic_kw
+
+
+def mapTopic(row, dict_):
+    return dict_[row]

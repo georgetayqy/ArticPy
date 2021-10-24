@@ -11,18 +11,13 @@ visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_pr
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import os
 import pathlib
 import nltk
 import numpy as np
-import openpyxl
 import pandas as pd
-import spacy
 import streamlit as st
 import texthero as hero
-import pandas_profiling
 
-from streamlit_pandas_profiling import st_profile_report
 from texthero import preprocessing
 from utils import csp_downloaders
 from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame
@@ -76,6 +71,11 @@ PIPELINE = [
 FINALISED_DATA_LIST = []
 DATA_COLUMN = None
 QUERY = None
+TOKENIZE = True
+EXTEND_STOPWORD = False
+STOPWORD_LIST = list()
+FIN_STOPWORD_LIST = list()
+FINALISE = False
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -90,7 +90,8 @@ def app():
 # |                                               GLOBAL VARIABLES                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
-        CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY
+        CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY, \
+        TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, FIN_STOPWORD_LIST, FINALISE
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -111,33 +112,36 @@ def app():
                 'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n'
                 '## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. If your files are larger than 200 MB, please select "Large File(s)" and select the '
-                'CSP you are using to host and store your data. To circumvent this limitation, you may choose to '
+                'with the widget. To circumvent this limitation, you may choose to '
                 'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
                 '`streamlit run app.py` command and define the maximum size of file you can upload '
-                'onto Streamlit, or use the Large File option to pull your dataset from any one of the three supported '
-                'Cloud Service Providers into the app. Note that modifying the command you use to run the app is not '
-                'available if you are using the **web interface** for the app and you will be limited to using the '
-                'Large File option to pull datasets larger than 200 MB in size. For Docker, you will need to append '
-                'the tag above behind the Docker Image name when running the *run* command, e.g. '
-                '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
-                'After uploading your files, select the file format you wish to upload. You are warned that if you '
-                'fail to define the correct file format you wish to upload, the app will not let you upload it'
-                '(if you are using the Small File module and may result in errors (for Large File module).\n\n')
-    FILE = st.selectbox('Select the type of file to load', ('Small File(s)', 'Large File(s)'))
-    MODE = st.selectbox('Define the data input format', ('CSV', 'XLSX'))
+                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
+                'is only available for users who run the app using the app\'s source code, or through Docker. '
+                'For Docker, you will need to append the tag above behind the Docker Image name when running the *run* '
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
+                'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
+                'supported Cloud Service Providers into the app.\n\n'
+                'After selecting the size of your file, select the file format you wish to upload. You are warned '
+                'that if you fail to define the correct file format you wish to upload, the app will not let you '
+                'upload your file (if you are using the Small File option, only the defined file format will be '
+                'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
+    FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+    MODE = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
         st.markdown('### Upload the file that you wish to analyse:\n')
-        DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
+        DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
             if not DATA.empty or not DATA:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                st.success('Data Loaded!')
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
+        else:
+            # RESET
+            DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
@@ -151,7 +155,7 @@ def app():
                     DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -163,7 +167,7 @@ def app():
                     DATA = readFile(aws.AWS_FILE_NAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -175,7 +179,7 @@ def app():
                     DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -187,7 +191,7 @@ def app():
                     DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -195,36 +199,58 @@ def app():
 # |                                               PROCESSING FLAGS                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## Flags\n'
-                'Note that there is an inherent size limit (50 MB) for the DataFrames that are printed to screen. If '
+                'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
                 'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the number '
                 'of data points you wish to visualise or download the file and visualise it through Excel or any other '
                 'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
                 'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
                 'over to and from the Streamlit server.')
     CLEAN = st.checkbox('Clean the data?')
-    SAVE = st.checkbox('Output to CSV file?')
+    SAVE = st.checkbox('Save Output DataFrame into CSV File?')
     VERBOSE = st.checkbox('Print out DataFrames?')
     if VERBOSE:
-        VERBOSITY = st.slider('Data points',
+        VERBOSITY = st.slider('Data Points To Print',
                               key='Data points to display?',
                               min_value=1,
                               max_value=1000,
                               value=20)
-        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                        help='This option will analyse your DataFrame and display advanced statistics '
+                                             'on it. Note that this will require some time and processing power to '
+                                             'complete. Deselect this option if this functionality is not required.')
     if CLEAN:
         st.markdown('## Preprocessing\n'
-                    'The below options will allow you to specify whether to conduct a simple cleaning ('
-                    'sentence structures and context is retained, while any wrongly encoded characters will be '
-                    'removed) or a complex cleaning (a process to lemmatize words and remove stopwords) and '
-                    'advanced cleaning (advanced NLP techniques will be used to process the data).')
+                    'The below options will allow you to specify whether to conduct a **simple cleaning** ('
+                    '*sentence structures and context is retained*, while any wrongly encoded characters will be '
+                    'removed) or a **complex cleaning** (a process to *lemmatize words and remove stopwords*).\n\n'
+                    'Files created from **simple cleaning** may be used for Summarization in *NLP Toolkit* while '
+                    'files created from **complex cleaning** may be used for Document-Term Matrix Creation in '
+                    '*Document-Term Matrix*.')
         CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex'))
+        TOKENIZE = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect this '
+                                                                  'option if you do not want to tokenize your data.')
+        if CLEAN_MODE == 'Complex':
+            EXTEND_STOPWORD = st.checkbox('Extend List of Stopwords?',
+                                          help='Select this option to extend the list of stopwords that will be used '
+                                               'to clean your data.')
+            if EXTEND_STOPWORD:
+                STOPWORD_LIST = st.text_area('Extended List of Stopwords',
+                                             value='Key in a list of stopwords that you wish to append to the existing '
+                                                   'list of stopwords. Delimit your words by commas, e.g. this, is, a, '
+                                                   'sample, list ...')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                           DATA LOADING AND PROCESSING                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## Data Cleaning and Visualisation\n'
-                'Ensure that you have successfully uploaded the required data before clicking on the "Begin Analysis" '
-                'button. If you failed to upload your file, errors may be raised.')
+                'Ensure that you have successfully uploaded the required data and selected the correct column '
+                'containing your data before clicking on the "Begin Analysis" button. The status of your file '
+                'upload is displayed below for your reference.')
+    if DATA_PATH:
+        st.info('File loaded.')
+    else:
+        st.warning('File has not been loaded.')
+
     if st.button('Begin Analysis', key='runner'):
         if DATA_PATH:
             try:
@@ -235,7 +261,7 @@ def app():
             except Exception as ex:
                 st.error(f'Error: {ex}')
             else:
-                st.info('Data parsed!')
+                st.info('Data loaded properly!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                 DATA CLEANER                                                     + #
@@ -251,57 +277,130 @@ def app():
                             CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             CLEANED_DATA.dropna(inplace=True, subset=['CLEANED CONTENT'])
                             CLEANED_DATA = CLEANED_DATA.astype(str)
+
+                            if TOKENIZE:
+                                CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
+                                CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
                         except Exception as ex:
                             st.error(ex)
 
                     elif CLEAN_MODE == 'Complex' or CLEAN_MODE == 'Advanced':
-                        try:
-                            CLEANED_DATA = DATA[[DATA_COLUMN]]
+                        if EXTEND_STOPWORD:
+                            try:
+                                if len(STOPWORD_LIST) != 0:
+                                    STOPWORD_LIST = [word.strip().lower() for word in STOPWORD_LIST.split(sep=',')]
+                                    FIN_STOPWORD_LIST = [word.lower() for word in nltk.corpus.words.words()]
+                                    FIN_STOPWORD_LIST.extend(STOPWORD_LIST)
+                                    FIN_STOPWORD_LIST = set(FIN_STOPWORD_LIST)
+                                    FINALISE = True
+                                    st.info('Stopwords parsed!')
+                                else:
+                                    FINALISE = False
+                                    raise ValueError('Length of list is 0. Try again.')
+                            except Exception as ex:
+                                st.error(f'Error: {ex}')
+                        else:
+                            FIN_STOPWORD_LIST = set(word.lower() for word in nltk.corpus.words.words())
+                            FINALISE = True
+                            st.info('Stopwords parsed!')
 
-                            # PREPROCESSING AND CLEANING
-                            CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], PIPELINE)
-                            CLEANED_DATA['CLEANED CONTENT'] = hero.remove_digits(CLEANED_DATA['CLEANED CONTENT'],
-                                                                                 only_blocks=False)
-                            CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
-                            CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
+                        if FINALISE:
+                            try:
+                                CLEANED_DATA = DATA[[DATA_COLUMN]]
 
-                            # PRELIMINARY TOKENIZATION THE DATA
-                            CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
-                            CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.apply(lemmatizeText)
+                                # PREPROCESSING AND CLEANING
+                                CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], PIPELINE)
+                                CLEANED_DATA['CLEANED CONTENT'] = hero.remove_digits(CLEANED_DATA['CLEANED CONTENT'],
+                                                                                     only_blocks=False)
+                                CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
+                                CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
 
-                            # SPELL CHECK
-                            words = set(word.lower() for word in nltk.corpus.words.words())
-                            for index, row in CLEANED_DATA_TOKENIZED.iteritems():
-                                CLEANED_DATA.at[index, 'CLEANED CONTENT'] = \
-                                    (" ".join(word for word in row if word.lower() in words or not word.isalpha()))
-                            CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
-                            CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
-                            CLEANED_DATA = CLEANED_DATA.astype(str)
+                                # PRELIMINARY TOKENIZATION THE DATA
+                                CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
+                                CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.apply(lemmatizeText)
 
-                            # FINAL TOKENIZATION THE DATA
-                            CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
-                            CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
+                                # SPELL CHECK
+                                for index, row in CLEANED_DATA_TOKENIZED.iteritems():
+                                    CLEANED_DATA.at[index, 'CLEANED CONTENT'] = \
+                                        (" ".join(word for word in row if word.lower() in FIN_STOPWORD_LIST
+                                                  or not word.isalpha()))
+                                CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
+                                CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
+                                CLEANED_DATA = CLEANED_DATA.astype(str)
 
-                        except Exception as ex:
-                            st.error(ex)
+                                if TOKENIZE:
+                                    # FINAL TOKENIZATION THE DATA
+                                    CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
+                                    CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
 
-                FINALISED_DATA_LIST = [
-                    (DATA, 'Raw Data', 'raw_ascii_data.csv'),
-                    (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv'),
-                    (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv')
-                ]
+                            except Exception as ex:
+                                st.error(ex)
+                        else:
+                            st.error('Error: Length of list is 0. Try again.')
+
+                if EXTEND_STOPWORD:
+                    if FINALISE:
+                        if TOKENIZE:
+                            FINALISED_DATA_LIST = [
+                                (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                                (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv'),
+                                (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv')
+                            ]
+                        else:
+                            FINALISED_DATA_LIST = [
+                                (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                                (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv')
+                            ]
+                    else:
+                        st.error('Error: Length of list is 0. No Data will be saved.')
+                else:
+                    if TOKENIZE:
+                        FINALISED_DATA_LIST = [
+                            (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                            (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv'),
+                            (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv')
+                        ]
+                    else:
+                        FINALISED_DATA_LIST = [
+                            (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                            (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv')
+                        ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                        VISUALISE THE DATA: CLEANED DATA                                          + #
 # -------------------------------------------------------------------------------------------------------------------- #
                 if VERBOSE:
                     if CLEAN:
-                        st.markdown('## Cleaned DataFrame')
-                        printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
-                        st.markdown('## Cleaned Tokenized DataFrame')
-                        printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
-                                       advanced=ADVANCED_ANALYSIS)
+                        if CLEAN_MODE == 'Simple':
+                            st.markdown('## Cleaned DataFrame')
+                            printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY,
+                                           advanced=ADVANCED_ANALYSIS)
+                            if TOKENIZE:
+                                st.markdown('## Cleaned Tokenized DataFrame')
+                                printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
+                                               advanced=ADVANCED_ANALYSIS)
+                        elif CLEAN_MODE == 'Complex':
+                            if EXTEND_STOPWORD:
+                                if FINALISE:
+                                    st.markdown('## Cleaned DataFrame')
+                                    printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY,
+                                                   advanced=ADVANCED_ANALYSIS)
+                                    if TOKENIZE:
+                                        st.markdown('## Cleaned Tokenized DataFrame')
+                                        printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
+                                                       advanced=ADVANCED_ANALYSIS)
+                                else:
+                                    st.error('Error: Stopwords are not parsed properly. No Data is displayed.'
+                                             'Try again.')
+                            else:
+                                st.markdown('## Cleaned DataFrame')
+                                printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                                if TOKENIZE:
+                                    st.markdown('## Cleaned Tokenized DataFrame')
+                                    printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
+                                                   advanced=ADVANCED_ANALYSIS)
                     else:
+                        st.markdown('## Raw DataFrame')
                         printDataFrame(data=DATA, extract_from=DATA_COLUMN, verbose_level=VERBOSITY,
                                        advanced=ADVANCED_ANALYSIS)
 
@@ -309,18 +408,35 @@ def app():
 # +                                                   SAVE THE DATA                                                  + #
 # -------------------------------------------------------------------------------------------------------------------- #
                 if SAVE:
-                    st.markdown('## Download Data')
-                    try:
-                        for data in FINALISED_DATA_LIST:
-                            if not data[0].empty:
-                                st.markdown(f'### {data[1]}\n'
-                                            f'Download data from [downloads/{data[2]}]'
-                                            f'(downloads/{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
-                    except KeyError:
-                        st.error('Warning: Your data was not processed properly. Try again.')
-                    except Exception as ex:
-                        st.error(f'Error: Unknown Fatal Error -> {ex}')
+                    if EXTEND_STOPWORD:
+                        if FINALISE:
+                            st.markdown('## Download Data')
+                            try:
+                                for data in FINALISED_DATA_LIST:
+                                    if not data[0].empty:
+                                        st.markdown(f'### {data[1]}\n'
+                                                    f'Download data from [downloads/{data[2]}]'
+                                                    f'(downloads/{data[2]})')
+                                        data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                            except KeyError:
+                                st.error('Warning: Your data was not processed properly. Try again.')
+                            except Exception as ex:
+                                st.error(f'Error: Unknown Fatal Error -> {ex}')
+                        else:
+                            st.error('Error: Stopwords are not parsed properly. No Data is displayed. Try again.')
+                    else:
+                        st.markdown('## Download Data')
+                        try:
+                            for data in FINALISED_DATA_LIST:
+                                if not data[0].empty:
+                                    st.markdown(f'### {data[1]}\n'
+                                                f'Download data from [downloads/{data[2]}]'
+                                                f'(downloads/{data[2]})')
+                                    data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                        except KeyError:
+                            st.error('Warning: Your data was not processed properly. Try again.')
+                        except Exception as ex:
+                            st.error(f'Error: Unknown Fatal Error -> {ex}')
             else:
                 st.error('Error: No files uploaded.')
         else:

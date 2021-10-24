@@ -12,16 +12,11 @@ A large portion of this module uses the nltk and scikit-learn packages to create
 import os
 import pathlib
 
-import openpyxl
 import pandas as pd
-import plotly.express
 import streamlit as st
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
-import pandas_profiling
-import kaleido
 
-from streamlit_pandas_profiling import st_profile_report
 from utils import csp_downloaders
 from utils.helper import readFile, printDataFrame
 
@@ -43,7 +38,6 @@ SAVE = False
 MODE = 'CSV'
 DTM_copy = pd.DataFrame()
 N = 100
-DTM_copy_ = pd.DataFrame()
 CSP = None
 ADVANCED_ANALYSIS = False
 FINALISED_DATA_LIST = []
@@ -63,7 +57,7 @@ def app():
 # |                                                GLOBAL VARIABLES                                                  | #
 # -------------------------------------------------------------------------------------------------------------------- #
     global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, SAVE, SIZE, MODE, \
-        STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy_, CSP, ADVANCED_ANALYSIS, \
+        STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy, CSP, ADVANCED_ANALYSIS, \
         FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -91,8 +85,8 @@ def app():
                 'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
                 'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
                 'data before proceeding.')
-    SIZE = st.selectbox('Define the size of the file to pass into function', ('Small File(s)', 'Large File(s)'))
-    MODE = st.selectbox('Define the data input format', ('CSV', ' XLSX'))
+    SIZE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+    MODE = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -104,7 +98,10 @@ def app():
             DATA = readFile(DATA_PATH, MODE)
             if not DATA.empty or not DATA:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                st.success('Data Loaded!')
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
+        else:
+            # RESET
+            DATA = pd.DataFrame()
 
     elif SIZE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
@@ -118,7 +115,7 @@ def app():
                     DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -130,7 +127,7 @@ def app():
                     DATA = readFile(aws.AWS_FILE_NAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -142,7 +139,7 @@ def app():
                     DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -154,7 +151,7 @@ def app():
                     DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
                     if not DATA.empty:
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info('File Read!')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -164,38 +161,52 @@ def app():
     st.markdown('## Flags\n'
                 'The following section contains flags you can use to better define the outputs of this module and to '
                 'modify what the app prints out to screen.\n\n'
-                'Note that there is an inherent size limit (50 MB) for the DataFrames that are printed to screen. If '
+                'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
                 'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the number '
                 'of data points you wish to visualise or download the file and visualise it through Excel or any other '
                 'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
                 'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
                 'over to and from the Streamlit server.')
     SAVE = st.checkbox('Save Output DataFrame into CSV File?')
-    ANALYSIS = st.checkbox('Conduct Analysis on the Document-Term Matrix?')
-    if ANALYSIS:
-        VERBOSE_DTM = st.checkbox('Display DataFrame of Document-Term Matrix?')
-        if VERBOSE_DTM:
-            VERBOSITY_DTM = st.slider('Data points to display for Document-Term Matrix?',
-                                      min_value=1,
-                                      max_value=1000,
-                                      value=20)
-        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-        VERBOSE_ANALYSIS = st.checkbox('Display top N words in Document-Term Matrix?')
+    VERBOSE_DTM = st.checkbox('Display DataFrame of Document-Term Matrix?')
+    if VERBOSE_DTM:
+        VERBOSITY_DTM = st.slider('Data Points to Display for Document-Term Matrix?',
+                                  min_value=1,
+                                  max_value=1000,
+                                  value=100,
+                                  help='Note that this parameter defines the number of points to print out for '
+                                       'the raw DTM produced by the app.')
+        VERBOSE_ANALYSIS = st.checkbox('Display top N words in Document-Term Matrix?',
+                                       help='This sorts the DTM and shows you the top number of words you select.')
         if VERBOSE_ANALYSIS:
-            N = st.slider('Key in the top N number of words to display',
+            N = st.slider('Key in the top **N** number of words to display',
                           key='N',
                           min_value=1,
                           max_value=1000,
-                          value=100)
+                          value=100,
+                          help='This parameter controls the top number of words that will be displayed and plotted. '
+                               'This parameter is not the same as that above which controls the number of data points '
+                               'printed out for the raw DTM DataFrame.')
+        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                        help='This option will analyse your DataFrame and display advanced statistics '
+                                             'on it. Note that this will require some time and processing power to '
+                                             'complete. Deselect this option if this functionality is not required.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Analysis Operation\n'
+    st.markdown('## Document-Term Matrix Creation\n'
                 'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
-                'before proceeding.')
+                'before clicking on the "Proceed" button. The status of your file upload is displayed below for your '
+                'reference.')
+    if not DATA.empty:
+        st.info('File loaded.')
+    else:
+        st.warning('File has not been loaded.')
+
     if st.button('Proceed', key='doc'):
         if not DATA.empty:
+            st.info('Data loaded properly!')
             DATA = DATA.astype(str)
             with st.spinner('Working to create a Document-Term Matrix...'):
                 counter_object = CountVectorizer(stop_words=stopwords.words('english'))
@@ -221,40 +232,61 @@ def app():
 # +                                                 VISUALISE THE DATA                                               + #
 # -------------------------------------------------------------------------------------------------------------------- #
             if not DTM.empty:
-                if ANALYSIS:
-                    if VERBOSE_DTM:
-                        # VISUALISE THE DATA
-                        st.markdown('## Visualise Data\n'
-                                    'The Document-Term Matrix will now be displayed on screen.')
-                        DTM_copy = DTM.copy()
-                        try:
-                            st.dataframe(DTM_copy.head(N), width=900, height=500)
-                        except RuntimeError:
-                            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-                            st.dataframe(DTM_copy.head(10), height=600, width=800)
-                        except Exception as ex:
-                            st.error(f'Error: {ex}')
+                DTM_copy = DTM.copy().transpose()
+                DTM_copy.columns = ['Word Frequency']
+                DTM_copy.sort_values(by=['Word Frequency'], ascending=False, inplace=True)
+                TOP_N_WORD_FIG = DTM_copy.head(N).plot.line(title=f'Frequency of top {N} words used',
+                                                            labels=dict(index='Word',
+                                                                        value='Frequency',
+                                                                        variable='Count'),
+                                                            width=900,
+                                                            height=500)
+
+                if VERBOSE_DTM:
+                    # VISUALISE THE DATA
+                    st.markdown('## DTM Data\n'
+                                'The Document-Term Matrix will now be displayed on screen.')
+                    try:
+                        st.dataframe(DTM.transpose().head(VERBOSITY_DTM).transpose(), width=900, height=500)
+                    except RuntimeError:
+                        st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
+                        st.dataframe(DTM.transpose().head(10).transpose(), height=600, width=800)
+                    except Exception as ex:
+                        st.error(f'Error: {ex}')
 
                     if VERBOSE_ANALYSIS:
-                        DTM_copy_ = DTM.copy().transpose()
-                        DTM_copy_.columns = ['Word Frequency']
-                        DTM_copy_.sort_values(by=['Word Frequency'], ascending=False, inplace=True)
-                        st.markdown('The following DataFrame contains the sorted Document-Term Matrix, '
+                        st.markdown(f'## Top {N} Words in DTM\n'
+                                    'The following DataFrame contains the sorted Document-Term Matrix, '
                                     f'displaying the top {N} words of the Document-Term Matrix.')
-                        printDataFrame(data=DTM_copy_, verbose_level=VERBOSITY_DTM, advanced=ADVANCED_ANALYSIS)
-                        TOP_N_WORD_FIG = DTM_copy_.head(N).plot.line(title=f'Frequency of top {N} words used',
-                                                                     labels=dict(index='Word',
-                                                                                 value='Frequency',
-                                                                                 variable='Count'),
-                                                                     width=900,
-                                                                     height=500)
+                        printDataFrame(data=DTM_copy, verbose_level=N, advanced=ADVANCED_ANALYSIS)
                         st.plotly_chart(TOP_N_WORD_FIG, use_container_width=True)
+                        with st.expander('Elaboration'):
+                            st.markdown('If your data is sufficiently large enough, you may see that your data '
+                                        'resembles an exponential graph. This phenomenon is known as **Zipf\'s Law**. '
+                                        '\n\nZipf\'s Law states that given a corpus of natural language utterances, '
+                                        'the frequency of any word in the corpus is inversely proportional to the '
+                                        'word\'s rank in the frequency table, i.e. **f ∝ 1 / rank**.\n\n'
+                                        'Naturally, to find the frequency of word use in any corpus, we simply '
+                                        'multiply the inverse of the rank with frequency of the most used word. '
+                                        'This value provides a good approximation of the actual frequency of word use '
+                                        'in the corpus.')
 
-                FINALISED_DATA_LIST = [
-                    (DTM, 'DTM', 'dtm.csv', 'csv'),
-                    (DTM_copy_, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
-                    (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
-                ]
+                # FINALISED DATA LIST
+                if not VERBOSE_DTM and not VERBOSE_ANALYSIS:
+                    FINALISED_DATA_LIST = [
+                        (DTM, 'DTM', 'dtm.csv', 'csv')
+                    ]
+                elif VERBOSE_DTM and not VERBOSE_ANALYSIS:
+                    FINALISED_DATA_LIST = [
+                        (DTM, 'DTM', 'dtm.csv', 'csv'),
+                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv')
+                    ]
+                if VERBOSE_DTM and VERBOSE_ANALYSIS:
+                    FINALISED_DATA_LIST = [
+                        (DTM, 'DTM', 'dtm.csv', 'csv'),
+                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
+                        (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
+                    ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                   SAVE THE DATA                                                  + #
@@ -274,5 +306,7 @@ def app():
                                 st.markdown(f'Download requested data from [downloads/{data[2]}]'
                                             f'(downloads/{data[2]})')
                                 data[0].write_image(str(DOWNLOAD_PATH / data[2]))
+            else:
+                st.error('Error: DTM not created properly. Try again.')
         else:
             st.error('Error: No files are loaded.')

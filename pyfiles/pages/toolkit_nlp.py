@@ -80,19 +80,22 @@ NLP = None
 ONE_DATAPOINT = False
 DATAPOINT_SELECTOR = 0
 NLP_TOPIC_MODEL = 'Latent Dirichlet Allocation'
-MIN_DF = 5
-MAX_DF = 0.90
-MAX_ITER = 10
+MIN_DF = 2
+MAX_DF = 0.95
+MAX_ITER = 100
 CV = None
 VECTORISED = None
 COLOUR = None
 TOPIC_TEXT = []
 SVG = None
 HAC_PLOT = None
+HAC_PLOT1 = None
 WORKER = 1
 MAX_FEATURES = 5000
 ALPHA = 0.1
 L1_RATIO = 0.5
+PLOT = False
+W_PLOT = False
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -111,7 +114,7 @@ def app():
         NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, DATAPOINT_SELECTOR, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, \
         NMF_MODEL, NMF_DATA, LSI_MODEL, LSI_DATA, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
         COLOUR, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, KW, TOPIC_FRAME, ALPHA, \
-        L1_RATIO
+        L1_RATIO, PLOT, W_PLOT, HAC_PLOT1
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -129,34 +132,36 @@ def app():
                 'the functionality of this app.\n\n')
     st.markdown('## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. If your files are larger than 200 MB, please select "Large File(s)" and select the '
-                'CSP you are using to host and store your data. To circumvent this limitation, you may choose to '
+                'with the widget. To circumvent this limitation, you may choose to '
                 'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
                 '`streamlit run app.py` command and define the maximum size of file you can upload '
-                'onto Streamlit, or use the Large File option to pull your dataset from any one of the three supported '
-                'Cloud Service Providers into the app. Note that modifying the command you use to run the app is not '
-                'available if you are using the **web interface** for the app and you will be limited to using the '
-                'Large File option to pull datasets larger than 200 MB in size. For Docker, you will need to append '
-                'the tag above behind the Docker Image name when running the *run* command, e.g. '
-                '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
-                'After uploading your files, select the file format you wish to upload. You are warned that if you '
-                'fail to define the correct file format you wish to upload, the app will not let you upload it '
-                '(if you are using the Small File module and may result in errors (for Large File module).\n\n')
-    FILE = st.selectbox('Select the type of file to load', ('Small File(s)', 'Large File(s)'))
-    MODE = st.selectbox('Define the data input format', ('CSV', 'XLSX'))
+                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
+                'is only available for users who run the app using the app\'s source code, or through Docker. '
+                'For Docker, you will need to append the tag above behind the Docker Image name when running the *run* '
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
+                'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
+                'supported Cloud Service Providers into the app.\n\n'
+                'After selecting the size of your file, select the file format you wish to upload. You are warned '
+                'that if you fail to define the correct file format you wish to upload, the app will not let you '
+                'upload your file (if you are using the Small File option, only the defined file format will be '
+                'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
+    FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+    MODE = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('### Upload the file that you wish to analyse:\n')
     if FILE == 'Small File(s)':
-        DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
+        DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
             if not DATA.empty:
                 DATA = DATA.astype(str)
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                st.info(f'File Read! Data Extracted from {DATA_COLUMN}')
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
+        else:
+            # RESET
+            DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
@@ -171,7 +176,7 @@ def app():
                     if not DATA.empty:
                         DATA = DATA.astype(str)
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info(f'File Read! Data Extracted from {DATA_COLUMN}')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -184,7 +189,7 @@ def app():
                     if not DATA.empty:
                         DATA = DATA.astype(str)
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info(f'File Read! Data Extracted from {DATA_COLUMN}')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -197,7 +202,7 @@ def app():
                     if not DATA.empty:
                         DATA = DATA.astype(str)
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info(f'File Read! Data Extracted from {DATA_COLUMN}')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
@@ -210,15 +215,15 @@ def app():
                     if not DATA.empty:
                         DATA = DATA.astype(str)
                         DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.info(f'File Read! Data Extracted from {DATA_COLUMN}')
+                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              FUNCTION SELECTOR                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('# Analysis Functions\n'
-                'Select the NLP functions which you wish to apply to your dataset.')
+    st.markdown('# NLP Operations\n'
+                'Select the NLP functions which you wish to execute.')
     APP_MODE = st.selectbox('Select the NLP Operation to execute',
                             ('Topic Modelling', 'Analyse Sentiment', 'Word Cloud', 'Named Entity Recognition',
                              'POS Tagging', 'Summarise'))
@@ -227,7 +232,11 @@ def app():
 # |                                            WORD CLOUD VISUALISATION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if APP_MODE == 'Word Cloud':
-        st.markdown('# Word Cloud Generation')
+        st.markdown('# Word Cloud Generation\n'
+                    'This module takes in a long list of documents and converts it into a WordCloud representation '
+                    'of all the documents.\n\n'
+                    'Note that the documents should not be tokenized, but it should be cleaned and lemmatized to '
+                    'avoid double-counting words.')
 
         # FLAGS
         st.markdown('## Flags')
@@ -373,6 +382,7 @@ def app():
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             PART OF SPEECH TAGGING                                               | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -456,7 +466,10 @@ def app():
         st.markdown('## Flags')
         st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
                     'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
-        NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'))
+        NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'),
+                             help='Be careful when using the Accuracy Model. Due to caching issues in the app, '
+                                  'changes to the column where data is extracted from in the file uploaded will '
+                                  'reset the portions of the app that follows.')
         if NLP_MODEL == 'en_core_web_sm':
             try:
                 NLP = spacy.load('en_core_web_sm')
@@ -527,6 +540,7 @@ def app():
             else:
                 st.error('Warning: Data is processed wrongly. Try again.')
 
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -541,7 +555,8 @@ def app():
         VERBOSE = st.checkbox('Print out the outputs to screen?')
         if VERBOSE:
             VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
-            COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
+            if BACKEND_ANALYSER == 'VADER':
+                COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
 
         # MAIN PROCESSING
@@ -591,15 +606,19 @@ def app():
                         st.markdown('## Sentiment DataFrame')
                         printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
-                        st.markdown('## Kernel Density Plot')
-                        HAC_PLOT = ff.create_distplot([DATA['VADER SCORE'].tolist()], ['VADER'],
-                                                      colors=[COLOUR], show_hist=False, show_rug=False)
-                        HAC_PLOT.update_layout(title_text='Histogram and Curve Plot',
+                        st.markdown('## VADER Score')
+                        HAC_PLOT = ff.create_distplot([DATA['VADER SCORE'].tolist()],
+                                                      ['VADER'],
+                                                      colors=[COLOUR],
+                                                      bin_size=0.25,
+                                                      curve_type='normal',
+                                                      show_rug=False,
+                                                      show_hist=False)
+                        HAC_PLOT.update_layout(title_text='Distribution Plot',
                                                xaxis_title='VADER Score',
                                                yaxis_title='Frequency Density',
-                                               legend_title='Frequency Density',
-                                               )
-                        st.plotly_chart(HAC_PLOT)
+                                               legend_title='Frequency Density')
+                        st.plotly_chart(HAC_PLOT, use_container_width=True)
                     else:
                         st.error('Warning: An error is made in the processing of the data. Try again.')
 
@@ -608,7 +627,7 @@ def app():
                         st.markdown('## Sentiment DataFrame')
                         printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
-                        st.markdown('## Visualise Polarity VS Subjectivity')
+                        st.markdown('## Polarity VS Subjectivity')
                         HAC_PLOT = px.scatter(DATA[['SUBJECTIVITY', 'POLARITY']],
                                               x='SUBJECTIVITY',
                                               y='POLARITY',
@@ -617,6 +636,14 @@ def app():
                                                   'POLARITY': 'Polarity'
                                               })
                         st.plotly_chart(HAC_PLOT, use_container_width=True)
+
+                        st.markdown('### Normal Distribution Plots of Subjectivity and Polarity')
+                        HAC_PLOT1 = ff.create_distplot([DATA['SUBJECTIVITY'].tolist(), DATA['POLARITY'].tolist()],
+                                                       ['Subjectivity', 'Polarity'],
+                                                       curve_type='normal',
+                                                       show_rug=False,
+                                                       show_hist=False)
+                        st.plotly_chart(HAC_PLOT1, use_container_width=True)
                     else:
                         st.error('Warning: An error is made in the processing of the data. Try again.')
 
@@ -631,6 +658,11 @@ def app():
                     st.markdown('## Graph')
                     st.markdown('Download sentiment data from [downloads/plot.png](downloads/plot.png)')
                     HAC_PLOT.write_image(str(DOWNLOAD_PATH / 'plot.png'))
+                if HAC_PLOT1 is not None:
+                    st.markdown('## Normal Distribution Graph')
+                    st.markdown('Download sentiment data from [downloads/normal_plot.png]'
+                                '(downloads/normal_plot.png)')
+                    HAC_PLOT1.write_image(str(DOWNLOAD_PATH / 'normal_plot.png'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                TOPIC MODELLING                                                   | #
@@ -657,76 +689,91 @@ def app():
                     'LSI is a technique of analysing a document to discover statistical co-occurrences of words which '
                     'appear to gather, which gives us insights into the topics of the words and of the document.')
 
-        # FLAGS
-        st.markdown('## Flags')
-        SAVE = st.checkbox('Output to file?')
-        VERBOSE = st.checkbox('Display Outputs?')
-        if VERBOSE:
-            VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+        st.markdown('## Topic Modelling Model Selection')
         NLP_TOPIC_MODEL = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
                                                                'Non-Negative Matrix Factorization',
                                                                'Latent Semantic Indexing'))
-        NUM_TOPICS = st.number_input('Choose number of topics to generate per text',
+
+        # FLAGS
+        st.markdown('## Flags')
+        SAVE = st.checkbox('Output to file?')
+        VERBOSE = st.checkbox('Display Outputs?', help='Note: For LSI, if verbose is enabled, the model will be '
+                                                       'refitted such that only 2 components are considered. If you '
+                                                       'wish to turn off this feature, deselect the "Generate '
+                                                       'Plot" selection below.')
+        if VERBOSE:
+            VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+        NUM_TOPICS = st.number_input('Choose Number of Topics to Generate Per Text',
                                      min_value=1,
                                      max_value=100,
                                      step=1,
                                      value=10)
-        MAX_FEATURES = st.number_input('Choose the maximum number of features to extract from dataset',
+        MAX_FEATURES = st.number_input('Choose the Maximum Number of Features to Extract from Dataset',
                                        min_value=1,
                                        max_value=99999,
                                        step=1,
                                        value=5000)
-        MAX_ITER = st.number_input('Choose number of iterations of model training',
+        MAX_ITER = st.number_input('Choose Number of Iterations of Model Training',
                                    min_value=1,
-                                   max_value=100,
+                                   max_value=10000,
                                    step=1,
                                    value=10)
 
         if NLP_TOPIC_MODEL == 'Latent Dirichlet Allocation':
-            MIN_DF = st.number_input('Choose minimum (cardinal) frequency of words to consider',
+            MIN_DF = st.number_input('Choose Minimum (Cardinal) Frequency of Words to Consider',
                                      min_value=1,
                                      max_value=100,
                                      step=1,
                                      value=5)
-            MAX_DF = st.number_input('Choose maximum (percentage) frequency of words to consider',
+            MAX_DF = st.number_input('Choose Maximum (Percentage) Frequency of Words to Consider',
                                      min_value=0.,
                                      max_value=1.,
                                      step=0.01,
                                      format='%.2f',
                                      value=0.90)
-            WORKER = st.number_input('Chose number of CPU Cores to use',
+            WORKER = st.number_input('Chose Number of CPU Cores to Use',
                                      min_value=1,
                                      max_value=multiprocessing.cpu_count(),
                                      step=1,
-                                     value=1)
+                                     value=1,
+                                     help='The number of effective cores is calculated from multiplying the number of '
+                                          'cores on your machine and the number of threads in your CPU.')
         elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
-            MIN_DF = st.number_input('Choose minimum (cardinal) frequency of words to consider',
+            MIN_DF = st.number_input('Choose Minimum (Cardinal) Frequency of Words to Consider',
                                      min_value=1,
                                      max_value=100,
                                      step=1,
                                      value=2)
-            MAX_DF = st.number_input('Choose maximum (percentage) frequency of words to consider',
+            MAX_DF = st.number_input('Choose Maximum (Percentage) Frequency of Words to Consider',
                                      min_value=0.,
                                      max_value=1.,
                                      step=0.01,
                                      format='%.2f',
                                      value=0.95)
-            ALPHA = st.number_input('Choose alpha value for NMF Model',
+            ALPHA = st.number_input('Choose Alpha Value for NMF Model',
                                     min_value=0.,
                                     max_value=1.,
                                     step=0.01,
                                     format='%.2f',
-                                    value=.1)
+                                    value=.1,
+                                    help='Constant that multiplies the regularization terms. '
+                                         'Set it to zero to have no regularization.'
+                                         'Regularization is not scaled by the number of features to consider in the '
+                                         'model.')
             L1_RATIO = st.number_input('Choose L1 Ratio for NMF Model',
                                        min_value=0.,
                                        max_value=1.,
                                        step=0.01,
                                        format='%.2f',
-                                       value=.5)
+                                       value=.5,
+                                       help='The regularization mixing parameter, with 0 <= l1_ratio <= 1.')
         elif NLP_TOPIC_MODEL == 'Latent Semantic Indexing':
             if VERBOSE:
-                COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
+                PLOT = st.checkbox('Generate LSI Plot?')
+                if PLOT:
+                    W_PLOT = st.checkbox('Generate Word Representation of LSI Plot?')
+                    COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
 
         if st.button('Start Modelling', key='topic'):
             if not DATA.empty:
@@ -749,12 +796,11 @@ def app():
                                                           n_jobs=WORKER)
                     LDA_DATA = LDA_MODEL.fit_transform(VECTORISED)
 
-                    st.markdown('## Model Data')
-                    TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS)
-
-                    # GET DOMINANT TOPICS
-                    DATA['DOMINANT TOPIC'] = DATA[DATA_COLUMN].apply(lambda x:
-                                                                     (LDA_MODEL.transform(CV.transform([x]))[0]))
+                    if VERBOSE:
+                        st.markdown('## Model Data')
+                        TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS)
+                    else:
+                        TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS, vb=False)
 
                     KW = pd.DataFrame(dominantTopic(vect=CV, model=LDA_MODEL, n_words=NUM_TOPICS))
                     KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
@@ -764,9 +810,6 @@ def app():
                     LDA_VIS = pyLDAvis.sklearn.prepare(LDA_MODEL, VECTORISED, CV, mds='tsne')
 
                     if VERBOSE:
-                        st.markdown('## DataFrame')
-                        printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
-
                         st.markdown('## Topic Label\n'
                                     'The following frame will show you the words that are associated with a certain '
                                     'topic.')
@@ -808,7 +851,10 @@ def app():
                                     l1_ratio=L1_RATIO).fit(TFIDF_VECTORISED)
                     NMF_DATA = NMF_MODEL.fit_transform(TFIDF_VECTORISED)
 
-                    st.markdown('## Model Data')
+                    if VERBOSE:
+                        st.markdown('## Model Data')
+                        TOPIC_TEXT = modelIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
+
                     TOPIC_TEXT = modelNMFIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
                     TOPIC_FRAME = pd.DataFrame(TOPIC_TEXT)
 
@@ -817,8 +863,6 @@ def app():
                     KW.columns = [f'topic_{i}' for i in range(KW.shape[0])]
 
                     if VERBOSE:
-                        st.markdown('## NMF Data')
-                        printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
                         st.markdown('## NMF Topic DataFrame')
                         printDataFrame(data=KW, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
@@ -841,69 +885,86 @@ def app():
                                              n_iter=MAX_ITER)
                     LSI_DATA = LSI_MODEL.fit_transform(VECTORISED)
 
-                    st.markdown('## Model Data')
-                    TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
+                    if VERBOSE:
+                        st.markdown('## Model Data')
+                        TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
+
+                    TOPIC_TEXT = modelNMFIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
+                    TOPIC_FRAME = pd.DataFrame(TOPIC_TEXT)
+
+                    KW = pd.DataFrame(TOPIC_TEXT)
+                    KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
+                    KW.columns = [f'topic_{i}' for i in range(KW.shape[0])]
 
                     if VERBOSE:
-                        st.markdown('## LSI(SVD) Scatterplot\n'
-                                    'Note that the following visualisation will use a Topic count of 2, '
-                                    'overriding previous inputs above, as you are only able to visualise data '
-                                    'on 2 axis. However the full analysis result of the above operation will '
-                                    'be saved in the dataset you provided and be available for download later '
-                                    'on in the app.\n\n'
-                                    'The main aim of the scatterplot is to show the similarity between topics, '
-                                    'which is measured by the distance between markers as shown in the following '
-                                    'diagram. The diagram contained within the expander is the same as the marker '
-                                    'diagram, just that the markers are all replaced by the topic words the '
-                                    'markers actually represent.')
-                        svd_2d = TruncatedSVD(n_components=2)
-                        data_2d = svd_2d.fit_transform(VECTORISED)
+                        st.markdown('## LSI Topic DataFrame')
+                        printDataFrame(data=KW, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
-                        MAR_FIG = go.Scattergl(
-                            x=data_2d[:, 0],
-                            y=data_2d[:, 1],
-                            mode='markers',
-                            marker=dict(
-                                color=COLOUR,
-                                line=dict(width=1)
-                            ),
-                            text=CV.get_feature_names(),
-                            hovertext=CV.get_feature_names(),
-                            hoverinfo='text'
-                        )
-                        MAR_FIG = [MAR_FIG]
-                        MAR_FIG = go.Figure(data=MAR_FIG)
-                        st.plotly_chart(MAR_FIG)
+                        if PLOT:
+                            st.markdown('## LSI(SVD) Scatterplot\n'
+                                        'Note that the following visualisation will use a Topic count of 2, '
+                                        'overriding previous inputs above, as you are only able to visualise data '
+                                        'on 2 axis. However the full analysis result of the above operation will '
+                                        'be saved in the dataset you provided and be available for download later '
+                                        'on in the app.\n\n'
+                                        'The main aim of the scatterplot is to show the similarity between topics, '
+                                        'which is measured by the distance between markers as shown in the following '
+                                        'diagram. The diagram contained within the expander is the same as the marker '
+                                        'diagram, just that the markers are all replaced by the topic words the '
+                                        'markers actually represent.')
+                            svd_2d = TruncatedSVD(n_components=2)
+                            data_2d = svd_2d.fit_transform(VECTORISED)
 
-                        with st.expander('Show Word Plots'):
-                            WORD_FIG = go.Scattergl(
+                            MAR_FIG = go.Scattergl(
                                 x=data_2d[:, 0],
                                 y=data_2d[:, 1],
-                                mode='text',
+                                mode='markers',
                                 marker=dict(
                                     color=COLOUR,
                                     line=dict(width=1)
                                 ),
                                 text=CV.get_feature_names(),
+                                hovertext=CV.get_feature_names(),
+                                hoverinfo='text'
                             )
-                            WORD_FIG = [WORD_FIG]
-                            WORD_FIG = go.Figure(data=WORD_FIG)
-                            st.plotly_chart(WORD_FIG)
+                            MAR_FIG = [MAR_FIG]
+                            MAR_FIG = go.Figure(data=MAR_FIG)
+                            st.plotly_chart(MAR_FIG)
 
-                        if SAVE:
-                            st.markdown('## Save Data\n'
-                                        '### Topics')
-                            for i in range(len(TOPIC_TEXT)):
-                                st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
-                                            f'(downloads/lsi_topic_{i}.csv)')
-                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+                            if W_PLOT:
+                                with st.expander('Show Word Plots'):
+                                    WORD_FIG = go.Scattergl(
+                                        x=data_2d[:, 0],
+                                        y=data_2d[:, 1],
+                                        mode='text',
+                                        marker=dict(
+                                            color=COLOUR,
+                                            line=dict(width=1)
+                                        ),
+                                        text=CV.get_feature_names(),
+                                    )
+                                    WORD_FIG = [WORD_FIG]
+                                    WORD_FIG = go.Figure(data=WORD_FIG)
+                                    st.plotly_chart(WORD_FIG)
 
+                    if SAVE:
+                        st.markdown('## Save Data\n'
+                                    '### Topics')
+                        for i in range(len(TOPIC_TEXT)):
+                            st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
+                                        f'(downloads/lsi_topic_{i}.csv)')
+                            pd.DataFrame(TOPIC_TEXT[i]).\
+                                to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+
+                        if VERBOSE and PLOT:
                             st.markdown('### Other Requested Data')
                             st.markdown('Download PNG File from [downloads/marker_figure.png]'
                                         '(downloads/marker_figure.png)')
                             MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))
-                            st.markdown('Download PNG File from [downloads/word_figure.png]'
-                                        '(downloads/word_figure.png)')
-                            WORD_FIG.write_image(str(DOWNLOAD_PATH / 'word_figure.png'))
+
+                            if W_PLOT:
+                                st.markdown('Download PNG File from [downloads/word_figure.png]'
+                                            '(downloads/word_figure.png)')
+                                WORD_FIG.write_image(str(DOWNLOAD_PATH / 'word_figure.png'))
             else:
                 st.error('Error: File not loaded properly. Try again.')

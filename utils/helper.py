@@ -118,17 +118,19 @@ def summarise(text, stopwords, pos_tag, nlp, sent_count):
         return summary
 
 
-def modelIterator(model, vectoriser, top_n):
+def modelIterator(model, vectoriser, top_n, vb=True):
     frame_list = []
 
     for id_, topic in enumerate(model.components_):
         lister = [(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]
-
-        st.markdown(f'### Topic {id_}')
         df = pd.DataFrame(data=lister,
                           index=range(len(lister)),
                           columns=['word', 'weight']).astype(str)
-        st.dataframe(df)
+
+        if vb:
+            st.markdown(f'### Topic {id_}')
+            st.dataframe(df)
+
         frame_list.append(df)
 
     return frame_list

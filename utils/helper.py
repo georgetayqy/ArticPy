@@ -125,7 +125,7 @@ def modelIterator(model, vectoriser, top_n, vb=True):
         lister = [(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]
         df = pd.DataFrame(data=lister,
                           index=range(len(lister)),
-                          columns=['word', 'weight']).astype(str)
+                          columns=['word', 'weight'])
 
         if vb:
             st.markdown(f'### Topic {id_}')
@@ -134,15 +134,6 @@ def modelIterator(model, vectoriser, top_n, vb=True):
         frame_list.append(df)
 
     return frame_list
-
-
-def modelNMFIterator(model, vectoriser, top_n):
-    kw = np.array(vectoriser.get_feature_names())
-    topic_kw = []
-    for weights in model.components_:
-        loc = (-weights).argsort()[:top_n]
-        topic_kw.append(kw.take(loc))
-    return topic_kw
 
 
 def downloadCorpora(model: str):

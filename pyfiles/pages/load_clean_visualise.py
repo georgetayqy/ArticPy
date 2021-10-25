@@ -28,10 +28,8 @@ from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFram
 STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
 DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
 
-# DOWNLOAD THE NECESSARY CORPUS
+# # DOWNLOAD THE NECESSARY CORPUS
 downloadCorpora('words')
-downloadCorpora('wordnet')
-downloadCorpora('vader_lexicon')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            GLOBAL VARIABLE DEFINITION                                            | #
@@ -73,8 +71,8 @@ DATA_COLUMN = None
 QUERY = None
 TOKENIZE = True
 EXTEND_STOPWORD = False
-STOPWORD_LIST = list()
-FIN_STOPWORD_LIST = list()
+STOPWORD_LIST = str()
+FIN_STOPWORD_LIST = []
 FINALISE = False
 
 
@@ -118,7 +116,8 @@ def app():
                 'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
                 'is only available for users who run the app using the app\'s source code, or through Docker. '
                 'For Docker, you will need to append the tag above behind the Docker Image name when running the *run* '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not, the '
+                'app will run with a default maximum upload size of 200 MB.\n\n'
                 'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
                 'supported Cloud Service Providers into the app.\n\n'
                 'After selecting the size of your file, select the file format you wish to upload. You are warned '
@@ -132,7 +131,7 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload the file that you wish to analyse:\n')
+        st.markdown('### Upload the File that you wish to Analyse:\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -225,7 +224,8 @@ def app():
                     'removed) or a **complex cleaning** (a process to *lemmatize words and remove stopwords*).\n\n'
                     'Files created from **simple cleaning** may be used for Summarization in *NLP Toolkit* while '
                     'files created from **complex cleaning** may be used for Document-Term Matrix Creation in '
-                    '*Document-Term Matrix*.')
+                    '*Document-Term Matrix*. Note that for most NLP Processes, the ** complex cleaning** process '
+                    'is recommended.')
         CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('Simple', 'Complex'))
         TOKENIZE = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect this '
                                                                   'option if you do not want to tokenize your data.')
@@ -234,10 +234,15 @@ def app():
                                           help='Select this option to extend the list of stopwords that will be used '
                                                'to clean your data.')
             if EXTEND_STOPWORD:
+                STOPWORD_LIST = str()
                 STOPWORD_LIST = st.text_area('Extended List of Stopwords',
                                              value='Key in a list of stopwords that you wish to append to the existing '
                                                    'list of stopwords. Delimit your words by commas, e.g. this, is, a, '
                                                    'sample, list ...')
+                if len(STOPWORD_LIST) != 0:
+                    st.info('Alert: Words detected.')
+                else:
+                    st.info('Alert: No Words detected')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                           DATA LOADING AND PROCESSING                                            | #
@@ -252,6 +257,10 @@ def app():
         st.warning('File has not been loaded.')
 
     if st.button('Begin Analysis', key='runner'):
+        # RESET STATE
+        CLEANED_DATA = pd.DataFrame()
+        CLEANED_DATA_TOKENIZED = pd.DataFrame()
+
         if DATA_PATH:
             try:
                 DATA = DATA[[DATA_COLUMN]]
@@ -260,8 +269,6 @@ def app():
                 DATA = DATA.dropna()
             except Exception as ex:
                 st.error(f'Error: {ex}')
-            else:
-                st.info('Data loaded properly!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # +                                                 DATA CLEANER                                                     + #
@@ -285,6 +292,7 @@ def app():
                             st.error(ex)
 
                     elif CLEAN_MODE == 'Complex' or CLEAN_MODE == 'Advanced':
+                        # CHECK IF NEW STOPWORDS WERE ADDED TO THE LIST
                         if EXTEND_STOPWORD:
                             try:
                                 if len(STOPWORD_LIST) != 0:
@@ -292,18 +300,22 @@ def app():
                                     FIN_STOPWORD_LIST = [word.lower() for word in nltk.corpus.words.words()]
                                     FIN_STOPWORD_LIST.extend(STOPWORD_LIST)
                                     FIN_STOPWORD_LIST = set(FIN_STOPWORD_LIST)
+                                    st.info(f'Stopwords accepted: {[word for word in STOPWORD_LIST]}!')
                                     FINALISE = True
-                                    st.info('Stopwords parsed!')
                                 else:
                                     FINALISE = False
-                                    raise ValueError('Length of list is 0. Try again.')
+                                    raise ValueError('Length of Stopword List is 0. Try again.')
                             except Exception as ex:
                                 st.error(f'Error: {ex}')
-                        else:
-                            FIN_STOPWORD_LIST = set(word.lower() for word in nltk.corpus.words.words())
-                            FINALISE = True
-                            st.info('Stopwords parsed!')
 
+                        # IF NO NEW STOPWORDS WERE DEFINED, THEN USE DEFAULT
+                        else:
+                            STOPWORD_LIST = str()
+                            FIN_STOPWORD_LIST = set(word.lower() for word in nltk.corpus.words.words())
+                            st.info('Alert: Default set of stopwords will be used.')
+                            FINALISE = True
+
+                        # NO ELSE CONDITION AS ELSE CONDITION IS EXPLICITLY SPECIFIED IN THE PREVIOUS EXCEPTION/ERROR
                         if FINALISE:
                             try:
                                 CLEANED_DATA = DATA[[DATA_COLUMN]]
@@ -332,11 +344,8 @@ def app():
                                     # FINAL TOKENIZATION THE DATA
                                     CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
                                     CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
-
                             except Exception as ex:
                                 st.error(ex)
-                        else:
-                            st.error('Error: Length of list is 0. Try again.')
 
                 if EXTEND_STOPWORD:
                     if FINALISE:
@@ -351,8 +360,6 @@ def app():
                                 (DATA, 'Raw Data', 'raw_ascii_data.csv'),
                                 (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv')
                             ]
-                    else:
-                        st.error('Error: Length of list is 0. No Data will be saved.')
                 else:
                     if TOKENIZE:
                         FINALISED_DATA_LIST = [
@@ -389,9 +396,6 @@ def app():
                                         st.markdown('## Cleaned Tokenized DataFrame')
                                         printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
                                                        advanced=ADVANCED_ANALYSIS)
-                                else:
-                                    st.error('Error: Stopwords are not parsed properly. No Data is displayed.'
-                                             'Try again.')
                             else:
                                 st.markdown('## Cleaned DataFrame')
                                 printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
@@ -410,8 +414,8 @@ def app():
                 if SAVE:
                     if EXTEND_STOPWORD:
                         if FINALISE:
-                            st.markdown('## Download Data')
                             try:
+                                st.markdown('## Download Data')
                                 for data in FINALISED_DATA_LIST:
                                     if not data[0].empty:
                                         st.markdown(f'### {data[1]}\n'
@@ -422,11 +426,9 @@ def app():
                                 st.error('Warning: Your data was not processed properly. Try again.')
                             except Exception as ex:
                                 st.error(f'Error: Unknown Fatal Error -> {ex}')
-                        else:
-                            st.error('Error: Stopwords are not parsed properly. No Data is displayed. Try again.')
                     else:
-                        st.markdown('## Download Data')
                         try:
+                            st.markdown('## Download Data')
                             for data in FINALISED_DATA_LIST:
                                 if not data[0].empty:
                                     st.markdown(f'### {data[1]}\n'
@@ -434,10 +436,10 @@ def app():
                                                 f'(downloads/{data[2]})')
                                     data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
                         except KeyError:
-                            st.error('Warning: Your data was not processed properly. Try again.')
+                            st.error('Warning: Your Data as not processed properly. Try again.')
                         except Exception as ex:
                             st.error(f'Error: Unknown Fatal Error -> {ex}')
             else:
-                st.error('Error: No files uploaded.')
+                st.error('Error: No Files Uploaded.')
         else:
-            st.error('Error: No files uploaded.')
+            st.error('Error: No Files Uploaded.')

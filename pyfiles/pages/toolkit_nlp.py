@@ -35,7 +35,7 @@ from spacy import displacy
 from wordcloud import WordCloud
 from textblob import TextBlob
 from utils import csp_downloaders
-from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic, modelNMFIterator
+from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         GLOBAL VARIABLE DECLARATION                                              | #
@@ -59,19 +59,18 @@ WIDTH = 800
 SENT_LEN = 3
 NUM_TOPICS = 10
 TOPIC_FRAME = None
-LDA_DATA = pd.DataFrame()
 LDA_VIS = None
 LDA_MODEL = None
 KW = None
 TFIDF_MODEL = None
 TFIDF_VECTORISED = None
 NMF_MODEL = None
-NMF_DATA = None
 LSI_MODEL = None
 LSI_DATA = None
 MAR_FIG = None
 WORD_FIG = None
 LDA_VIS_STR = None
+LDA_DATA = None
 MODEL = None
 ADVANCED_ANALYSIS = False
 NLP_MODEL = 'en_core_web_sm'
@@ -110,11 +109,11 @@ def app():
 # |                                               GLOBAL VARIABLES                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     global FILE, MODE, DATA_PATH, CSP, SAVE, VERBOSE, VERBOSITY, APP_MODE, BACKEND_ANALYSER, MAX_WORDS, \
-        CONTOUR_WIDTH, DATA, SENT_LEN, NUM_TOPICS, LDA_MODEL, MODEL, LDA_DATA, LDA_VIS, ADVANCED_ANALYSIS, \
+        CONTOUR_WIDTH, DATA, SENT_LEN, NUM_TOPICS, LDA_MODEL, MODEL, LDA_VIS, ADVANCED_ANALYSIS, \
         NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, DATAPOINT_SELECTOR, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, \
-        NMF_MODEL, NMF_DATA, LSI_MODEL, LSI_DATA, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
+        NMF_MODEL, LSI_MODEL, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
         COLOUR, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, KW, TOPIC_FRAME, ALPHA, \
-        L1_RATIO, PLOT, W_PLOT, HAC_PLOT1
+        L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -804,7 +803,7 @@ def app():
 
                     KW = pd.DataFrame(dominantTopic(vect=CV, model=LDA_MODEL, n_words=NUM_TOPICS))
                     KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.columns = [f'topic_{i}' for i in range(KW.shape[0])]
+                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
 
                     # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
                     LDA_VIS = pyLDAvis.sklearn.prepare(LDA_MODEL, VECTORISED, CV, mds='tsne')
@@ -849,22 +848,20 @@ def app():
                                     random_state=1,
                                     alpha=ALPHA,
                                     l1_ratio=L1_RATIO).fit(TFIDF_VECTORISED)
-                    NMF_DATA = NMF_MODEL.fit_transform(TFIDF_VECTORISED)
 
                     if VERBOSE:
                         st.markdown('## Model Data')
                         TOPIC_TEXT = modelIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
+                    else:
+                        TOPIC_TEXT = modelIterator(model=NMF_MODEL, vectoriser=TFIDF_MODEL, top_n=NUM_TOPICS, vb=False)
 
-                    TOPIC_TEXT = modelNMFIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
-                    TOPIC_FRAME = pd.DataFrame(TOPIC_TEXT)
-
-                    KW = pd.DataFrame(TOPIC_TEXT)
+                    KW = pd.DataFrame(dominantTopic(model=NMF_MODEL, vect=TFIDF_MODEL, n_words=NUM_TOPICS))
                     KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.columns = [f'topic_{i}' for i in range(KW.shape[0])]
+                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
 
                     if VERBOSE:
                         st.markdown('## NMF Topic DataFrame')
-                        printDataFrame(data=KW, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                        printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=ADVANCED_ANALYSIS)
 
                     if SAVE:
                         st.markdown('## Save Data\n'
@@ -872,12 +869,12 @@ def app():
                         for i in range(len(TOPIC_TEXT)):
                             st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
                                         f'(downloads/nmf_topics_{i}.csv)')
-                            TOPIC_FRAME[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
+                            TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
+
                         st.markdown('### Topic/Word List')
                         st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
                                     f'(downloads/summary_topics.csv)')
-                        st.markdown('Download Processed Data from [downloads/processed.csv](downloads/processed.csv)')
-                        DATA.to_csv(str(DOWNLOAD_PATH / 'processed.csv'))
+                        KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
 
                 # LSI
                 elif NLP_TOPIC_MODEL == 'Latent Semantic Indexing':
@@ -888,13 +885,12 @@ def app():
                     if VERBOSE:
                         st.markdown('## Model Data')
                         TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
+                    else:
+                        TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS, vb=False)
 
-                    TOPIC_TEXT = modelNMFIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
-                    TOPIC_FRAME = pd.DataFrame(TOPIC_TEXT)
-
-                    KW = pd.DataFrame(TOPIC_TEXT)
+                    KW = pd.DataFrame(dominantTopic(model=LSI_MODEL, vect=CV, n_words=NUM_TOPICS))
                     KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.columns = [f'topic_{i}' for i in range(KW.shape[0])]
+                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
 
                     if VERBOSE:
                         st.markdown('## LSI Topic DataFrame')
@@ -928,7 +924,8 @@ def app():
                                 hoverinfo='text'
                             )
                             MAR_FIG = [MAR_FIG]
-                            MAR_FIG = go.Figure(data=MAR_FIG)
+                            MAR_FIG = go.Figure(data=MAR_FIG,
+                                                layout=go.Layout(title='Scatter Plot'))
                             st.plotly_chart(MAR_FIG)
 
                             if W_PLOT:
@@ -944,7 +941,8 @@ def app():
                                         text=CV.get_feature_names(),
                                     )
                                     WORD_FIG = [WORD_FIG]
-                                    WORD_FIG = go.Figure(data=WORD_FIG)
+                                    WORD_FIG = go.Figure(data=WORD_FIG,
+                                                         layout=go.Layout(title='Scatter Word Plot'))
                                     st.plotly_chart(WORD_FIG)
 
                     if SAVE:
@@ -955,6 +953,11 @@ def app():
                                         f'(downloads/lsi_topic_{i}.csv)')
                             pd.DataFrame(TOPIC_TEXT[i]).\
                                 to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+
+                        st.markdown('### Topic/Word List')
+                        st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
+                                    f'(downloads/summary_topics.csv)')
+                        KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
 
                         if VERBOSE and PLOT:
                             st.markdown('### Other Requested Data')

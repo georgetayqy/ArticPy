@@ -50,7 +50,7 @@ TOP_N_WORD_FIG = None
 # -------------------------------------------------------------------------------------------------------------------- #
 def app():
     """
-    This function is called when the app is run
+    Main function that will be called when the app is run and this module is called
     """
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -84,16 +84,16 @@ def app():
                 'limited to using the Large File option to pull datasets larger than 200 MB in size.\n\n'
                 'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
                 'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
-                'data before proceeding.')
+                'data before proceeding. Do not upload the a file containing tokenized data for DTM Creation.')
     SIZE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('### Upload the file that you wish to analyse:\n')
+    st.markdown('### Upload the File that you wish to Analyse:\n')
     if SIZE == 'Small File(s)':
-        DATA_PATH = st.file_uploader(f'Load up a {MODE} File containing the cleaned data', type=[MODE])
+        DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
             if not DATA.empty or not DATA:

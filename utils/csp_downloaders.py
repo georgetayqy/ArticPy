@@ -14,11 +14,6 @@ import pandas as pd
 import streamlit as st
 from azure.storage.blob import BlobServiceClient
 from google.cloud import storage
-from googleapiclient.http import MediaIoBaseDownload
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -63,15 +58,25 @@ class AWSDownloader:
 
         with st.form('AWS Parameters'):
             if self.FROM_CREDENTIAL_FILE:
-                self.AWS_CREDENTIAL_FILE = st.file_uploader('Upload Credential File', type=['CSV'])
+                self.AWS_CREDENTIAL_FILE = st.file_uploader('Upload Credential File', type=['CSV'],
+                                                            help='Upload a CSV file downloaded from AWS containing '
+                                                                 'your credentials for your S3 Storage Account')
             else:
                 self.AWS_ACCESS_KEY_ID = st.text_input('AWS Access Key')
                 self.AWS_SECRET_ACCESS_KEY = st.text_input('AWS Secret Access Key')
 
-            self.AWS_BUCKET_NAME = st.text_input('Bucket Name')
-            self.AWS_OBJECT_KEY = st.text_input('S3 Object Key')
-            self.AWS_FILE_NAME = st.text_input('Filename with **extension**; note that the file will always be '
-                                               'saved in the current working directory')
+            self.AWS_BUCKET_NAME = st.text_input('Bucket Name', help='This is the name of the S3 bucket you have '
+                                                                     'created')
+            self.AWS_OBJECT_KEY = st.text_input('S3 Object Key', help='This is the name of the file you want to pull '
+                                                                      'from your S3 bucket. It should contain the '
+                                                                      'relative path to the file (if your file is '
+                                                                      'not found in the root directory)')
+            self.AWS_FILE_NAME = st.text_input('Filename with extension; note that the file will always be '
+                                               'saved in the current working directory',
+                                               help='If file extensions are not included, your file will not be able '
+                                                    'to load. If you encounter errors, ensure that the file extension '
+                                                    'is present and correct; no file extension validation is done '
+                                                    'on the files you decide to pull')
             self.SUBMIT = st.form_submit_button('Submit Parameters')
 
             if self.SUBMIT:
@@ -79,8 +84,8 @@ class AWSDownloader:
                         self.AWS_OBJECT_KEY and not self.AWS_FILE_NAME:
                     st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
                     self.SUCCESSFUL = False
-                elif not self.FROM_CREDENTIAL_FILE and not self.AWS_CREDENTIAL_FILE and not self.AWS_BUCKET_NAME and not \
-                        self.AWS_OBJECT_KEY and not self.AWS_FILE_NAME:
+                elif not self.FROM_CREDENTIAL_FILE and not self.AWS_CREDENTIAL_FILE and not self.AWS_BUCKET_NAME and \
+                        not self.AWS_OBJECT_KEY and not self.AWS_FILE_NAME:
                     st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
                     self.SUCCESSFUL = False
                 else:
@@ -157,6 +162,9 @@ class AzureDownloader:
 
         st.title('Azure Downloader')
         with st.form('API Variables'):
+            st.markdown('Due to limitations of the API and how data stored in Azure Blobs, when this method is called, '
+                        'all files in a blob is downloaded. Ensure that you only have **one** file per blob to avoid '
+                        'this error.')
             self.AZURE_CONNECTION_STRING = st.text_input("Azure Connection String")
             self.AZURE_BLOB_NAME = st.text_input("Azure Blob Name")
             self.LOCAL_DOWNLOAD_PATH = st.text_input("Local Download Path (do not modify if running on web app)",
@@ -214,8 +222,9 @@ class AzureDownloader:
             for blob in ClientBlob:
                 print('.', end='')
                 byte = self.ClientContainer.get_blob_client(blob).download_blob().readall()
+                print(byte)
                 self.saveBlob(blob.name, byte)
-                self.AZURE_DOWNLOAD_ABS_PATH = os.path.join(self.AZURE_DOWNLOAD_PATH, blob.name)
+                # self.AZURE_DOWNLOAD_ABS_PATH = os.path.join(self.AZURE_DOWNLOAD_PATH, blob.name)
                 st.success('File Successfully downloaded!')
         else:
             st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
@@ -295,121 +304,9 @@ class GoogleDownloader:
                 self.GoogleBlob = self.GoogleBucket.blob(self.GOOGLE_STORAGE_OBJECT_NAME)
                 self.GoogleBlob.download_to_filename(self.GOOGLE_DESTINATION_FILE_NAME)
             except Exception as e:
+                self.SUCCESSFUL = False
                 st.error(e)
             else:
                 st.success('File Downloaded!')
-        else:
-            st.error('Error: Parameters are not loaded or is validated successfully. Try again.')
-
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                GOOGLE DRIVE                                                      | #
-# -------------------------------------------------------------------------------------------------------------------- #
-class GoogleDriveDownloader:
-    """
-    This class manages the downloading of files stored on Google Drive. This is offered as an alternative for users who
-    uses Google products to store their data but does not wish to use Google Cloud Console.
-
-    Global Variables
-    ----------------
-    GOOGLE_DRIVE_CREDENTIALS_TOKEN                  Google Drive API Token
-    GOOGLE_DRIVE_CREDENTIALS_SECRET                 Google Drive API Secret
-    GOOGLE_DRIVE_CREDENTIALS                        Google Drive API Credential File
-    GOOGLE_DRIVE_FILEID                             File ID of the file found on Google Drive
-    GOOGLE_DRIVE_SVC                                Google Drive Service object
-    GOOGLE_DRIVE_REQUEST                            Google Drive Request object
-    GOOGLE_DRIVE_DOWNLOADER                         Google Drive Download object
-    SCOPES                                          Google Drive API Scope
-    SCOPE_STR                                       User-defined Google API Scope
-    SUCCESSFUL                                      Flag
-    ----------------
-    """
-
-    def __init__(self):
-        self.GOOGLE_DRIVE_CREDENTIALS_TOKEN = None
-        self.GOOGLE_DRIVE_CREDENTIALS_SECRET = None
-        self.GOOGLE_DRIVE_CREDENTIALS = None
-        self.GOOGLE_DRIVE_FILEID = None
-        self.GOOGLE_DRIVE_SVC = None
-        self.GOOGLE_DRIVE_REQUEST = None
-        self.GOOGLE_DRIVE_DOWNLOADER = None
-        self.GOOGLE_DRIVE_OUTPUT_FILENAME = ''
-        self.SCOPE_STR = None
-        self.SCOPES = ['https://www.googleapis.com/auth/drive.apps.readonly']
-        self.SUCCESSFUL = False
-
-        st.title('Google Drive Downloader')
-        with st.form(key='googleDrive'):
-            self.SCOPE_STR = st.text_input('Key in scope of Drive API, delimited with "," without spaces')
-            self.GOOGLE_DRIVE_CREDENTIALS_TOKEN = st.file_uploader('Load Google Drive Credentials', type=['JSON'])
-            self.GOOGLE_DRIVE_CREDENTIALS_SECRET = st.file_uploader('Load Google Drive Secret', type=['JSON'])
-            self.GOOGLE_DRIVE_FILEID = st.text_input('Key in Google Drive File ID')
-            self.GOOGLE_DRIVE_OUTPUT_FILENAME = os.path.join(os.getcwd(), st.text_input('Key in the filename of the '
-                                                                                        'downloaded file with '
-                                                                                        'extensions'))
-            self.GOOGLE_DRIVE_SUBMIT = st.form_submit_button('Submit Parameters')
-
-            if self.GOOGLE_DRIVE_SUBMIT:
-                # ASSERT VARS
-                if not self.SCOPE_STR or not self.GOOGLE_DRIVE_CREDENTIALS_TOKEN or \
-                        not self.GOOGLE_DRIVE_CREDENTIALS_SECRET or not self.GOOGLE_DRIVE_FILEID or not \
-                        self.GOOGLE_DRIVE_OUTPUT_FILENAME:
-                    st.error('Error: One or more Parameters are missing. Try again.')
-                else:
-                    st.success('Parameters Validated and Accepted!')
-
-                    try:
-                        if self.SCOPE_STR is not None or '':
-                            self.SCOPES = self.SCOPE_STR.split(sep=',')
-                        st.info('Credentials Loaded!')
-
-                        if os.path.exists('token.json'):
-                            self.GOOGLE_DRIVE_CREDENTIALS = Credentials.from_authorized_user_file(
-                                self.GOOGLE_DRIVE_CREDENTIALS_TOKEN, self.SCOPES)
-
-                        # If there are no (valid) credentials available, let the user log in.
-                        if not self.GOOGLE_DRIVE_CREDENTIALS or not self.GOOGLE_DRIVE_CREDENTIALS.valid:
-                            if self.GOOGLE_DRIVE_CREDENTIALS and self.GOOGLE_DRIVE_CREDENTIALS.expired \
-                                    and self.GOOGLE_DRIVE_CREDENTIALS.refresh_token:
-                                self.GOOGLE_DRIVE_CREDENTIALS.refresh(Request())
-                            else:
-                                flow = InstalledAppFlow.from_client_secrets_file(self.GOOGLE_DRIVE_CREDENTIALS_SECRET,
-                                                                                 self.SCOPES)
-                                self.GOOGLE_DRIVE_CREDENTIALS = flow.run_local_server(port=0)
-                            # Save the credentials for the next run
-                            with open(self.GOOGLE_DRIVE_CREDENTIALS_TOKEN, 'w') as token:
-                                token.write(self.GOOGLE_DRIVE_CREDENTIALS.to_json())
-                    except Exception as ex:
-                        st.error(f'Error: {ex}')
-                        self.SUCCESSFUL = False
-                    else:
-                        st.success('Successfully Authenticated!')
-                        self.SUCCESSFUL = True
-                        self.GOOGLE_DRIVE_SVC = build('drive', 'v3', credentials=self.GOOGLE_DRIVE_CREDENTIALS)
-
-    def downloadBlob(self):
-        """
-        Download data
-        """
-        if self.SUCCESSFUL:
-            try:
-                self.GOOGLE_DRIVE_REQUEST = self.GOOGLE_DRIVE_SVC.files().get_media(fileId=self.GOOGLE_DRIVE_FILEID)
-                file_handler = io.BytesIO()
-                self.GOOGLE_DRIVE_DOWNLOADER = MediaIoBaseDownload(file_handler, self.GOOGLE_DRIVE_REQUEST)
-
-                status = False
-                download_bar = st.progress(0)
-                while status is False:
-                    download_status, status = self.GOOGLE_DRIVE_DOWNLOADER.next_chunk()
-                    download_bar.progress(int(download_status.progress() * 100))
-
-                file_handler.seek(0)
-
-                with open(self.GOOGLE_DRIVE_OUTPUT_FILENAME, 'wb') as f:
-                    shutil.copyfileobj(file_handler, f)
-            except Exception as e:
-                st.error(f'Error: {e}. Try again.')
-            else:
-                st.success(F'File {self.GOOGLE_DRIVE_OUTPUT_FILENAME} downloaded!')
         else:
             st.error('Error: Parameters are not loaded or is validated successfully. Try again.')

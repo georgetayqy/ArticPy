@@ -144,19 +144,21 @@ def app():
 
     elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
-        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
             if azure.SUCCESSFUL:
                 try:
                     azure.downloadBlob()
-                    DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
+                    DATA = readFile(azure.AZURE_DOWNLOAD_PATH, MODE)
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
@@ -164,11 +166,13 @@ def app():
                 try:
                     aws.downloadFile()
                     DATA = readFile(aws.AWS_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
@@ -176,23 +180,14 @@ def app():
                 try:
                     gcs.downloadBlob()
                     DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
 
-        elif CSP == 'Google Drive':
-            gd = csp_downloaders.GoogleDriveDownloader()
-            if gd.SUCCESSFUL:
-                try:
-                    gd.downloadBlob()
-                    DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               PROCESSING FLAGS                                                   | #
@@ -251,17 +246,23 @@ def app():
                 'Ensure that you have successfully uploaded the required data and selected the correct column '
                 'containing your data before clicking on the "Begin Analysis" button. The status of your file '
                 'upload is displayed below for your reference.')
-    if DATA_PATH:
-        st.info('File loaded.')
-    else:
-        st.warning('File has not been loaded.')
+    if FILE == 'Small File(s)':
+        if DATA_PATH:
+            st.info('File loaded.')
+        else:
+            st.warning('File has not been loaded.')
+    elif FILE == 'Large File(s)':
+        if not DATA.empty:
+            st.info('File loaded.')
+        else:
+            st.warning('File has not been loaded.')
 
     if st.button('Begin Analysis', key='runner'):
         # RESET STATE
         CLEANED_DATA = pd.DataFrame()
         CLEANED_DATA_TOKENIZED = pd.DataFrame()
 
-        if DATA_PATH:
+        if (FILE == 'Small File(s)' and DATA_PATH) or (FILE == 'Large File(s)' and not DATA.empty):
             try:
                 DATA = DATA[[DATA_COLUMN]]
                 DATA[DATA_COLUMN] = DATA[DATA_COLUMN].str.encode('ascii', 'ignore').str.decode('ascii')

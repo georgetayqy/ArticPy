@@ -27,7 +27,7 @@ STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
 DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
 DTM = pd.DataFrame()
 pd.options.plotting.backend = 'plotly'
-SIZE = 'Small File(s)'
+FILE = 'Small File(s)'
 DATA = pd.DataFrame()
 DATA_PATH = None
 ANALYSIS = False
@@ -56,7 +56,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                GLOBAL VARIABLES                                                  | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, SAVE, SIZE, MODE, \
+    global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, SAVE, FILE, MODE, \
         STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy, CSP, ADVANCED_ANALYSIS, \
         FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG
 
@@ -85,14 +85,14 @@ def app():
                 'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
                 'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
                 'data before proceeding. Do not upload the a file containing tokenized data for DTM Creation.')
-    SIZE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+    FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('### Upload the File that you wish to Analyse:\n')
-    if SIZE == 'Small File(s)':
+    if FILE == 'Small File(s)':
+        st.markdown('### Upload the File that you wish to Analyse:\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -103,21 +103,23 @@ def app():
             # RESET
             DATA = pd.DataFrame()
 
-    elif SIZE == 'Large File(s)':
+    elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
-        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
             if azure.SUCCESSFUL:
                 try:
                     azure.downloadBlob()
-                    DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
+                    DATA = readFile(azure.AZURE_DOWNLOAD_PATH, MODE)
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
@@ -125,11 +127,13 @@ def app():
                 try:
                     aws.downloadFile()
                     DATA = readFile(aws.AWS_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
@@ -137,23 +141,13 @@ def app():
                 try:
                     gcs.downloadBlob()
                     DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
+                    DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
 
-        elif CSP == 'Google Drive':
-            gd = csp_downloaders.GoogleDriveDownloader()
-            if gd.SUCCESSFUL:
-                try:
-                    gd.downloadBlob()
-                    DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
-                    if not DATA.empty:
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                      FLAGS                                                       | #
@@ -199,13 +193,19 @@ def app():
                 'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
                 'before clicking on the "Proceed" button. The status of your file upload is displayed below for your '
                 'reference.')
-    if not DATA.empty:
-        st.info('File loaded.')
-    else:
-        st.warning('File has not been loaded.')
+    if FILE == 'Small File(s)':
+        if DATA_PATH:
+            st.info('File loaded.')
+        else:
+            st.warning('File has not been loaded.')
+    elif FILE == 'Large File(s)':
+        if not DATA.empty:
+            st.info('File loaded.')
+        else:
+            st.warning('File has not been loaded.')
 
     if st.button('Proceed', key='doc'):
-        if not DATA.empty:
+        if (FILE == 'Small File(s)' and DATA_PATH) or (FILE == 'Large File(s)' and not DATA.empty):
             st.info('Data loaded properly!')
             DATA = DATA.astype(str)
             with st.spinner('Working to create a Document-Term Matrix...'):

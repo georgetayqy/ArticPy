@@ -151,6 +151,7 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
+        st.markdown('### Upload the File that you wish to Analyse:\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -159,25 +160,24 @@ def app():
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
         else:
-            # RESET
             DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
         st.info(f'File Format Selected: {MODE}')
-        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google', 'Google Drive'))
+        CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':
             azure = csp_downloaders.AzureDownloader()
             if azure.SUCCESSFUL:
                 try:
                     azure.downloadBlob()
-                    DATA = readFile(azure.AZURE_DOWNLOAD_ABS_PATH, MODE)
-                    if not DATA.empty:
-                        DATA = DATA.astype(str)
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
+                    DATA = readFile(azure.AZURE_DOWNLOAD_PATH, MODE)
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Amazon':
             aws = csp_downloaders.AWSDownloader()
@@ -185,12 +185,12 @@ def app():
                 try:
                     aws.downloadFile()
                     DATA = readFile(aws.AWS_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA = DATA.astype(str)
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
+
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
         elif CSP == 'Google':
             gcs = csp_downloaders.GoogleDownloader()
@@ -198,25 +198,12 @@ def app():
                 try:
                     gcs.downloadBlob()
                     DATA = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, MODE)
-                    if not DATA.empty:
-                        DATA = DATA.astype(str)
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
                 except Exception as ex:
                     st.error(f'Error: {ex}. Try again.')
 
-        elif CSP == 'Google Drive':
-            gd = csp_downloaders.GoogleDriveDownloader()
-            if gd.SUCCESSFUL:
-                try:
-                    gd.downloadBlob()
-                    DATA = readFile(gd.GOOGLE_DRIVE_OUTPUT_FILENAME, MODE)
-                    if not DATA.empty:
-                        DATA = DATA.astype(str)
-                        DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                        st.success(f'Data Loaded from {DATA_COLUMN}!')
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            if not DATA.empty:
+                DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
+                st.success(f'Data Loaded from {DATA_COLUMN}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              FUNCTION SELECTOR                                                   | #
@@ -326,13 +313,13 @@ def app():
             else:
                 st.info('Accuracy Model Loaded!')
         VERBOSE = st.checkbox('Display DataFrames?')
-        SAVE = st.checkbox('Save Data?')
         if VERBOSE:
             VERBOSITY = st.slider('Choose Number of Data Points to Display (Select 0 to display all Data Points)',
                                   min_value=0,
                                   max_value=1000,
                                   value=20)
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+        SAVE = st.checkbox('Save Data?')
         ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
         if ONE_DATAPOINT:
             DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
@@ -776,198 +763,200 @@ def app():
 
         if st.button('Start Modelling', key='topic'):
             if not DATA.empty:
-                CV = CountVectorizer(min_df=MIN_DF,
-                                     max_df=MAX_DF,
-                                     stop_words='english',
-                                     lowercase=True,
-                                     token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}',
-                                     max_features=MAX_FEATURES)
                 try:
+                    CV = CountVectorizer(min_df=MIN_DF,
+                                         max_df=MAX_DF,
+                                         stop_words='english',
+                                         lowercase=True,
+                                         token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}',
+                                         max_features=MAX_FEATURES)
                     VECTORISED = CV.fit_transform(DATA[DATA_COLUMN])
-                except ValueError:
-                    st.error('Error: The column loaded is empty or has invalid data points. Try again.')
+                # except ValueError:
+                #     st.error('Error: The column loaded is empty or has invalid data points. Try again.')
+                except Exception as ex:
+                    st.error(f'Error: {ex}')
+                else:
+                    # LDA
+                    if NLP_TOPIC_MODEL == 'Latent Dirichlet Allocation':
+                        LDA_MODEL = LatentDirichletAllocation(n_components=NUM_TOPICS,
+                                                              max_iter=MAX_ITER,
+                                                              learning_method='online',
+                                                              n_jobs=WORKER)
+                        LDA_DATA = LDA_MODEL.fit_transform(VECTORISED)
 
-                # LDA
-                if NLP_TOPIC_MODEL == 'Latent Dirichlet Allocation':
-                    LDA_MODEL = LatentDirichletAllocation(n_components=NUM_TOPICS,
-                                                          max_iter=MAX_ITER,
-                                                          learning_method='online',
-                                                          n_jobs=WORKER)
-                    LDA_DATA = LDA_MODEL.fit_transform(VECTORISED)
+                        if VERBOSE:
+                            st.markdown('## Model Data')
+                            TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS)
+                        else:
+                            TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS, vb=False)
 
-                    if VERBOSE:
-                        st.markdown('## Model Data')
-                        TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS)
-                    else:
-                        TOPIC_TEXT = modelIterator(LDA_MODEL, CV, top_n=NUM_TOPICS, vb=False)
+                        KW = pd.DataFrame(dominantTopic(vect=CV, model=LDA_MODEL, n_words=NUM_TOPICS))
+                        KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
+                        KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
 
-                    KW = pd.DataFrame(dominantTopic(vect=CV, model=LDA_MODEL, n_words=NUM_TOPICS))
-                    KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
+                        # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
+                        LDA_VIS = pyLDAvis.sklearn.prepare(LDA_MODEL, VECTORISED, CV, mds='tsne')
 
-                    # THIS VISUALISES ALL THE DOCUMENTS IN THE DATASET PROVIDED
-                    LDA_VIS = pyLDAvis.sklearn.prepare(LDA_MODEL, VECTORISED, CV, mds='tsne')
+                        if VERBOSE:
+                            st.markdown('## Topic Label\n'
+                                        'The following frame will show you the words that are associated with a '
+                                        'certain topic.')
+                            printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=False)
 
-                    if VERBOSE:
-                        st.markdown('## Topic Label\n'
-                                    'The following frame will show you the words that are associated with a certain '
-                                    'topic.')
-                        printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=False)
+                            st.markdown('## LDA\n'
+                                        f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
+                                        f'from all the text provided in your dataset.')
+                            LDA_VIS_STR = pyLDAvis.prepared_data_to_html(LDA_VIS)
+                            streamlit.components.v1.html(LDA_VIS_STR, width=1300, height=800)
 
-                        st.markdown('## LDA\n'
-                                    f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
-                                    f'from all the text provided in your dataset.')
-                        LDA_VIS_STR = pyLDAvis.prepared_data_to_html(LDA_VIS)
-                        streamlit.components.v1.html(LDA_VIS_STR, width=1300, height=800)
+                        if SAVE:
+                            st.markdown('## Save Data\n'
+                                        '### Topics')
+                            for i in range(len(TOPIC_TEXT)):
+                                st.markdown(f'Download all Topic List from [downloads/lda_topics_{i}.csv]'
+                                            f'(downloads/lda_topics_{i}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lda_topics_{i}.csv'), index=False)
+                            st.markdown('### Topic/Word List')
+                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
+                                        f'(downloads/summary_topics.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
 
-                    if SAVE:
-                        st.markdown('## Save Data\n'
-                                    '### Topics')
-                        for i in range(len(TOPIC_TEXT)):
-                            st.markdown(f'Download all Topic List from [downloads/lda_topics_{i}.csv]'
-                                        f'(downloads/lda_topics_{i}.csv)')
-                            TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lda_topics_{i}.csv'), index=False)
-                        st.markdown('### Topic/Word List')
-                        st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                    f'(downloads/summary_topics.csv)')
-                        KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
-
-                        st.markdown('### Other Requested Data')
-                        st.markdown('Download HTML File from [downloads/lda.html](downloads/lda.html)')
-                        pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / 'lda.html'))
-
-                # NMF
-                elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
-                    TFIDF_MODEL = TfidfVectorizer(max_df=MAX_DF,
-                                                  min_df=MIN_DF,
-                                                  max_features=MAX_FEATURES,
-                                                  stop_words='english')
-                    TFIDF_VECTORISED = TFIDF_MODEL.fit_transform(DATA[DATA_COLUMN].values.astype(str))
-                    NMF_MODEL = NMF(n_components=NUM_TOPICS,
-                                    max_iter=MAX_ITER,
-                                    random_state=1,
-                                    alpha=ALPHA,
-                                    l1_ratio=L1_RATIO).fit(TFIDF_VECTORISED)
-
-                    if VERBOSE:
-                        st.markdown('## Model Data')
-                        TOPIC_TEXT = modelIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
-                    else:
-                        TOPIC_TEXT = modelIterator(model=NMF_MODEL, vectoriser=TFIDF_MODEL, top_n=NUM_TOPICS, vb=False)
-
-                    KW = pd.DataFrame(dominantTopic(model=NMF_MODEL, vect=TFIDF_MODEL, n_words=NUM_TOPICS))
-                    KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
-
-                    if VERBOSE:
-                        st.markdown('## NMF Topic DataFrame')
-                        printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=ADVANCED_ANALYSIS)
-
-                    if SAVE:
-                        st.markdown('## Save Data\n'
-                                    '### Topics')
-                        for i in range(len(TOPIC_TEXT)):
-                            st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
-                                        f'(downloads/nmf_topics_{i}.csv)')
-                            TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
-
-                        st.markdown('### Topic/Word List')
-                        st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                    f'(downloads/summary_topics.csv)')
-                        KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
-
-                # LSI
-                elif NLP_TOPIC_MODEL == 'Latent Semantic Indexing':
-                    LSI_MODEL = TruncatedSVD(n_components=NUM_TOPICS,
-                                             n_iter=MAX_ITER)
-                    LSI_DATA = LSI_MODEL.fit_transform(VECTORISED)
-
-                    if VERBOSE:
-                        st.markdown('## Model Data')
-                        TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
-                    else:
-                        TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS, vb=False)
-
-                    KW = pd.DataFrame(dominantTopic(model=LSI_MODEL, vect=CV, n_words=NUM_TOPICS))
-                    KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
-                    KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
-
-                    if VERBOSE:
-                        st.markdown('## LSI Topic DataFrame')
-                        printDataFrame(data=KW, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
-
-                        if PLOT:
-                            st.markdown('## LSI(SVD) Scatterplot\n'
-                                        'Note that the following visualisation will use a Topic count of 2, '
-                                        'overriding previous inputs above, as you are only able to visualise data '
-                                        'on 2 axis. However the full analysis result of the above operation will '
-                                        'be saved in the dataset you provided and be available for download later '
-                                        'on in the app.\n\n'
-                                        'The main aim of the scatterplot is to show the similarity between topics, '
-                                        'which is measured by the distance between markers as shown in the following '
-                                        'diagram. The diagram contained within the expander is the same as the marker '
-                                        'diagram, just that the markers are all replaced by the topic words the '
-                                        'markers actually represent.')
-                            svd_2d = TruncatedSVD(n_components=2)
-                            data_2d = svd_2d.fit_transform(VECTORISED)
-
-                            MAR_FIG = go.Scattergl(
-                                x=data_2d[:, 0],
-                                y=data_2d[:, 1],
-                                mode='markers',
-                                marker=dict(
-                                    color=COLOUR,
-                                    line=dict(width=1)
-                                ),
-                                text=CV.get_feature_names(),
-                                hovertext=CV.get_feature_names(),
-                                hoverinfo='text'
-                            )
-                            MAR_FIG = [MAR_FIG]
-                            MAR_FIG = go.Figure(data=MAR_FIG,
-                                                layout=go.Layout(title='Scatter Plot'))
-                            st.plotly_chart(MAR_FIG)
-
-                            if W_PLOT:
-                                with st.expander('Show Word Plots'):
-                                    WORD_FIG = go.Scattergl(
-                                        x=data_2d[:, 0],
-                                        y=data_2d[:, 1],
-                                        mode='text',
-                                        marker=dict(
-                                            color=COLOUR,
-                                            line=dict(width=1)
-                                        ),
-                                        text=CV.get_feature_names(),
-                                    )
-                                    WORD_FIG = [WORD_FIG]
-                                    WORD_FIG = go.Figure(data=WORD_FIG,
-                                                         layout=go.Layout(title='Scatter Word Plot'))
-                                    st.plotly_chart(WORD_FIG)
-
-                    if SAVE:
-                        st.markdown('## Save Data\n'
-                                    '### Topics')
-                        for i in range(len(TOPIC_TEXT)):
-                            st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
-                                        f'(downloads/lsi_topic_{i}.csv)')
-                            pd.DataFrame(TOPIC_TEXT[i]).\
-                                to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
-
-                        st.markdown('### Topic/Word List')
-                        st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                    f'(downloads/summary_topics.csv)')
-                        KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
-
-                        if VERBOSE and PLOT:
                             st.markdown('### Other Requested Data')
-                            st.markdown('Download PNG File from [downloads/marker_figure.png]'
-                                        '(downloads/marker_figure.png)')
-                            MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))
+                            st.markdown('Download HTML File from [downloads/lda.html](downloads/lda.html)')
+                            pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / 'lda.html'))
 
-                            if W_PLOT:
-                                st.markdown('Download PNG File from [downloads/word_figure.png]'
-                                            '(downloads/word_figure.png)')
-                                WORD_FIG.write_image(str(DOWNLOAD_PATH / 'word_figure.png'))
+                    # NMF
+                    elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
+                        TFIDF_MODEL = TfidfVectorizer(max_df=MAX_DF,
+                                                      min_df=MIN_DF,
+                                                      max_features=MAX_FEATURES,
+                                                      stop_words='english')
+                        TFIDF_VECTORISED = TFIDF_MODEL.fit_transform(DATA[DATA_COLUMN].values.astype(str))
+                        NMF_MODEL = NMF(n_components=NUM_TOPICS,
+                                        max_iter=MAX_ITER,
+                                        random_state=1,
+                                        alpha=ALPHA,
+                                        l1_ratio=L1_RATIO).fit(TFIDF_VECTORISED)
+
+                        if VERBOSE:
+                            st.markdown('## Model Data')
+                            TOPIC_TEXT = modelIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
+                        else:
+                            TOPIC_TEXT = modelIterator(model=NMF_MODEL, vectoriser=TFIDF_MODEL, top_n=NUM_TOPICS, vb=False)
+
+                        KW = pd.DataFrame(dominantTopic(model=NMF_MODEL, vect=TFIDF_MODEL, n_words=NUM_TOPICS))
+                        KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
+                        KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
+
+                        if VERBOSE:
+                            st.markdown('## NMF Topic DataFrame')
+                            printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=ADVANCED_ANALYSIS)
+
+                        if SAVE:
+                            st.markdown('## Save Data\n'
+                                        '### Topics')
+                            for i in range(len(TOPIC_TEXT)):
+                                st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
+                                            f'(downloads/nmf_topics_{i}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
+
+                            st.markdown('### Topic/Word List')
+                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
+                                        f'(downloads/summary_topics.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
+
+                    # LSI
+                    elif NLP_TOPIC_MODEL == 'Latent Semantic Indexing':
+                        LSI_MODEL = TruncatedSVD(n_components=NUM_TOPICS,
+                                                 n_iter=MAX_ITER)
+                        LSI_DATA = LSI_MODEL.fit_transform(VECTORISED)
+
+                        if VERBOSE:
+                            st.markdown('## Model Data')
+                            TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS)
+                        else:
+                            TOPIC_TEXT = modelIterator(LSI_MODEL, CV, top_n=NUM_TOPICS, vb=False)
+
+                        KW = pd.DataFrame(dominantTopic(model=LSI_MODEL, vect=CV, n_words=NUM_TOPICS))
+                        KW.columns = [f'word_{i}' for i in range(KW.shape[1])]
+                        KW.index = [f'topic_{i}' for i in range(KW.shape[0])]
+
+                        if VERBOSE:
+                            st.markdown('## LSI Topic DataFrame')
+                            printDataFrame(data=KW, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+
+                            if PLOT:
+                                st.markdown('## LSI(SVD) Scatterplot\n'
+                                            'Note that the following visualisation will use a Topic count of 2, '
+                                            'overriding previous inputs above, as you are only able to visualise data '
+                                            'on 2 axis. However the full analysis result of the above operation will '
+                                            'be saved in the dataset you provided and be available for download later '
+                                            'on in the app.\n\n'
+                                            'The main aim of the scatterplot is to show the similarity between topics, '
+                                            'which is measured by the distance between markers as shown in the following '
+                                            'diagram. The diagram contained within the expander is the same as the marker '
+                                            'diagram, just that the markers are all replaced by the topic words the '
+                                            'markers actually represent.')
+                                svd_2d = TruncatedSVD(n_components=2)
+                                data_2d = svd_2d.fit_transform(VECTORISED)
+
+                                MAR_FIG = go.Scattergl(
+                                    x=data_2d[:, 0],
+                                    y=data_2d[:, 1],
+                                    mode='markers',
+                                    marker=dict(
+                                        color=COLOUR,
+                                        line=dict(width=1)
+                                    ),
+                                    text=CV.get_feature_names(),
+                                    hovertext=CV.get_feature_names(),
+                                    hoverinfo='text'
+                                )
+                                MAR_FIG = [MAR_FIG]
+                                MAR_FIG = go.Figure(data=MAR_FIG,
+                                                    layout=go.Layout(title='Scatter Plot'))
+                                st.plotly_chart(MAR_FIG)
+
+                                if W_PLOT:
+                                    with st.expander('Show Word Plots'):
+                                        WORD_FIG = go.Scattergl(
+                                            x=data_2d[:, 0],
+                                            y=data_2d[:, 1],
+                                            mode='text',
+                                            marker=dict(
+                                                color=COLOUR,
+                                                line=dict(width=1)
+                                            ),
+                                            text=CV.get_feature_names(),
+                                        )
+                                        WORD_FIG = [WORD_FIG]
+                                        WORD_FIG = go.Figure(data=WORD_FIG,
+                                                             layout=go.Layout(title='Scatter Word Plot'))
+                                        st.plotly_chart(WORD_FIG)
+
+                        if SAVE:
+                            st.markdown('## Save Data\n'
+                                        '### Topics')
+                            for i in range(len(TOPIC_TEXT)):
+                                st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
+                                            f'(downloads/lsi_topic_{i}.csv)')
+                                pd.DataFrame(TOPIC_TEXT[i]).\
+                                    to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+
+                            st.markdown('### Topic/Word List')
+                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
+                                        f'(downloads/summary_topics.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
+
+                            if VERBOSE and PLOT:
+                                st.markdown('### Other Requested Data')
+                                st.markdown('Download PNG File from [downloads/marker_figure.png]'
+                                            '(downloads/marker_figure.png)')
+                                MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))
+
+                                if W_PLOT:
+                                    st.markdown('Download PNG File from [downloads/word_figure.png]'
+                                                '(downloads/word_figure.png)')
+                                    WORD_FIG.write_image(str(DOWNLOAD_PATH / 'word_figure.png'))
             else:
                 st.error('Error: File not loaded properly. Try again.')

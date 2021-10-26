@@ -1,4 +1,4 @@
-FROM python:3
+FROM python:3.9.6
 
 WORKDIR /usr/src/streamlit
 COPY requirements.txt ./

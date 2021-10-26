@@ -35,8 +35,8 @@ learning functionality of the app. If you are using Conda to manage your Python 
 environment you created is activated in this step. You must install these requirements in different Conda 
 environments or you will run into errors.
 
-After installing the dependencies, run the command `streamlit run app.py` in the same folder as above on your terminal to 
-initialise the app.
+After installing the dependencies, run the command `streamlit run app.py` in the same folder as above on your terminal 
+to initialise the app.
 
 After initialising the app, navigate to the `localhost` address printed out in the terminal in your web browser.
 By default, Streamlit is configured to run on `localhost` on port `8501`.
@@ -65,8 +65,8 @@ successful, you should be able to see an image by the name of "asdfghjklxd/news"
 generated. If you do not see the image on the list or if the list is empty, run the pull command again and allow the 
 image to download into your machine.
 
-Next, you may choose to create and run a Docker container on the Command Line Interface (CLI) or on the Docker Desktop GUI. 
-If you choose to create and run the Docker container on the CLI, run the command 
+Next, you may choose to create and run a Docker container on the Command Line Interface (CLI) or on the Docker Desktop 
+GUI. If you choose to create and run the Docker container on the CLI, run the command 
 `docker run -it -p 5000:8501 --name news asdfghjklxd/news:latest` (the word after the --name tag can be anything you 
 want it to be; it represents the name of the container you will be creating) to create and run the Docker Container.
 The tags `-it` is for enabling Interactive Mode in the Docker Container and to display an interactive sudo terminal 
@@ -101,5 +101,6 @@ process, it is highly recommended to go with the other two methods mentioned abo
 use your own system resources (CPU, RAM, GPU) to run the app and carry out compute-intensive processes.
 
 ## File Upload Size Restrictions
-We are aware of Streamlit's inherent limitation on the file size which you can upload onto the app. To overcome this, you may 
-choose to host your files through any one of the supported Cloud Service Providers and pull the required files from there.
+We are aware of Streamlit's inherent limitation on the file size which you can upload onto the app. To overcome this, 
+you may choose to host your files through any one of the supported Cloud Service Providers and pull the required files 
+from there.

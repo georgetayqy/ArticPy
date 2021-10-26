@@ -1,12 +1,20 @@
-# codeChallenge
-This repository serves as a storage location for scripts needed to for the SPF Code Challenge. This README.md file 
-serves as a guide on how to set up the environment and to run the scripts. In-depth explanations on how the modules 
-work will be provided in a separate README.md file in the `pyfiles` folder.
+# ArctiPy
+This repository contains a small app that helps you to conduct elementary NLP processes with Python. 
+This README.md file will serve as a guide on how to set up the environment and to run the scripts. 
+In-depth explanations on how the modules work will be provided in a separate README.md file in 
+the `pyfiles` folder.
 
 ## Running the App
 There are 3 main ways you can access the functionalities of the app, namely replicating/downloading the repository 
 onto your local machine and setting up using `requirements.txt`, setting up the environment using Docker, and 
-finally through the web application interface hosted on Streamlit.
+finally through the web application interface hosted on Streamlit. 
+
+We recommend that users try to use the app's source code to run the app as it gives you the most control over how 
+you want the app to run, and provide you with unfettered access to the code for you to edit to suit your needs.
+
+For users who want to orchestrate the running of the apps on multiple devices, they may find the second method of 
+using Docker to run the app better as Docker allows for easy orchestration through Docker Compose, Docker Swarm and 
+Kubernetes.
 
 ### Setting up the app environment using `requirements.txt`
 #### Init
@@ -26,22 +34,17 @@ download the code through the web interface on Github.
 After activating the Virtual Environment of your choice, navigate to the file location where you stored the local copy 
 of this repository through your terminal.
 
-Note that there are two different requirements.txt file you may run. Note that due to conflicting dependencies within 
-the code that cannot be easily resolved, we have decided to split the Machine Learning portion of the app into a 
-separate requirements.txt file. Run the command `pip install -r requirements.txt` on your terminal to 
-download and install all dependencies for the main functionality of the app. Run the command 
-`pip install -r requirements_gpu.txt` on your terminal to download and install all dependencies for the machine 
-learning functionality of the app. If you are using Conda to manage your Python packages, ensure that the Conda 
-environment you created is activated in this step. You must install these requirements in different Conda 
-environments or you will run into errors.
+Run the command `pip install -r requirements.txt` on your terminal to download and install all dependencies for the 
+main functionality of the app. If you are using Conda to manage your Python packages, ensure that the Conda environment 
+you created is activated in this step.
 
 After installing the dependencies, run the command `streamlit run app.py` in the same folder as above on your terminal 
 to initialise the app.
 
 After initialising the app, navigate to the `localhost` address printed out in the terminal in your web browser.
-By default, Streamlit is configured to run on `localhost` on port `8501`.
+By default, Streamlit is configured to run on `localhost` on port `8501` by default.
 
-### Setting up the app environment through Docker 🐳
+### Setting up the App Environment through Docker 🐳
 #### Init
 The second method of running the app is by using a premade Docker image containing all the source code and dependencies 
 preinstalled.
@@ -93,7 +96,7 @@ the Docker Container.
 For this method, no setup is required from you. We have deployed the app on Streamlit, allowing all users to access the 
 app without any prior setup.
 
-To access the app, navigate to the website https://share.streamlit.io/asdfghjkxd/newsanalyserapp/main/app.py.
+To access the app, navigate to the website https://share.streamlit.io/asdfghjkxd/articpy/main/app.py.
 
 Note that through this method, you may not be able to handle large databases of news articles to process, due to the 
 hardware limitations of the instance created online to run the app. If you have a large database of news articles to 
@@ -104,3 +107,6 @@ use your own system resources (CPU, RAM, GPU) to run the app and carry out compu
 We are aware of Streamlit's inherent limitation on the file size which you can upload onto the app. To overcome this, 
 you may choose to host your files through any one of the supported Cloud Service Providers and pull the required files 
 from there.
+
+If you are using the app through the source code or through Docker, you may use the tag `--server.maxUploadSize=[SIZE]`,
+with `SIZE` representing the maximum size of the file you are able to upload through Streamlit in MB.

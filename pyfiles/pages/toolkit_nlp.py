@@ -535,8 +535,12 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
-        BACKEND_ANALYSER = st.selectbox('Choose the backend engine used to conduct sentiment analysis on your text',
-                                        ('VADER', 'TextBlob'))
+        BACKEND_ANALYSER = st.selectbox('Choose the Backend Engine Used to Conduct Sentiment Analysis',
+                                        ('VADER', 'TextBlob'),
+                                        help='VADER is more optimised for texts extracted from Social Media platforms '
+                                             '(where slangs and emoticons are used) while TextBlob performs better '
+                                             'for more formal pieces of text. If you are not sure which to choose, '
+                                             'VADER is recommended.')
         SAVE = st.checkbox('Output to CSV file?')
         VERBOSE = st.checkbox('Print out the outputs to screen?')
         if VERBOSE:

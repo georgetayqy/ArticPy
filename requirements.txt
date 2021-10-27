@@ -21,3 +21,4 @@ openpyxl==3.0.9
 scikit-learn==0.24.2
 chart-studio==1.1.0
 kaleido==0.2.1
+pycountry==20.7.3

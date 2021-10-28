@@ -150,7 +150,7 @@ def app():
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
-            if not DATA.empty or not DATA:
+            if not DATA.empty:
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
         else:
@@ -327,14 +327,15 @@ def app():
             CLEANED_DATA_TOKENIZED = pd.DataFrame()
 
             if (FILE == 'Small File(s)' and DATA_PATH) or (FILE == 'Large File(s)' and not DATA.empty):
-                try:
-                    DATA[DATA_COLUMN] = DATA[DATA_COLUMN].str.encode('ascii', 'ignore').str.decode('ascii')
-                    DATA = pd.DataFrame(data=DATA)
-                    DATA = DATA.dropna()
-                except Exception as ex:
-                    st.error(f'Error: {ex}')
-
                 if not DATA.empty:
+                    try:
+                        DATA = DATA.astype(str)
+                        DATA[DATA_COLUMN] = DATA[DATA_COLUMN].str.encode('ascii', 'ignore').str.decode('ascii')
+                        DATA = pd.DataFrame(data=DATA)
+                        DATA = DATA.dropna()
+                    except Exception as ex:
+                        st.error(f'Error: {ex}')
+
                     if CLEAN_MODE == 'None':
                         # DO NOTHING
                         DATA = DATA[[DATA_COLUMN]]
@@ -347,6 +348,7 @@ def app():
                             CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], SIMPLE_PIPELINE)
                             CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             CLEANED_DATA.dropna(inplace=True, subset=['CLEANED CONTENT'])
+
                             CLEANED_DATA = CLEANED_DATA.astype(str)
 
                             if TOKENIZE:
@@ -355,7 +357,7 @@ def app():
                         except Exception as ex:
                             st.error(ex)
 
-                    elif CLEAN_MODE == 'Complex' or CLEAN_MODE == 'Advanced':
+                    elif CLEAN_MODE == 'Complex':
                         # CHECK IF NEW STOPWORDS WERE ADDED TO THE LIST
                         if EXTEND_STOPWORD:
                             try:

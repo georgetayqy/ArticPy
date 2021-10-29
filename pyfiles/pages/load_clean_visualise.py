@@ -577,10 +577,13 @@ def app():
                             st.markdown(f'Download data from [downloads/map.png]'
                                         f'(downloads/map.png)')
                             GLOBE_FIG.write_image(str(DOWNLOAD_PATH / 'map.png'))
+                    except ValueError:
+                        st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
+                                   'Connect to the Internet and try again.')
                     except Exception as ex:
                         st.error(f'Error: Unknown Fatal Error -> {ex}')
             else:
-                st.error('Warning: Your data was not processed properly. Try again.')
+                st.error('Error: No files loaded.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

@@ -173,7 +173,7 @@ def app():
         VERBOSE_ANALYSIS = st.checkbox('Display top N words in Document-Term Matrix?',
                                        help='This sorts the DTM and shows you the top number of words you select.')
         if VERBOSE_ANALYSIS:
-            N = st.slider('Key in the top **N** number of words to display',
+            N = st.slider('Key in the top N number of words to display',
                           key='N',
                           min_value=1,
                           max_value=1000,
@@ -279,12 +279,12 @@ def app():
                 elif VERBOSE_DTM and not VERBOSE_ANALYSIS:
                     FINALISED_DATA_LIST = [
                         (DTM, 'DTM', 'dtm.csv', 'csv'),
-                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv')
+                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv_')
                     ]
                 if VERBOSE_DTM and VERBOSE_ANALYSIS:
                     FINALISED_DATA_LIST = [
                         (DTM, 'DTM', 'dtm.csv', 'csv'),
-                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv'),
+                        (DTM_copy, 'Sorted DTM', 'sorted_dtm.csv', 'csv_'),
                         (TOP_N_WORD_FIG, f'Top {N} Words Frequency', 'top_n.png', 'png')
                     ]
 
@@ -300,6 +300,12 @@ def app():
                                 st.markdown(f'Download requested data from [downloads/{data[2]}]'
                                             f'(downloads/{data[2]})')
                                 data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
+                        elif data[3] == 'csv_':
+                            if not data[0].empty:
+                                st.markdown(f'### {data[1]}')
+                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
+                                            f'(downloads/{data[2]})')
+                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=True)
                         elif data[3] == 'png':
                             if data[0]:
                                 st.markdown(f'### {data[1]}')

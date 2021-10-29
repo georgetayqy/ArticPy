@@ -221,19 +221,19 @@ def app():
                                              'outputs. If None mode is chosen, you will not be able to download '
                                              'the outputs as it is assumed that you already possess that.')
     VERBOSE = st.checkbox('Print out DataFrames?')
+    if VERBOSE:
+        VERBOSITY = st.slider('Data Points To Print',
+                              key='Data points to display?',
+                              min_value=1,
+                              max_value=1000,
+                              value=20)
+        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                        help='This option will analyse your DataFrame and display advanced '
+                                             'statistics on it. Note that this will require some time and '
+                                             'processing power to complete. Deselect this option if this if '
+                                             'you do not require ')
 
     if ANALYSIS_MODE == 'Data Cleaning':
-        if VERBOSE:
-            VERBOSITY = st.slider('Data Points To Print',
-                                  key='Data points to display?',
-                                  min_value=1,
-                                  max_value=1000,
-                                  value=20)
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
-                                            help='This option will analyse your DataFrame and display advanced '
-                                                 'statistics on it. Note that this will require some time and '
-                                                 'processing power to complete. Deselect this option if this if '
-                                                 'you do not require ')
         CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('None', 'Simple', 'Complex'),
                                   help='None mode will return the raw data passed into the app. This mode is '
                                        'recommended for purely visualising data without modifying it in any way.\n\n'
@@ -268,16 +268,6 @@ def app():
                     'analysis on the data. So far, we have implemented the ability to extract the countries '
                     'mentioned in your data and to plot out the Data Points on a World Map.')
         if VERBOSE:
-            VERBOSITY = st.slider('Data Points To Print',
-                                  key='Data points to display?',
-                                  min_value=1,
-                                  max_value=1000,
-                                  value=20)
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
-                                            help='This option will analyse your DataFrame and display advanced '
-                                                 'statistics on it. Note that this will require some time and '
-                                                 'processing power to complete. Deselect this option if this '
-                                                 'functionality is not required.')
             WORLD_MAP = st.checkbox('Generate a World Map Representation of the Countries Mentioned?', value=True)
 
     elif ANALYSIS_MODE == 'Data Query':
@@ -288,14 +278,14 @@ def app():
                                    'strings, hence all queries will be based on substring searching.')
 
         if QUERY_MODE == 'Single Query':
-            QUERY = st.text_input('Key in word(s)/numbers/character/symbol to Query')
+            QUERY = st.text_input('Key in words/numbers/characters/symbols to Query')
             if len(QUERY) != 0:
                 st.info('Alert: Words detected.')
             else:
                 st.info('Alert: No Words detected')
 
         elif QUERY_MODE == 'Multiple Queries':
-            QUERY = st.text_area('Key in word(s)/numbers/character/symbol to Query',
+            QUERY = st.text_area('Key in words/numbers/characters/symbols to Query',
                                  help='Note: Delimit your list by commas')
             QUERY = [word.strip() for word in QUERY.split(sep=',')]
             QUERY = '|'.join(map(re.escape, QUERY))
@@ -607,10 +597,16 @@ def app():
                 st.warning('File has not been loaded.')
 
         if st.button('Query Data', key='query'):
+            # reset query
+            QUERY_DATA = pd.DataFrame()
+            DATA = DATA.astype(str)
+
             if not DATA.empty:
                 try:
-                    DATA = DATA.astype(str)
-                    QUERY_DATA = DATA.loc[DATA[DATA_COLUMN].str.contains(QUERY, case=MATCH)]
+                    # make a copy of the original dataframe to avoid mutating it with .loc
+                    temp = DATA.copy()
+                    QUERY_DATA = temp.loc[temp[DATA_COLUMN].str.contains(QUERY, case=MATCH)]
+                    print(DATA)
                 except Exception as ex:
                     st.error(f'Error: {ex}')
                 else:

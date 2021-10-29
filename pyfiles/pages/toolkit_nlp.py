@@ -592,6 +592,7 @@ def app():
             # SHOW DATA
             if VERBOSE:
                 if BACKEND_ANALYSER == 'VADER':
+                    HAC_PLOT1 = None
                     if 'VADER SENTIMENT' or 'VADER SCORE' in DATA.columns:
                         st.markdown('## Sentiment DataFrame')
                         printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)

@@ -92,7 +92,7 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload the File that you wish to Analyse:\n')
+        st.markdown('### Upload File:\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)

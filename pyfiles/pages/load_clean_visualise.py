@@ -140,13 +140,16 @@ def app():
                 'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
     FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+    st.markdown('## Processing Mode\n\n'
+                'Choose the type of processing you want to apply to your dataset. You may choose between the three '
+                'processes: Cleaning, Modification (Country Extraction) and Query.')
     ANALYSIS_MODE = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification', 'Data Query'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload the File that you wish to Analyse:\n')
+        st.markdown('### Upload File:\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)

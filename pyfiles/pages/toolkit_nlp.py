@@ -434,6 +434,7 @@ def app():
                                   value=20,
                                   help='Select 0 to display all Data Points')
             ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
             if ONE_DATAPOINT:
                 DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
                 COLOUR_BCKGD = st.color_picker('Choose Colour of Render Background', value='#000000')
@@ -441,8 +442,6 @@ def app():
             else:
                 st.info('You are conducting POS on the entire dataset. Only DataFrame is printed. POS output will be '
                         'automatically saved.')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-
         SAVE = st.checkbox('Save Outputs?')
 
         # MAIN PROCESSING
@@ -581,8 +580,6 @@ def app():
                 st.markdown('Download summarised data from [downloads/summarised.csv]'
                             '(downloads/summarised.csv)')
                 DATA.to_csv(str(DOWNLOAD_PATH / 'summarised.csv'), index=False)
-            else:
-                st.error('Warning: Data is processed wrongly. Try again.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -883,8 +880,8 @@ def app():
                                          token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}',
                                          max_features=MAX_FEATURES)
                     VECTORISED = CV.fit_transform(DATA[DATA_COLUMN])
-                # except ValueError:
-                #     st.error('Error: The column loaded is empty or has invalid data points. Try again.')
+                except ValueError:
+                    st.error('Error: The column loaded is empty or has invalid data points. Try again.')
                 except Exception as ex:
                     st.error(f'Error: {ex}')
                 else:
@@ -913,7 +910,7 @@ def app():
                             st.markdown('## Topic Label\n'
                                         'The following frame will show you the words that are associated with a '
                                         'certain topic.')
-                            printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=False)
+                            printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=ADVANCED_ANALYSIS)
 
                             st.markdown('## LDA\n'
                                         f'The following HTML render displays the top {NUM_TOPICS} of Topics generated '
@@ -955,7 +952,8 @@ def app():
                             st.markdown('## Model Data')
                             TOPIC_TEXT = modelIterator(NMF_MODEL, TFIDF_MODEL, top_n=NUM_TOPICS)
                         else:
-                            TOPIC_TEXT = modelIterator(model=NMF_MODEL, vectoriser=TFIDF_MODEL, top_n=NUM_TOPICS, vb=False)
+                            TOPIC_TEXT = modelIterator(model=NMF_MODEL, vectoriser=TFIDF_MODEL, top_n=NUM_TOPICS,
+                                                       vb=False)
 
                         KW = pd.DataFrame(dominantTopic(model=NMF_MODEL, vect=TFIDF_MODEL, n_words=NUM_TOPICS))
                         KW.columns = [f'word_{i}' for i in range(KW.shape[1])]

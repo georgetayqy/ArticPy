@@ -244,9 +244,7 @@ def app():
                                        'Simple mode will retain sentence structure and context, while removing any '
                                        'wrongly encoded characters.\n\n'
                                        'Complex mode will remove stopwords and lemmatize words; sentence structure '
-                                       'and context may be destroyed in this process. Numbers will be removed in '
-                                       'blocks (e.g. **1231324524352452** is removed from the text while **abc1** '
-                                       'is not)\n\n'
+                                       'and context may be destroyed in this process. Numbers will all be removed.\n\n'
                                        'Files created from simple cleaning may be used for Summarization in NLP '
                                        'Toolkit while files created from complex cleaning may be used for '
                                        'Document-Term Matrix Creation in Document-Term Matrix. Note that for most '
@@ -339,6 +337,8 @@ def app():
                     if CLEAN_MODE == 'None':
                         # DO NOTHING
                         DATA = DATA[[DATA_COLUMN]]
+                        CLEANED_DATA_TOKENIZED = hero.tokenize(DATA[DATA_COLUMN])
+                        CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
 
                     elif CLEAN_MODE == 'Simple':
                         try:
@@ -387,15 +387,18 @@ def app():
                                 # PREPROCESSING AND CLEANING
                                 CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], PIPELINE)
                                 CLEANED_DATA['CLEANED CONTENT'] = hero.remove_digits(CLEANED_DATA['CLEANED CONTENT'],
-                                                                                     only_blocks=True)
+                                                                                     only_blocks=False)
                                 CLEANED_DATA['CLEANED CONTENT'] = hero.remove_stopwords(CLEANED_DATA['CLEANED CONTENT'],
                                                                                         STOPWORD_LIST)
 
                                 CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
                                 CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.apply(lemmatizeText)
+
+                                # ACCEPT ONLY ENGLISH WORDS
                                 fin_list = [[word for word in text if word.lower() in ENGLISH_WORDS or not
                                             word.isalpha()] for text in CLEANED_DATA_TOKENIZED]
 
+                                # UPDATE TOKENS
                                 CLEANED_DATA['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
                                 CLEANED_DATA_TOKENIZED.update([str(text) for text in fin_list])
                                 CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
@@ -406,7 +409,8 @@ def app():
                                 st.error(ex)
 
                     if CLEAN_MODE == 'None':
-                        FINALISED_DATA_LIST = [(DATA, 'Raw Data', 'raw_ascii_data.csv')]
+                        if TOKENIZE:
+                            FINALISED_DATA_LIST = [(CLEANED_DATA_TOKENIZED, 'Tokenized Data', 'tokenized.csv')]
                     elif CLEAN_MODE == 'Simple' or CLEAN_MODE == 'Complex':
                         if TOKENIZE:
                             FINALISED_DATA_LIST = [
@@ -424,6 +428,10 @@ def app():
                         if CLEAN_MODE == 'None':
                             st.markdown('## Raw DataFrame')
                             printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                            if TOKENIZE:
+                                st.markdown('## Tokenized DataFrame')
+                                printDataFrame(data=CLEANED_DATA_TOKENIZED, verbose_level=VERBOSITY,
+                                               advanced=ADVANCED_ANALYSIS)
                         elif CLEAN_MODE == 'Simple':
                             st.markdown('## Cleaned DataFrame')
                             printDataFrame(data=CLEANED_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
@@ -451,7 +459,22 @@ def app():
 
                     if SAVE:
                         if CLEAN_MODE == 'None':
-                            st.info('None mode chosen, no file downloads are provided.')
+                            if TOKENIZE:
+                                try:
+                                    st.markdown('---')
+                                    st.markdown('## Download Data')
+                                    for data in FINALISED_DATA_LIST:
+                                        if not data[0].empty:
+                                            st.markdown(f'### {data[1]}\n'
+                                                        f'Download data from [downloads/{data[2]}]'
+                                                        f'(downloads/{data[2]})')
+                                            data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                                except KeyError:
+                                    st.error('Warning: Your data was not processed properly. Try again.')
+                                except Exception as ex:
+                                    st.error(f'Error: Unknown Fatal Error -> {ex}')
+                            else:
+                                st.info('None mode chosen, no file downloads are provided.')
 
                         elif CLEAN_MODE == 'Simple':
                             try:

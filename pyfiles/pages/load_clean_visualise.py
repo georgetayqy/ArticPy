@@ -11,7 +11,6 @@ visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_pr
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import itertools
 import pathlib
 import re
 
@@ -22,6 +21,7 @@ import pycountry
 import streamlit as st
 import texthero as hero
 
+from texthero import stopwords
 from collections import Counter
 from texthero import preprocessing
 import plotly.express as px
@@ -66,7 +66,6 @@ PIPELINE = [
     preprocessing.remove_punctuation,
     preprocessing.remove_html_tags,
     preprocessing.remove_diacritics,
-    preprocessing.remove_stopwords,
     preprocessing.remove_whitespace,
     preprocessing.remove_urls,
     preprocessing.drop_no_content
@@ -76,8 +75,8 @@ FINALISED_DATA_LIST = []
 DATA_COLUMN = None
 TOKENIZE = True
 EXTEND_STOPWORD = False
-STOPWORD_LIST = str()
-FIN_STOPWORD_LIST = []
+STOPWORD_LIST = ''
+ENGLISH_WORDS = set(nltk.corpus.words.words())
 FINALISE = False
 ANALYSIS_MODE = 'Data Cleaning'
 WORLD_MAP = True
@@ -102,7 +101,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
         CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY, \
-        TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, FIN_STOPWORD_LIST, FINALISE, ANALYSIS_MODE, WORLD_MAP, GLOBE_DATA, \
+        TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, ENGLISH_WORDS, FINALISE, ANALYSIS_MODE, WORLD_MAP, GLOBE_DATA, \
         GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -114,25 +113,32 @@ def app():
 
     st.title('Load, Clean and Visualise Data')
     st.markdown('## Init\n'
-                'This module is used for the visualisation and cleaning of data used for NLP Analysis on news '
-                'articles. Since this process uses the nltk stopword corpus, you need to download the corpus onto your '
+                'This module is used for the visualisation and cleaning of data used for NLP Analysis on news articles.'
+                ' Since this process uses the `nltk` stopword corpus, you need to download the corpus onto your '
                 'system. The corpus will automatically download onto your device when you run the app. Please ensure '
-                'that sufficient storage (~1 GB) of storage space is free, and that you are connected to the Internet '
+                'that sufficient storage (~1 GB) of storage space is free and that you are connected to the Internet '
                 'to ensure that the corpus can be successfully downloaded. If the download fails, rerun the app again '
                 'and ensure that your device has sufficient space and is connected to the Internet.\n\n '
                 'For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
-                'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n'
-                '## Upload Data\n'
+                'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n')
+
+    st.markdown('## Processing Mode\n\n'
+                'Choose the type of processing you want to apply to your dataset. You may choose between the three '
+                'processes: Cleaning, Modification (Country Extraction) and Query.')
+    ANALYSIS_MODE = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification', 'Data Query'))
+    st.info(f'{ANALYSIS_MODE} Mode Selected!')
+
+    st.markdown('## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
                 'with the widget. To circumvent this limitation, you may choose to '
                 'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
                 '`streamlit run app.py` command and define the maximum size of file you can upload '
                 'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                'is only available for users who run the app using the app\'s source code, or through Docker. '
-                'For Docker, you will need to append the tag above behind the Docker Image name when running the *run* '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not, the '
-                'app will run with a default maximum upload size of 200 MB.\n\n'
-                'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
+                'is only available for users who run the app using the app\'s source code or through Docker. '
+                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
+                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
+                'Alternatively, you may use the Large File option to pull your dataset from any one of the three '
                 'supported Cloud Service Providers into the app.\n\n'
                 'After selecting the size of your file, select the file format you wish to upload. You are warned '
                 'that if you fail to define the correct file format you wish to upload, the app will not let you '
@@ -140,16 +146,13 @@ def app():
                 'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
     FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
-    st.markdown('## Processing Mode\n\n'
-                'Choose the type of processing you want to apply to your dataset. You may choose between the three '
-                'processes: Cleaning, Modification (Country Extraction) and Query.')
-    ANALYSIS_MODE = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification', 'Data Query'))
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload File:\n')
+        st.markdown('### Upload File\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -220,13 +223,14 @@ def app():
     SAVE = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any saved '
                                              'outputs. If None mode is chosen, you will not be able to download '
                                              'the outputs as it is assumed that you already possess that.')
-    VERBOSE = st.checkbox('Print out DataFrames?')
+    VERBOSE = st.checkbox('Display Outputs?')
     if VERBOSE:
         VERBOSITY = st.slider('Data Points To Print',
                               key='Data points to display?',
-                              min_value=1,
+                              min_value=0,
                               max_value=1000,
-                              value=20)
+                              value=20,
+                              help='Select 0 to display all Data Points')
         ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
                                         help='This option will analyse your DataFrame and display advanced '
                                              'statistics on it. Note that this will require some time and '
@@ -240,7 +244,9 @@ def app():
                                        'Simple mode will retain sentence structure and context, while removing any '
                                        'wrongly encoded characters.\n\n'
                                        'Complex mode will remove stopwords and lemmatize words; sentence structure '
-                                       'and context may be destroyed in this process.\n\n'
+                                       'and context may be destroyed in this process. Numbers will be removed in '
+                                       'blocks (e.g. **1231324524352452** is removed from the text while **abc1** '
+                                       'is not)\n\n'
                                        'Files created from simple cleaning may be used for Summarization in NLP '
                                        'Toolkit while files created from complex cleaning may be used for '
                                        'Document-Term Matrix Creation in Document-Term Matrix. Note that for most '
@@ -299,6 +305,7 @@ def app():
 # |                                                DATA CLEANING                                                     | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if ANALYSIS_MODE == 'Data Cleaning':
+        st.markdown('---')
         st.markdown('## Data Cleaning and Visualisation\n'
                     'Ensure that you have successfully uploaded the required data and selected the correct column '
                     'containing your data before clicking on the "Begin Analysis" button. The status of your file '
@@ -355,22 +362,20 @@ def app():
                         if EXTEND_STOPWORD:
                             try:
                                 if len(STOPWORD_LIST) != 0:
-                                    STOPWORD_LIST = [word.strip().lower() for word in STOPWORD_LIST.split(sep=',')]
-                                    FIN_STOPWORD_LIST = [word.lower() for word in nltk.corpus.words.words()]
-                                    FIN_STOPWORD_LIST.extend(STOPWORD_LIST)
-                                    FIN_STOPWORD_LIST = set(FIN_STOPWORD_LIST)
+                                    STOPWORD_LIST = set(word.strip().lower() for word in STOPWORD_LIST.split(sep=','))
                                     st.info(f'Stopwords accepted: {[word for word in STOPWORD_LIST]}!')
+                                    STOPWORD_LIST = stopwords.DEFAULT.union(STOPWORD_LIST)
                                     FINALISE = True
                                 else:
                                     FINALISE = False
+                                    STOPWORD_LIST = stopwords.DEFAULT
                                     raise ValueError('Length of Stopword List is 0. Try again.')
                             except Exception as ex:
                                 st.error(f'Error: {ex}')
 
                         # IF NO NEW STOPWORDS WERE DEFINED, THEN USE DEFAULT
                         else:
-                            STOPWORD_LIST = str()
-                            FIN_STOPWORD_LIST = set(word.lower() for word in nltk.corpus.words.words())
+                            STOPWORD_LIST = stopwords.DEFAULT
                             st.info('Alert: Default set of stopwords will be used.')
                             FINALISE = True
 
@@ -382,27 +387,21 @@ def app():
                                 # PREPROCESSING AND CLEANING
                                 CLEANED_DATA['CLEANED CONTENT'] = hero.clean(CLEANED_DATA[DATA_COLUMN], PIPELINE)
                                 CLEANED_DATA['CLEANED CONTENT'] = hero.remove_digits(CLEANED_DATA['CLEANED CONTENT'],
-                                                                                     only_blocks=False)
-                                CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
-                                CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
+                                                                                     only_blocks=True)
+                                CLEANED_DATA['CLEANED CONTENT'] = hero.remove_stopwords(CLEANED_DATA['CLEANED CONTENT'],
+                                                                                        STOPWORD_LIST)
 
-                                # PRELIMINARY TOKENIZATION THE DATA
                                 CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
                                 CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.apply(lemmatizeText)
+                                fin_list = [[word for word in text if word.lower() in ENGLISH_WORDS or not
+                                            word.isalpha()] for text in CLEANED_DATA_TOKENIZED]
 
-                                # SPELL CHECK
-                                for index, row in CLEANED_DATA_TOKENIZED.iteritems():
-                                    CLEANED_DATA.at[index, 'CLEANED CONTENT'] = \
-                                        (" ".join(word for word in row if word.lower() in FIN_STOPWORD_LIST
-                                                  or not word.isalpha()))
+                                CLEANED_DATA['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
+                                CLEANED_DATA_TOKENIZED.update([str(text) for text in fin_list])
+                                CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
                                 CLEANED_DATA['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 CLEANED_DATA.dropna(subset=['CLEANED CONTENT'], inplace=True)
                                 CLEANED_DATA = CLEANED_DATA.astype(str)
-
-                                if TOKENIZE:
-                                    # FINAL TOKENIZATION THE DATA
-                                    CLEANED_DATA_TOKENIZED = hero.tokenize(CLEANED_DATA['CLEANED CONTENT'])
-                                    CLEANED_DATA_TOKENIZED = CLEANED_DATA_TOKENIZED.to_frame().astype(str)
                             except Exception as ex:
                                 st.error(ex)
 
@@ -456,6 +455,7 @@ def app():
 
                         elif CLEAN_MODE == 'Simple':
                             try:
+                                st.markdown('---')
                                 st.markdown('## Download Data')
                                 for data in FINALISED_DATA_LIST:
                                     if not data[0].empty:
@@ -472,6 +472,7 @@ def app():
                             if EXTEND_STOPWORD:
                                 if FINALISE:
                                     try:
+                                        st.markdown('---')
                                         st.markdown('## Download Data')
                                         for data in FINALISED_DATA_LIST:
                                             if not data[0].empty:
@@ -485,6 +486,7 @@ def app():
                                         st.error(f'Error: Unknown Fatal Error -> {ex}')
                             else:
                                 try:
+                                    st.markdown('---')
                                     st.markdown('## Download Data')
                                     for data in FINALISED_DATA_LIST:
                                         if not data[0].empty:
@@ -506,6 +508,7 @@ def app():
 # |                                               COUNTRY EXTRACTION                                                 | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif ANALYSIS_MODE == 'Data Modification':
+        st.markdown('---')
         st.markdown('## Country Extraction\n'
                     'This module will take in a DataFrame containing all documents meant for NLP Analysis and return '
                     'a new DataFrame whereby countries mentioned in the documents will be extracted. Users can then '
@@ -525,6 +528,9 @@ def app():
                 st.warning('File has not been loaded.')
 
         if st.button('Begin Country Extraction', key='country'):
+            GLOBE_DATA = pd.DataFrame()
+            GLOBE_FIG = None
+
             if not DATA.empty:
                 DATA = DATA.astype(object)
                 DATA['COUNTRIES'] = DATA[DATA_COLUMN].astype(str).apply(lambda x: [country.name for country in
@@ -551,6 +557,7 @@ def app():
 
                 if SAVE:
                     try:
+                        st.markdown('---')
                         st.markdown('## Download Data')
                         st.markdown('### Country Data')
                         st.markdown(f'Download data from [downloads/globe_data.csv]'
@@ -580,6 +587,7 @@ def app():
 # |                                                      QUERY                                                       | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif ANALYSIS_MODE == 'Data Query':
+        st.markdown('---')
         st.markdown('## DataFrame Query\n'
                     'This module will allow you to query certain parts of your DataFrame to get documents which '
                     'fulfills your criteria. You may choose between querying just one column at a time (one '
@@ -606,7 +614,6 @@ def app():
                     # make a copy of the original dataframe to avoid mutating it with .loc
                     temp = DATA.copy()
                     QUERY_DATA = temp.loc[temp[DATA_COLUMN].str.contains(QUERY, case=MATCH)]
-                    print(DATA)
                 except Exception as ex:
                     st.error(f'Error: {ex}')
                 else:
@@ -621,6 +628,7 @@ def app():
 
                 if SAVE:
                     if not QUERY_DATA.empty:
+                        st.markdown('---')
                         st.markdown('## Save Query')
                         st.markdown('Download data from [downloads/query.csv](downloads/query.csv)')
                         QUERY_DATA.to_csv(str(DOWNLOAD_PATH / 'query.csv'), index=False)

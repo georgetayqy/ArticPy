@@ -18,10 +18,8 @@ import plotly.graph_objs as go
 import plotly.figure_factory as ff
 import plotly.express as px
 import nltk
-import kaleido
 import pyLDAvis
 import pyLDAvis.gensim_models
-import pandas_profiling
 import pyLDAvis.sklearn
 import streamlit.components.v1
 
@@ -85,6 +83,8 @@ MAX_ITER = 100
 CV = None
 VECTORISED = None
 COLOUR = None
+COLOUR_BCKGD = None
+COLOUR_TXT = None
 TOPIC_TEXT = []
 SVG = None
 HAC_PLOT = None
@@ -112,8 +112,8 @@ def app():
         CONTOUR_WIDTH, DATA, SENT_LEN, NUM_TOPICS, LDA_MODEL, MODEL, LDA_VIS, ADVANCED_ANALYSIS, \
         NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, DATAPOINT_SELECTOR, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, \
         NMF_MODEL, LSI_MODEL, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
-        COLOUR, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, KW, TOPIC_FRAME, ALPHA, \
-        L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA
+        COLOUR, COLOUR_BCKGD, COLOUR_TXT, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, \
+        KW, TOPIC_FRAME, ALPHA, L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -129,15 +129,27 @@ def app():
                 'the data to be decently cleaned; if you have not done so, run the Load, Clean adn Visualise module '
                 'and save the cleaned  data onto your workstation. Those files may come in useful in '
                 'the functionality of this app.\n\n')
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                              FUNCTION SELECTOR                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('## NLP Operations\n'
+                'Select the NLP functions which you wish to execute.')
+    APP_MODE = st.selectbox('Select the NLP Operation to execute',
+                            ('Topic Modelling', 'Analyse Sentiment', 'Word Cloud', 'Named Entity Recognition',
+                             'POS Tagging', 'Summarise'))
+    st.info(f'**{APP_MODE}** Selected')
+
     st.markdown('## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
                 'with the widget. To circumvent this limitation, you may choose to '
                 'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
                 '`streamlit run app.py` command and define the maximum size of file you can upload '
                 'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                'is only available for users who run the app using the app\'s source code, or through Docker. '
-                'For Docker, you will need to append the tag above behind the Docker Image name when running the *run* '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`.\n\n'
+                'is only available for users who run the app using the app\'s source code or through Docker. '
+                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
+                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
                 'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
                 'supported Cloud Service Providers into the app.\n\n'
                 'After selecting the size of your file, select the file format you wish to upload. You are warned '
@@ -151,7 +163,7 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload File:\n')
+        st.markdown('### Upload File\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -205,19 +217,12 @@ def app():
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
 
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                              FUNCTION SELECTOR                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('# NLP Operations\n'
-                'Select the NLP functions which you wish to execute.')
-    APP_MODE = st.selectbox('Select the NLP Operation to execute',
-                            ('Topic Modelling', 'Analyse Sentiment', 'Word Cloud', 'Named Entity Recognition',
-                             'POS Tagging', 'Summarise'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if APP_MODE == 'Word Cloud':
+        st.markdown('---')
         st.markdown('# Word Cloud Generation\n'
                     'This module takes in a long list of documents and converts it into a WordCloud representation '
                     'of all the documents.\n\n'
@@ -226,7 +231,7 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
-        SAVE = st.checkbox('Output to image file?')
+        SAVE = st.checkbox('Save Outputs?')
         MAX_WORDS = st.number_input('Key in the maximum number of words to display',
                                     min_value=2,
                                     max_value=1000,
@@ -259,6 +264,7 @@ def app():
             st.image(wc.to_image(), width=None)
 
             if SAVE:
+                st.markdown('---')
                 st.markdown('## Download Image')
                 st.markdown('Download image from [downloads/wordcloud.png](downloads/wordcloud.png)')
                 wc.to_file(str(DOWNLOAD_PATH / 'wordcloud.png'))
@@ -268,6 +274,7 @@ def app():
 # |                                            NAMED ENTITY RECOGNITION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Named Entity Recognition':
+        st.markdown('---')
         st.markdown('# Named Entity Recognition')
         st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
                     'large chunks of text, prepare to wait for hours for the NER Tagging process to finish. We are '
@@ -312,20 +319,21 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('Accuracy Model Loaded!')
-        VERBOSE = st.checkbox('Display DataFrames?')
+        VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
-            VERBOSITY = st.slider('Choose Number of Data Points to Display (Select 0 to display all Data Points)',
+            VERBOSITY = st.slider('Choose Number of Data Points to Display',
                                   min_value=0,
                                   max_value=1000,
-                                  value=20)
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
+            ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
+            if ONE_DATAPOINT:
+                DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
+            else:
+                st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
+                        'automatically saved.')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-        SAVE = st.checkbox('Save Data?')
-        ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
-        if ONE_DATAPOINT:
-            DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
-        else:
-            st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
-                    'automatically saved.')
+        SAVE = st.checkbox('Save Outputs?')
 
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
@@ -334,7 +342,7 @@ def app():
                 DATA = DATA[[DATA_COLUMN]]
                 DATA['NER'] = ''
                 DATA['COMPILED_LABELS'] = ''
-                DATA = DATA.astype('str')
+                DATA = DATA.astype(str)
 
                 for index in range(len(DATA)):
                     temp_nlp = NLP(DATA[DATA_COLUMN][index])
@@ -346,18 +354,19 @@ def app():
                     st.markdown('## NER DataFrame')
                     printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
-                if ONE_DATAPOINT:
-                    verbose_data_copy = DATA.copy()
-                    temp_df = verbose_data_copy[DATA_COLUMN][DATAPOINT_SELECTOR]
-                    st.markdown('## DisplaCy Rendering')
-                    st.info('If rendering is not clean, choose to save files generated and download the rendering '
-                            'in HTML format.')
-                    SVG = displacy.render([sent for sent in NLP(str(temp_df)).sents],
-                                          style='ent',
-                                          page=True)
-                    st.markdown(SVG, unsafe_allow_html=True)
+                    if ONE_DATAPOINT:
+                        verbose_data_copy = DATA.copy()
+                        temp_df = verbose_data_copy[DATA_COLUMN][DATAPOINT_SELECTOR]
+                        st.markdown('## DisplaCy Rendering')
+                        st.info('If rendering is not clean, choose to save files generated and download the rendering '
+                                'in HTML format.')
+                        SVG = displacy.render(list(NLP(str(temp_df)).sents),
+                                              style='ent',
+                                              page=True)
+                        st.markdown(SVG, unsafe_allow_html=True)
 
                 if SAVE:
+                    st.markdown('---')
                     st.markdown('## Download Data')
                     st.markdown('Download data from [downloads/ner.csv](downloads/ner.csv)')
                     DATA.to_csv(str(DOWNLOAD_PATH / 'ner.csv'), index=False)
@@ -373,6 +382,7 @@ def app():
 # |                                             PART OF SPEECH TAGGING                                               | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'POS Tagging':
+        st.markdown('---')
         st.markdown('# POS Tagging')
         st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
                     'large chunks of text, prepare to wait for hours for the POS tagging process to finish. We are '
@@ -382,6 +392,13 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
+        st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
+                    'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
+                    'one point. However, you will still be able to download a text/html file containing '
+                    'the outputs for you to save onto your disks.\n'
+                    '### NLP Models\n'
+                    'Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
+                    'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
         NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'))
         if NLP_MODEL == 'en_core_web_sm':
             try:
@@ -409,38 +426,77 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('Accuracy Model Loaded!')
-        VERBOSE = st.checkbox('Display DataFrames?')
+        VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
-            VERBOSITY = st.slider('Choose Number of Data Points to Display (Select 0 to display all Data Points)',
+            VERBOSITY = st.slider('Choose Number of Data Points to Display',
                                   min_value=0,
                                   max_value=1000,
-                                  value=20)
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
+            ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
+            if ONE_DATAPOINT:
+                DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
+                COLOUR_BCKGD = st.color_picker('Choose Colour of Render Background', value='#000000')
+                COLOUR_TXT = st.color_picker('Choose Colour of Render Text', value='#ffffff')
+            else:
+                st.info('You are conducting POS on the entire dataset. Only DataFrame is printed. POS output will be '
+                        'automatically saved.')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-        SAVE = st.checkbox('Save Output?')
 
-        if st.button('Start POS Tagging'):
+        SAVE = st.checkbox('Save Outputs?')
+
+        # MAIN PROCESSING
+        if st.button('Start POS Tagging', key='pos'):
+            # RESET OUTPUTS
+            SVG = None
+
             if not DATA.empty:
-                DATA['POS'] = np.nan
-                DATA = DATA.astype(object)
+                DATA = DATA[[DATA_COLUMN]]
+                DATA['POS'] = ''
+                DATA = DATA.astype(str)
 
                 for index in range(len(DATA)):
                     temp_nlp = NLP(DATA[DATA_COLUMN][index])
                     DATA.at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
                                                          [word.pos_ for word in temp_nlp])))
+                    DATA.at[index, 'COMPILED_LABELS'] = str(list(set([word.pos_ for word in temp_nlp])))
 
                 if VERBOSE:
                     st.markdown('## POS DataFrame')
                     printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
+                    if ONE_DATAPOINT:
+                        verbose_data_copy = DATA.copy()
+                        temp_df = verbose_data_copy[DATA_COLUMN][DATAPOINT_SELECTOR]
+                        print(temp_df)
+                        st.markdown('## DisplaCy Rendering')
+                        st.info('Renders are not shown due to the sheer size of the image. Kindly save the render in '
+                                'HTML format below to view it.')
+                        SVG = displacy.render(list(NLP(str(temp_df)).sents),
+                                              style='dep',
+                                              options={
+                                                  'compact': True,
+                                                  'color': COLOUR_TXT,
+                                                  'bg': COLOUR_BCKGD,
+                                              })
+
+                        st.markdown('### Render')
+                        st.markdown('Download data from [downloads/rendering.html](downloads/rendering.html)')
+                        with open(pathlib.Path(str(DOWNLOAD_PATH / 'rendering.html')), 'w', encoding='utf-8') as f:
+                            f.write(SVG)
+
                 if SAVE:
+                    st.markdown('---')
                     st.markdown('## Download Data')
                     st.markdown('Download data from [downloads/pos.csv](downloads/pos.csv)')
                     DATA.to_csv(str(DOWNLOAD_PATH / 'pos.csv'), index=False)
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 SUMMARIZATION                                                    | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Summarise':
+        st.markdown('---')
         st.markdown('# Summarization of Text')
         st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
                     'large chunks of text, prepare to wait for hours for the summarization process to finish. We are '
@@ -486,14 +542,15 @@ def app():
                                    min_value=1,
                                    max_value=100,
                                    value=3)
-        SAVE = st.checkbox('Output to CSV file?')
-        VERBOSE = st.checkbox('Print out DataFrames?')
+        SAVE = st.checkbox('Save Outputs?')
+        VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
             VERBOSITY = st.slider('Data points',
                                   key='Data points to display?',
-                                  min_value=1,
+                                  min_value=0,
                                   max_value=1000,
-                                  value=20)
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
 
         # MAIN PROCESSING
@@ -519,6 +576,7 @@ def app():
 
             # SAVE DATA
             if SAVE:
+                st.markdown('---')
                 st.markdown('## Download Summarised Data')
                 st.markdown('Download summarised data from [downloads/summarised.csv]'
                             '(downloads/summarised.csv)')
@@ -531,7 +589,11 @@ def app():
 # |                                              SENTIMENT ANALYSIS                                                  | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Analyse Sentiment':
-        st.markdown('# Sentiment Analysis')
+        st.markdown('---')
+        st.markdown('# Sentiment Analysis\n'
+                    'For this module, both the VADER and TextBlob models will be used to analyse the sentiment of the '
+                    'text you upload.\n'
+                    'For VADER, your sentiment score will be ')
 
         # FLAGS
         st.markdown('## Flags')
@@ -540,125 +602,165 @@ def app():
                                         help='VADER is more optimised for texts extracted from Social Media platforms '
                                              '(where slangs and emoticons are used) while TextBlob performs better '
                                              'for more formal pieces of text. If you are not sure which to choose, '
-                                             'VADER is recommended.')
-        SAVE = st.checkbox('Output to CSV file?')
-        VERBOSE = st.checkbox('Print out the outputs to screen?')
+                                             'TextBlob is recommended.')
+        SAVE = st.checkbox('Save Outputs?')
+        VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
-            VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
+            VERBOSITY = st.slider('Data points',
+                                  key='Data points to display?',
+                                  min_value=0,
+                                  max_value=1000,
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
             if BACKEND_ANALYSER == 'VADER':
                 COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
 
         # MAIN PROCESSING
         if st.button('Start Analysis', key='analysis'):
-            if BACKEND_ANALYSER == 'VADER':
-                replacer = {
-                    r"'": '',
-                    r'[^\w\s]': ' ',
-                    r' \d+': ' ',
-                    r' +': ' '
-                }
-
-                DATA['VADER SENTIMENT TEXT'] = DATA[DATA_COLUMN].replace(to_replace=replacer, regex=True)
-
-                vader_analyser = SentimentIntensityAnalyzer()
-                sent_score_list = list()
-                sent_label_list = list()
-
-                for i in DATA['VADER SENTIMENT TEXT'].values.tolist():
-                    sent_score = vader_analyser.polarity_scores(i)
-
-                    if sent_score['compound'] >= 0.05:
-                        sent_score_list.append(sent_score['compound'])
-                        sent_label_list.append('Positive')
-                    elif -0.05 < sent_score['compound'] < 0.05:
-                        sent_score_list.append(sent_score['compound'])
-                        sent_label_list.append('Neutral')
-                    elif sent_score['compound'] <= -0.05:
-                        sent_score_list.append(sent_score['compound'])
-                        sent_label_list.append('Negative')
-
-                DATA['VADER SENTIMENT'] = sent_label_list
-                DATA['VADER SCORE'] = sent_score_list
-
-            elif BACKEND_ANALYSER == 'TextBlob':
-                if not DATA.empty:
-                    # APPLY LAMBDAS ON THE DATAFRAME
-                    DATA['POLARITY'] = DATA[DATA_COLUMN].apply(lambda x: TextBlob(x).sentiment.polarity)
-                    DATA['SUBJECTIVITY'] = DATA[DATA_COLUMN].apply(lambda x: TextBlob(x).sentiment.subjectivity)
-                else:
-                    st.error('Error: Data file not loaded properly. Try again.')
-
-            # SHOW DATA
-            if VERBOSE:
+            if not DATA.empty:
                 if BACKEND_ANALYSER == 'VADER':
-                    HAC_PLOT1 = None
-                    if 'VADER SENTIMENT' or 'VADER SCORE' in DATA.columns:
-                        st.markdown('## Sentiment DataFrame')
-                        printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                    replacer = {
+                        r"'": '',
+                        r'[^\w\s]': ' ',
+                        r' \d+': ' ',
+                        r' +': ' '
+                    }
 
-                        st.markdown('## VADER Score')
-                        HAC_PLOT = ff.create_distplot([DATA['VADER SCORE'].tolist()],
-                                                      ['VADER'],
-                                                      colors=[COLOUR],
-                                                      bin_size=0.25,
-                                                      curve_type='normal',
-                                                      show_rug=False,
-                                                      show_hist=False)
-                        HAC_PLOT.update_layout(title_text='Distribution Plot',
-                                               xaxis_title='VADER Score',
-                                               yaxis_title='Frequency Density',
-                                               legend_title='Frequency Density')
-                        st.plotly_chart(HAC_PLOT, use_container_width=True)
-                    else:
-                        st.error('Warning: An error is made in the processing of the data. Try again.')
+                    DATA['VADER SENTIMENT TEXT'] = DATA[DATA_COLUMN].replace(to_replace=replacer, regex=True)
+
+                    vader_analyser = SentimentIntensityAnalyzer()
+                    sent_score_list = []
+                    sent_label_list = []
+
+                    for i in DATA['VADER SENTIMENT TEXT'].tolist():
+                        sent_score = vader_analyser.polarity_scores(i)
+
+                        if sent_score['compound'] > 0:
+                            sent_score_list.append(sent_score['compound'])
+                            sent_label_list.append('Positive')
+                        elif sent_score['compound'] == 0:
+                            sent_score_list.append(sent_score['compound'])
+                            sent_label_list.append('Neutral')
+                        elif sent_score['compound'] < 0:
+                            sent_score_list.append(sent_score['compound'])
+                            sent_label_list.append('Negative')
+
+                    DATA['VADER OVERALL SENTIMENT'] = sent_label_list
+                    DATA['VADER OVERALL SCORE'] = sent_score_list
+                    DATA['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
+                                                      DATA['VADER SENTIMENT TEXT'].values.tolist()]
+                    DATA['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
+                                                      DATA['VADER SENTIMENT TEXT'].values.tolist()]
+                    DATA['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
+                                                      DATA['VADER SENTIMENT TEXT'].values.tolist()]
 
                 elif BACKEND_ANALYSER == 'TextBlob':
-                    if 'POLARITY' or 'SUBJECTIVITY' in DATA.columns:
-                        st.markdown('## Sentiment DataFrame')
-                        printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                    try:
+                        pol_list = []
+                        sub_list = []
 
-                        st.markdown('## Polarity VS Subjectivity')
-                        HAC_PLOT = px.scatter(DATA[['SUBJECTIVITY', 'POLARITY']],
-                                              x='SUBJECTIVITY',
-                                              y='POLARITY',
-                                              labels={
-                                                  'SUBJECTIVITY': 'Subjectivity',
-                                                  'POLARITY': 'Polarity'
-                                              })
-                        st.plotly_chart(HAC_PLOT, use_container_width=True)
+                        # APPLY POLARITY FUNCTION
+                        DATA['POLARITY SCORE'] = DATA[DATA_COLUMN].apply(lambda x: TextBlob(x).sentiment.polarity)
+                        for i in DATA['POLARITY SCORE'].tolist():
+                            if float(i) > 0:
+                                pol_list.append('Positive')
+                            elif float(i) < 0:
+                                pol_list.append('Negative')
+                            elif float(i) == 0:
+                                pol_list.append('Neutral')
+                        DATA['POLARITY SENTIMENT'] = pol_list
 
-                        st.markdown('### Normal Distribution Plots of Subjectivity and Polarity')
-                        HAC_PLOT1 = ff.create_distplot([DATA['SUBJECTIVITY'].tolist(), DATA['POLARITY'].tolist()],
-                                                       ['Subjectivity', 'Polarity'],
-                                                       curve_type='normal',
-                                                       show_rug=False,
-                                                       show_hist=False)
-                        st.plotly_chart(HAC_PLOT1, use_container_width=True)
-                    else:
-                        st.error('Warning: An error is made in the processing of the data. Try again.')
+                        # APPLY SUBJECTIVITY FUNCTION
+                        DATA['SUBJECTIVITY SCORE'] = DATA[DATA_COLUMN].apply(
+                            lambda x: TextBlob(x).sentiment.subjectivity
+                        )
+                        for i in DATA['SUBJECTIVITY SCORE'].tolist():
+                            if float(i) < 0.5:
+                                sub_list.append('Objective')
+                            elif float(i) > 0.5:
+                                sub_list.append('Subjective')
+                            elif float(i) == 0.5:
+                                sub_list.append('Neutral')
+                        DATA['SUBJECTIVITY SENTIMENT'] = sub_list
+                    except Exception as ex:
+                        st.error(f'Error: {ex}')
 
-            # SAVE DATA
-            if SAVE:
-                st.markdown('## Download Data')
-                st.markdown('Download sentiment data from [downloads/sentiment_scores.csv]'
-                            '(downloads/sentiment_scores.csv)')
-                DATA.to_csv(str(DOWNLOAD_PATH / "sentiment_scores.csv"), index=False)
+                # SHOW DATA
+                if VERBOSE:
+                    if BACKEND_ANALYSER == 'VADER':
+                        HAC_PLOT1 = None
+                        if 'VADER OVERALL SENTIMENT' or 'VADER OVERALL SCORE' in DATA.columns:
+                            st.markdown('## Sentiment DataFrame')
+                            printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
 
-                if HAC_PLOT is not None:
-                    st.markdown('## Graph')
-                    st.markdown('Download sentiment data from [downloads/plot.png](downloads/plot.png)')
-                    HAC_PLOT.write_image(str(DOWNLOAD_PATH / 'plot.png'))
-                if HAC_PLOT1 is not None:
-                    st.markdown('## Normal Distribution Graph')
-                    st.markdown('Download sentiment data from [downloads/normal_plot.png]'
-                                '(downloads/normal_plot.png)')
-                    HAC_PLOT1.write_image(str(DOWNLOAD_PATH / 'normal_plot.png'))
+                            st.markdown('## VADER Score')
+                            HAC_PLOT = ff.create_distplot([DATA['VADER OVERALL SCORE'].tolist()],
+                                                          ['VADER'],
+                                                          colors=[COLOUR],
+                                                          bin_size=0.25,
+                                                          curve_type='normal',
+                                                          show_rug=False,
+                                                          show_hist=False)
+                            HAC_PLOT.update_layout(title_text='Distribution Plot',
+                                                   xaxis_title='VADER Score',
+                                                   yaxis_title='Frequency Density',
+                                                   legend_title='Frequency Density')
+                            st.plotly_chart(HAC_PLOT, use_container_width=True)
+                        else:
+                            st.error('Warning: An error is made in the processing of the data. Try again.')
+
+                    elif BACKEND_ANALYSER == 'TextBlob':
+                        if 'POLARITY SCORE' or 'SUBJECTIVITY SCORE' in DATA.columns:
+                            st.markdown('## Sentiment DataFrame')
+                            printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+
+                            st.markdown('## Polarity VS Subjectivity')
+                            HAC_PLOT = px.scatter(DATA[['SUBJECTIVITY SCORE', 'POLARITY SCORE']],
+                                                  x='SUBJECTIVITY SCORE',
+                                                  y='POLARITY SCORE',
+                                                  labels={
+                                                      'SUBJECTIVITY SCORE': 'Subjectivity',
+                                                      'POLARITY SCORE': 'Polarity'
+                                                  })
+                            st.plotly_chart(HAC_PLOT, use_container_width=True)
+
+                            st.markdown('### Normal Distribution Plots of Subjectivity and Polarity')
+                            HAC_PLOT1 = ff.create_distplot([DATA['SUBJECTIVITY SCORE'].tolist(),
+                                                            DATA['POLARITY SCORE'].tolist()],
+                                                           ['Subjectivity', 'Polarity'],
+                                                           curve_type='normal',
+                                                           show_rug=False,
+                                                           show_hist=False)
+                            st.plotly_chart(HAC_PLOT1, use_container_width=True)
+                        else:
+                            st.error('Warning: An error is made in the processing of the data. Try again.')
+
+                # SAVE DATA
+                if SAVE:
+                    st.markdown('---')
+                    st.markdown('## Download Data')
+                    st.markdown('Download sentiment data from [downloads/sentiment_scores.csv]'
+                                '(downloads/sentiment_scores.csv)')
+                    DATA.to_csv(str(DOWNLOAD_PATH / "sentiment_scores.csv"), index=False)
+
+                    if HAC_PLOT is not None:
+                        st.markdown('## Graph')
+                        st.markdown('Download sentiment data from [downloads/plot.png](downloads/plot.png)')
+                        HAC_PLOT.write_image(str(DOWNLOAD_PATH / 'plot.png'))
+                    if HAC_PLOT1 is not None:
+                        st.markdown('## Normal Distribution Graph')
+                        st.markdown('Download sentiment data from [downloads/normal_plot.png]'
+                                    '(downloads/normal_plot.png)')
+                        HAC_PLOT1.write_image(str(DOWNLOAD_PATH / 'normal_plot.png'))
+            else:
+                st.error('Error: Data not loaded properly. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                TOPIC MODELLING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif APP_MODE == 'Topic Modelling':
+        st.markdown('---')
         st.markdown('# Topic Modelling')
         st.markdown('Ensure that your data is **lemmatized and properly cleaned**; data **should not be tokenized** '
                     'for this step. Use the Load, Clean and Visualise module to clean and lemmatize your data if you '
@@ -687,13 +789,18 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
-        SAVE = st.checkbox('Output to file?')
+        SAVE = st.checkbox('Save Outputs?')
         VERBOSE = st.checkbox('Display Outputs?', help='Note: For LSI, if verbose is enabled, the model will be '
                                                        'refitted such that only 2 components are considered. If you '
                                                        'wish to turn off this feature, deselect the "Generate '
                                                        'Plot" selection below.')
         if VERBOSE:
-            VERBOSITY = st.slider('Data points', key='Data points to display?', min_value=1, max_value=1000, value=20)
+            VERBOSITY = st.slider('Data points',
+                                  key='Data points to display?',
+                                  min_value=0,
+                                  max_value=1000,
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
         NUM_TOPICS = st.number_input('Choose Number of Topics to Generate Per Text',
                                      min_value=1,
@@ -815,6 +922,7 @@ def app():
                             streamlit.components.v1.html(LDA_VIS_STR, width=1300, height=800)
 
                         if SAVE:
+                            st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):
@@ -858,6 +966,7 @@ def app():
                             printDataFrame(data=KW, verbose_level=NUM_TOPICS, advanced=ADVANCED_ANALYSIS)
 
                         if SAVE:
+                            st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):
@@ -898,10 +1007,10 @@ def app():
                                             'be saved in the dataset you provided and be available for download later '
                                             'on in the app.\n\n'
                                             'The main aim of the scatterplot is to show the similarity between topics, '
-                                            'which is measured by the distance between markers as shown in the following '
-                                            'diagram. The diagram contained within the expander is the same as the marker '
-                                            'diagram, just that the markers are all replaced by the topic words the '
-                                            'markers actually represent.')
+                                            'which is measured by the distance between markers as shown in the '
+                                            'following diagram. The diagram contained within the expander is the same '
+                                            'as the marker diagram, just that the markers are all replaced by the '
+                                            'topic words the markers actually represent.')
                                 svd_2d = TruncatedSVD(n_components=2)
                                 data_2d = svd_2d.fit_transform(VECTORISED)
 
@@ -940,6 +1049,7 @@ def app():
                                         st.plotly_chart(WORD_FIG)
 
                         if SAVE:
+                            st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):

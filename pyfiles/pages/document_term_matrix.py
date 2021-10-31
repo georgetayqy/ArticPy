@@ -75,16 +75,18 @@ def app():
     if st.button('Begin Download', key='download-model'):
         os.system('python -m nltk.downloader all')
     st.markdown('## Upload Data\n'
-                'For this mode, ensure that your file is smaller than 200 MB in size. If your file is larger than '
-                '200 MB, you may choose to rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` '
-                'appended behind the `streamlit run app.py` command and define the maximum size of file you can '
-                'upload onto Streamlit, or use the Large File option to pull your dataset from any one of the '
-                'three supported Cloud Service Providers into the app. Note that modifying the command you use '
-                'to run the app is not available if you are using the web interface for the app and you will be '
-                'limited to using the Large File option to pull datasets larger than 200 MB in size.\n\n'
-                'Also, ensure that your data is cleaned and lemmatized before passing it into this module. If '
+                'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
+                'with the widget. To circumvent this limitation, you may choose to '
+                'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
+                '`streamlit run app.py` command and define the maximum size of file you can upload '
+                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
+                'is only available for users who run the app using the app\'s source code or through Docker. '
+                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
+                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
+                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
+                'Ensure that your data is cleaned and lemmatized before passing it into this module. If '
                 'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
-                'data before proceeding. Do not upload the a file containing tokenized data for DTM Creation.')
+                'data before proceeding. Do not upload the a file containing tokenized data for DTM creation.')
     FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
 
@@ -92,7 +94,7 @@ def app():
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if FILE == 'Small File(s)':
-        st.markdown('### Upload File:\n')
+        st.markdown('### Upload File\n')
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
@@ -161,26 +163,26 @@ def app():
                 'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
                 'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
                 'over to and from the Streamlit server.')
-    SAVE = st.checkbox('Save Output DataFrame into CSV File?')
+    SAVE = st.checkbox('Save Outputs?')
     VERBOSE_DTM = st.checkbox('Display DataFrame of Document-Term Matrix?')
     if VERBOSE_DTM:
         VERBOSITY_DTM = st.slider('Data Points to Display for Document-Term Matrix?',
-                                  min_value=1,
+                                  min_value=0,
                                   max_value=1000,
                                   value=100,
                                   help='Note that this parameter defines the number of points to print out for '
-                                       'the raw DTM produced by the app.')
+                                       'the raw DTM produced by the app; Select 0 to display all Data Points')
         VERBOSE_ANALYSIS = st.checkbox('Display top N words in Document-Term Matrix?',
                                        help='This sorts the DTM and shows you the top number of words you select.')
         if VERBOSE_ANALYSIS:
             N = st.slider('Key in the top N number of words to display',
                           key='N',
-                          min_value=1,
+                          min_value=0,
                           max_value=1000,
                           value=100,
                           help='This parameter controls the top number of words that will be displayed and plotted. '
                                'This parameter is not the same as that above which controls the number of data points '
-                               'printed out for the raw DTM DataFrame.')
+                               'printed out for the raw DTM DataFrame; Select 0 to display all Data Points')
         ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
                                         help='This option will analyse your DataFrame and display advanced statistics '
                                              'on it. Note that this will require some time and processing power to '
@@ -189,6 +191,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('---')
     st.markdown('## Document-Term Matrix Creation\n'
                 'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
                 'before clicking on the "Proceed" button. The status of your file upload is displayed below for your '
@@ -292,6 +295,7 @@ def app():
 # +                                                   SAVE THE DATA                                                  + #
 # -------------------------------------------------------------------------------------------------------------------- #
                 if SAVE:
+                    st.markdown('---')
                     st.markdown('## Download Data')
                     for data in FINALISED_DATA_LIST:
                         if data[3] == 'csv':

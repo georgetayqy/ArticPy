@@ -86,6 +86,7 @@ MATCH = False
 QUERY = None
 QUERY_MODE = None
 QUERY_DATA = pd.DataFrame()
+FC = 0
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -102,7 +103,7 @@ def app():
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
         CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY, \
         TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, ENGLISH_WORDS, FINALISE, ANALYSIS_MODE, WORLD_MAP, GLOBE_DATA, \
-        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH
+        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH, FC
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -124,7 +125,7 @@ def app():
 
     st.markdown('## Processing Mode\n\n'
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '
-                'processes: Cleaning, Modification (Country Extraction) and Query.')
+                'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
     ANALYSIS_MODE = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification', 'Data Query'))
     st.info(f'{ANALYSIS_MODE} Mode Selected!')
 
@@ -411,7 +412,19 @@ def app():
                     if CLEAN_MODE == 'None':
                         if TOKENIZE:
                             FINALISED_DATA_LIST = [(CLEANED_DATA_TOKENIZED, 'Tokenized Data', 'tokenized.csv')]
-                    elif CLEAN_MODE == 'Simple' or CLEAN_MODE == 'Complex':
+                    elif CLEAN_MODE == 'Simple':
+                        if TOKENIZE:
+                            FINALISED_DATA_LIST = [
+                                (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                                (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv'),
+                                (CLEANED_DATA_TOKENIZED, 'Cleaned Tokenized Data', 'tokenized.csv')
+                            ]
+                        else:
+                            FINALISED_DATA_LIST = [
+                                (DATA, 'Raw Data', 'raw_ascii_data.csv'),
+                                (CLEANED_DATA, 'Cleaned Data', 'cleaned_data.csv')
+                            ]
+                    elif CLEAN_MODE == 'Complex':
                         if TOKENIZE:
                             FINALISED_DATA_LIST = [
                                 (DATA, 'Raw Data', 'raw_ascii_data.csv'),
@@ -467,8 +480,9 @@ def app():
                                         if not data[0].empty:
                                             st.markdown(f'### {data[1]}\n'
                                                         f'Download data from [downloads/{data[2]}]'
-                                                        f'(downloads/{data[2]})')
-                                            data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                                                        f'(downloads/id{FC}_{data[2]})')
+                                            data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=False)
+                                            FC += 1
                                 except KeyError:
                                     st.error('Warning: Your data was not processed properly. Try again.')
                                 except Exception as ex:
@@ -484,8 +498,9 @@ def app():
                                     if not data[0].empty:
                                         st.markdown(f'### {data[1]}\n'
                                                     f'Download data from [downloads/{data[2]}]'
-                                                    f'(downloads/{data[2]})')
-                                        data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                                                    f'(downloads/id{FC}_{data[2]})')
+                                        data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=False)
+                                        FC += 1
                             except KeyError:
                                 st.error('Warning: Your data was not processed properly. Try again.')
                             except Exception as ex:
@@ -501,8 +516,9 @@ def app():
                                             if not data[0].empty:
                                                 st.markdown(f'### {data[1]}\n'
                                                             f'Download data from [downloads/{data[2]}]'
-                                                            f'(downloads/{data[2]})')
-                                                data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                                                            f'(downloads/id{FC}_{data[2]})')
+                                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=False)
+                                                FC += 1
                                     except KeyError:
                                         st.error('Warning: Your data was not processed properly. Try again.')
                                     except Exception as ex:
@@ -515,8 +531,9 @@ def app():
                                         if not data[0].empty:
                                             st.markdown(f'### {data[1]}\n'
                                                         f'Download data from [downloads/{data[2]}]'
-                                                        f'(downloads/{data[2]})')
-                                            data[0].to_csv(str(DOWNLOAD_PATH / f'{data[2]}'), index=False)
+                                                        f'(downloads/id{FC}_{data[2]})')
+                                            data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=False)
+                                            FC += 1
                                 except KeyError:
                                     st.error('Warning: Your Data as not processed properly. Try again.')
                                 except Exception as ex:
@@ -584,19 +601,22 @@ def app():
                         st.markdown('## Download Data')
                         st.markdown('### Country Data')
                         st.markdown(f'Download data from [downloads/globe_data.csv]'
-                                    f'(downloads/globe_data.csv)')
-                        DATA.to_csv(str(DOWNLOAD_PATH / 'globe_data.csv'), index=False)
+                                    f'(downloads/globe_data_id{FC}.csv)')
+                        DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_id{FC}.csv'), index=False)
+                        FC += 1
 
                         st.markdown('### Country Data (Concatenated)')
                         st.markdown(f'Download data from [downloads/globe_data_concat.csv]'
-                                    f'(downloads/globe_data_concat.csv)')
-                        GLOBE_DATA.to_csv(str(DOWNLOAD_PATH / 'globe_data_concat.csv'), index=False)
+                                    f'(downloads/globe_data_concat_id{FC}.csv)')
+                        GLOBE_DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_concat_id{FC}.csv'), index=False)
+                        FC += 1
 
                         if WORLD_MAP:
                             st.markdown('### World Map Representation')
                             st.markdown(f'Download data from [downloads/map.png]'
-                                        f'(downloads/map.png)')
-                            GLOBE_FIG.write_image(str(DOWNLOAD_PATH / 'map.png'))
+                                        f'(downloads/map_id{FC}.png)')
+                            GLOBE_FIG.write_image(str(DOWNLOAD_PATH / f'map_id{FC}.png'))
+                            FC += 1
                     except ValueError:
                         st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
                                    'Connect to the Internet and try again.')
@@ -653,8 +673,9 @@ def app():
                     if not QUERY_DATA.empty:
                         st.markdown('---')
                         st.markdown('## Save Query')
-                        st.markdown('Download data from [downloads/query.csv](downloads/query.csv)')
-                        QUERY_DATA.to_csv(str(DOWNLOAD_PATH / 'query.csv'), index=False)
+                        st.markdown(f'Download data from [downloads/query.csv](downloads/query_id{FC}.csv)')
+                        QUERY_DATA.to_csv(str(DOWNLOAD_PATH / f'query_id{FC}.csv'), index=False)
+                        FC += 1
                     else:
                         st.error('Error: Query was not Successful. Try again.')
             else:

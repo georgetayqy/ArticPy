@@ -95,6 +95,7 @@ ALPHA = 0.1
 L1_RATIO = 0.5
 PLOT = False
 W_PLOT = False
+FC = 0
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -113,7 +114,7 @@ def app():
         NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, DATAPOINT_SELECTOR, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, \
         NMF_MODEL, LSI_MODEL, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
         COLOUR, COLOUR_BCKGD, COLOUR_TXT, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, \
-        KW, TOPIC_FRAME, ALPHA, L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA
+        KW, TOPIC_FRAME, ALPHA, L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA, FC
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -124,9 +125,9 @@ def app():
 
     st.title('NLP Toolkit')
     st.markdown('## Init\n'
-                'This module uses the spaCy package to conduct the necessary NLP preprocessing and '
+                'This module uses the *spaCy* package to conduct the necessary NLP preprocessing and '
                 'analysis tasks for users to make sense of the text they pass into app. Note that this app requires '
-                'the data to be decently cleaned; if you have not done so, run the Load, Clean adn Visualise module '
+                'the data to be decently cleaned; if you have not done so, run the *Load, Clean and Visualise* module '
                 'and save the cleaned  data onto your workstation. Those files may come in useful in '
                 'the functionality of this app.\n\n')
 
@@ -231,7 +232,9 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
         MAX_WORDS = st.number_input('Key in the maximum number of words to display',
                                     min_value=2,
                                     max_value=1000,
@@ -251,23 +254,27 @@ def app():
 
         # MAIN DATA PROCESSING
         if st.button('Generate Word Cloud', key='wc'):
-            DATA = DATA[[DATA_COLUMN]]
-            wc = WordCloud(background_color='white',
-                           max_words=MAX_WORDS,
-                           contour_width=CONTOUR_WIDTH,
-                           width=WIDTH,
-                           height=HEIGHT,
-                           contour_color='steelblue')
-            wc.generate(' '.join(DATA[DATA_COLUMN]))
+            if not DATA.empty:
+                DATA = DATA[[DATA_COLUMN]]
+                wc = WordCloud(background_color='white',
+                               max_words=MAX_WORDS,
+                               contour_width=CONTOUR_WIDTH,
+                               width=WIDTH,
+                               height=HEIGHT,
+                               contour_color='steelblue')
+                wc.generate(' '.join(DATA[DATA_COLUMN]))
 
-            st.markdown('## Wordcloud For Text Inputted')
-            st.image(wc.to_image(), width=None)
+                st.markdown('## Wordcloud For Text Inputted')
+                st.image(wc.to_image(), width=None)
 
-            if SAVE:
-                st.markdown('---')
-                st.markdown('## Download Image')
-                st.markdown('Download image from [downloads/wordcloud.png](downloads/wordcloud.png)')
-                wc.to_file(str(DOWNLOAD_PATH / 'wordcloud.png'))
+                if SAVE:
+                    st.markdown('---')
+                    st.markdown('## Download Image')
+                    st.markdown(f'Download image from [downloads/wordcloud.png](downloads/wordcloud_id{FC}.png)')
+                    wc.to_file(str(DOWNLOAD_PATH / f'wordcloud_id{FC}.png'))
+                    FC += 1
+            else:
+                st.error('Error: Data not loaded properly. Try again.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -333,7 +340,9 @@ def app():
                 st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
                         'automatically saved.')
             ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
 
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
@@ -368,12 +377,15 @@ def app():
                 if SAVE:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown('Download data from [downloads/ner.csv](downloads/ner.csv)')
-                    DATA.to_csv(str(DOWNLOAD_PATH / 'ner.csv'), index=False)
+                    st.markdown(f'Download data from [downloads/ner.csv](downloads/ner_id{FC}.csv)')
+                    DATA.to_csv(str(DOWNLOAD_PATH / f'ner_id{FC}.csv'), index=False)
+                    FC += 1
                     if ONE_DATAPOINT:
-                        st.markdown('Download data from [downloads/rendering.html](downloads/rendering.html)')
-                        with open(pathlib.Path(str(DOWNLOAD_PATH / 'rendering.html')), 'w', encoding='utf-8') as f:
+                        st.markdown(f'Download data from [downloads/rendering.html](downloads/rendering_id{FC}.html)')
+                        with open(pathlib.Path(str(DOWNLOAD_PATH / f'rendering_id{FC}.html')), 'w', encoding='utf-8') \
+                                as f:
                             f.write(SVG)
+                        FC += 1
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -442,7 +454,9 @@ def app():
             else:
                 st.info('You are conducting POS on the entire dataset. Only DataFrame is printed. POS output will be '
                         'automatically saved.')
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
 
         # MAIN PROCESSING
         if st.button('Start POS Tagging', key='pos'):
@@ -467,7 +481,6 @@ def app():
                     if ONE_DATAPOINT:
                         verbose_data_copy = DATA.copy()
                         temp_df = verbose_data_copy[DATA_COLUMN][DATAPOINT_SELECTOR]
-                        print(temp_df)
                         st.markdown('## DisplaCy Rendering')
                         st.info('Renders are not shown due to the sheer size of the image. Kindly save the render in '
                                 'HTML format below to view it.')
@@ -480,15 +493,20 @@ def app():
                                               })
 
                         st.markdown('### Render')
-                        st.markdown('Download data from [downloads/rendering.html](downloads/rendering.html)')
-                        with open(pathlib.Path(str(DOWNLOAD_PATH / 'rendering.html')), 'w', encoding='utf-8') as f:
+                        st.markdown(f'Download data from [downloads/rendering.html](downloads/rendering_id{FC}.html)')
+                        with open(pathlib.Path(str(DOWNLOAD_PATH / f'rendering_id{FC}.html')), 'w', encoding='utf-8') \
+                                as f:
                             f.write(SVG)
+                        FC += 1
 
                 if SAVE:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown('Download data from [downloads/pos.csv](downloads/pos.csv)')
-                    DATA.to_csv(str(DOWNLOAD_PATH / 'pos.csv'), index=False)
+                    st.markdown(f'Download data from [downloads/pos.csv](downloads/pos_id{FC}.csv)')
+                    DATA.to_csv(str(DOWNLOAD_PATH / f'pos_id{FC}.csv'), index=False)
+                    FC += 1
+            else:
+                st.error('Error: Data not loaded properly. Try again.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -541,7 +559,9 @@ def app():
                                    min_value=1,
                                    max_value=100,
                                    value=3)
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
         VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
             VERBOSITY = st.slider('Data points',
@@ -554,32 +574,35 @@ def app():
 
         # MAIN PROCESSING
         if st.button('Summarise Text', key='runner'):
-            try:
-                # CLEAN UP AND STANDARDISE DATAFRAMES
-                DATA = DATA[[DATA_COLUMN]]
-                DATA['SUMMARY'] = np.nan
-                DATA = DATA.astype(str)
-            except KeyError:
-                st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
-            except Exception as ex:
-                st.error(ex)
+            if not DATA.empty:
+                try:
+                    # CLEAN UP AND STANDARDISE DATAFRAMES
+                    DATA = DATA[[DATA_COLUMN]]
+                    DATA['SUMMARY'] = np.nan
+                    DATA = DATA.astype(str)
+                except KeyError:
+                    st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
+                except Exception as ex:
+                    st.error(ex)
+                else:
+                    stopwords = list(STOP_WORDS)
+                    pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
+                    DATA['SUMMARY'] = DATA[DATA_COLUMN].apply(lambda x: summarise(x, stopwords, pos_tag, NLP, SENT_LEN))
+
+                # SHOW DATASETS
+                if VERBOSE:
+                    st.markdown('## Summary DataFrame')
+                    printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+
+                # SAVE DATA
+                if SAVE:
+                    st.markdown('---')
+                    st.markdown('## Download Summarised Data')
+                    st.markdown('Download summarised data from [downloads/summarised.csv]'
+                                f'(downloads/summarised_id{FC}.csv)')
+                    DATA.to_csv(str(DOWNLOAD_PATH / f'summarised_id{FC}.csv'), index=False)
             else:
-                stopwords = list(STOP_WORDS)
-                pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
-                DATA['SUMMARY'] = DATA[DATA_COLUMN].apply(lambda x: summarise(x, stopwords, pos_tag, NLP, SENT_LEN))
-
-            # SHOW DATASETS
-            if VERBOSE:
-                st.markdown('## Summary DataFrame')
-                printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
-
-            # SAVE DATA
-            if SAVE:
-                st.markdown('---')
-                st.markdown('## Download Summarised Data')
-                st.markdown('Download summarised data from [downloads/summarised.csv]'
-                            '(downloads/summarised.csv)')
-                DATA.to_csv(str(DOWNLOAD_PATH / 'summarised.csv'), index=False)
+                st.error('Error: Data not loaded properly. Try again.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -600,7 +623,9 @@ def app():
                                              '(where slangs and emoticons are used) while TextBlob performs better '
                                              'for more formal pieces of text. If you are not sure which to choose, '
                                              'TextBlob is recommended.')
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
         VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
             VERBOSITY = st.slider('Data points',
@@ -648,7 +673,7 @@ def app():
                     DATA['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
                                                       DATA['VADER SENTIMENT TEXT'].values.tolist()]
                     DATA['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
-                                                      DATA['VADER SENTIMENT TEXT'].values.tolist()]
+                                                     DATA['VADER SENTIMENT TEXT'].values.tolist()]
                     DATA['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
                                                       DATA['VADER SENTIMENT TEXT'].values.tolist()]
 
@@ -738,18 +763,21 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     st.markdown('Download sentiment data from [downloads/sentiment_scores.csv]'
-                                '(downloads/sentiment_scores.csv)')
-                    DATA.to_csv(str(DOWNLOAD_PATH / "sentiment_scores.csv"), index=False)
+                                f'(downloads/sentiment_scores_id{FC}.csv)')
+                    DATA.to_csv(str(DOWNLOAD_PATH / f'sentiment_scores_id{FC}.csv'), index=False)
+                    FC += 1
 
                     if HAC_PLOT is not None:
                         st.markdown('## Graph')
-                        st.markdown('Download sentiment data from [downloads/plot.png](downloads/plot.png)')
-                        HAC_PLOT.write_image(str(DOWNLOAD_PATH / 'plot.png'))
+                        st.markdown(f'Download sentiment data from [downloads/plot.png](downloads/plot_id{FC}.png)')
+                        HAC_PLOT.write_image(str(DOWNLOAD_PATH / f'plot_id{FC}.png'))
+                        FC += 1
                     if HAC_PLOT1 is not None:
                         st.markdown('## Normal Distribution Graph')
                         st.markdown('Download sentiment data from [downloads/normal_plot.png]'
-                                    '(downloads/normal_plot.png)')
-                        HAC_PLOT1.write_image(str(DOWNLOAD_PATH / 'normal_plot.png'))
+                                    f'(downloads/normal_plot_id{FC}.png)')
+                        HAC_PLOT1.write_image(str(DOWNLOAD_PATH / f'normal_plot_id{FC}.png'))
+                        FC += 1
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -783,10 +811,13 @@ def app():
         NLP_TOPIC_MODEL = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
                                                                'Non-Negative Matrix Factorization',
                                                                'Latent Semantic Indexing'))
+        st.info(f'**{NLP_TOPIC_MODEL}** Selected')
 
         # FLAGS
         st.markdown('## Flags')
-        SAVE = st.checkbox('Save Outputs?')
+        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                 'content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
         VERBOSE = st.checkbox('Display Outputs?', help='Note: For LSI, if verbose is enabled, the model will be '
                                                        'refitted such that only 2 components are considered. If you '
                                                        'wish to turn off this feature, deselect the "Generate '
@@ -924,16 +955,19 @@ def app():
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):
                                 st.markdown(f'Download all Topic List from [downloads/lda_topics_{i}.csv]'
-                                            f'(downloads/lda_topics_{i}.csv)')
-                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lda_topics_{i}.csv'), index=False)
+                                            f'(downloads/lda_topics_{i}_id{FC}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'lda_topics_{i}_id{FC}.csv'), index=False)
+                                FC += 1
                             st.markdown('### Topic/Word List')
                             st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics.csv)')
-                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
+                                        f'(downloads/summary_topics_id{FC}.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{FC}.csv'))
+                            FC += 1
 
                             st.markdown('### Other Requested Data')
-                            st.markdown('Download HTML File from [downloads/lda.html](downloads/lda.html)')
-                            pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / 'lda.html'))
+                            st.markdown(f'Download HTML File from [downloads/lda.html](downloads/lda_id{FC}.html)')
+                            pyLDAvis.save_html(LDA_VIS, str(DOWNLOAD_PATH / f'lda_id{FC}.html'))
+                            FC += 1
 
                     # NMF
                     elif NLP_TOPIC_MODEL == 'Non-Negative Matrix Factorization':
@@ -969,13 +1003,15 @@ def app():
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):
                                 st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
-                                            f'(downloads/nmf_topics_{i}.csv)')
-                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}.csv'), index=False)
+                                            f'(downloads/nmf_topics_{i}_id{FC}.csv)')
+                                TOPIC_TEXT[i].to_csv(str(DOWNLOAD_PATH / f'nmf_topics_{i}_id{FC}.csv'), index=False)
+                                FC += 1
 
                             st.markdown('### Topic/Word List')
                             st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics.csv)')
-                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
+                                        f'(downloads/summary_topics_id{FC}.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{FC}.csv'))
+                            FC += 1
 
                     # LSI
                     elif NLP_TOPIC_MODEL == 'Latent Semantic Indexing':
@@ -1052,24 +1088,28 @@ def app():
                                         '### Topics')
                             for i in range(len(TOPIC_TEXT)):
                                 st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
-                                            f'(downloads/lsi_topic_{i}.csv)')
+                                            f'(downloads/lsi_topic_{i}_id{FC}.csv)')
                                 pd.DataFrame(TOPIC_TEXT[i]).\
-                                    to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}.csv'), index=False)
+                                    to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}_id{FC}.csv'), index=False)
+                                FC += 1
 
                             st.markdown('### Topic/Word List')
                             st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics.csv)')
-                            KW.to_csv(str(DOWNLOAD_PATH / 'summary_topics.csv'))
+                                        f'(downloads/summary_topics_id{FC}.csv)')
+                            KW.to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{FC}.csv'))
+                            FC += 1
 
                             if VERBOSE and PLOT:
                                 st.markdown('### Other Requested Data')
                                 st.markdown('Download PNG File from [downloads/marker_figure.png]'
-                                            '(downloads/marker_figure.png)')
-                                MAR_FIG.write_image(str(DOWNLOAD_PATH / 'marker_figure.png'))
+                                            f'(downloads/marker_figure_id{FC}.png)')
+                                MAR_FIG.write_image(str(DOWNLOAD_PATH / f'marker_figure_id{FC}.png'))
+                                FC += 1
 
                                 if W_PLOT:
                                     st.markdown('Download PNG File from [downloads/word_figure.png]'
-                                                '(downloads/word_figure.png)')
-                                    WORD_FIG.write_image(str(DOWNLOAD_PATH / 'word_figure.png'))
+                                                f'(downloads/word_figure_id{FC}.png)')
+                                    WORD_FIG.write_image(str(DOWNLOAD_PATH / f'word_figure_id{FC}.png'))
+                                    FC += 1
             else:
                 st.error('Error: File not loaded properly. Try again.')

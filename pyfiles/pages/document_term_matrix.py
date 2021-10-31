@@ -43,6 +43,7 @@ ADVANCED_ANALYSIS = False
 FINALISED_DATA_LIST = []
 DATA_COLUMN = None
 TOP_N_WORD_FIG = None
+FC = 0
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -58,7 +59,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     global DATA, DATA_PATH, ANALYSIS, VERBOSE_DTM, VERBOSITY_DTM, VERBOSE_ANALYSIS, SAVE, FILE, MODE, \
         STREAMLIT_STATIC_PATH, DOWNLOAD_PATH, DTM, DTM_copy, N, DTM_copy, CSP, ADVANCED_ANALYSIS, \
-        FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG
+        FINALISED_DATA_LIST, DATA_COLUMN, TOP_N_WORD_FIG, FC
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                     INIT                                                         | #
@@ -85,7 +86,7 @@ def app():
                 'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
                 'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
                 'Ensure that your data is cleaned and lemmatized before passing it into this module. If '
-                'you have not cleaned your dataset, use the Load, Clean and Visualise module to clean up your '
+                'you have not cleaned your dataset, use the *Load, Clean and Visualise* module to clean up your '
                 'data before proceeding. Do not upload the a file containing tokenized data for DTM creation.')
     FILE = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     MODE = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
@@ -302,20 +303,23 @@ def app():
                             if not data[0].empty:
                                 st.markdown(f'### {data[1]}')
                                 st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=False)
+                                            f'(downloads/id{FC}_{data[2]})')
+                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=False)
+                                FC += 1
                         elif data[3] == 'csv_':
                             if not data[0].empty:
                                 st.markdown(f'### {data[1]}')
                                 st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / data[2]), index=True)
+                                            f'(downloads/id{FC}_{data[2]})')
+                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'), index=True)
+                                FC += 1
                         elif data[3] == 'png':
                             if data[0]:
                                 st.markdown(f'### {data[1]}')
                                 st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/{data[2]})')
-                                data[0].write_image(str(DOWNLOAD_PATH / data[2]))
+                                            f'(downloads/id{FC}_{data[2]})')
+                                data[0].write_image(str(DOWNLOAD_PATH / f'id{FC}_{data[2]}'))
+                                FC += 1
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

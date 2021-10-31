@@ -1,5 +1,5 @@
 """
-This file is used to store some of the basic helper functions that is used in the main app
+This file is used to store some of the basic helper functions that are used frequently in the app
 """
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
@@ -15,6 +15,7 @@ from string import punctuation
 from collections import Counter
 from heapq import nlargest
 from nltk.stem import WordNetLemmatizer
+import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -25,27 +26,27 @@ with st.spinner('Downloading WordNet Corpora...'):
     nltk.download('vader_lexicon')
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# |                                                GLOBAL VARIABLES                                                  | #
+# |                                         GLOBAL VARIABLES DECLARATION                                             | #
 # -------------------------------------------------------------------------------------------------------------------- #
 lemmatizer = WordNetLemmatizer()
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# |                                                HELPER FUNCTIONS                                                  | #
+# |                                               HELPER FUNCTIONS                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
 def readFile(filepath, fformat):
     """
     This is a helper function to read the data
 
-    Attributes
+    Parameters
     ----------
-    filepath:                   A path-like or file-like object
-    fformat:                    The format of the file to read
+    filepath:                           A path-like or file-like object
+    fformat:                            The format of the file to read
     ----------
     """
     if fformat == 'CSV':
         try:
-            return pd.read_csv(filepath, low_memory=False, encoding='iso-8859-1')
+            return pd.read_csv(filepath, low_memory=False, encoding='latin1')
         except Exception as e:
             st.error(f'Error: {e}')
     elif fformat == 'XLSX':
@@ -63,8 +64,11 @@ def readFile(filepath, fformat):
 def lemmatizeText(text):
     """
     This function iterates through the pandas dataframe and lemmatizes the words
-    :param text:        text to lemmatize
-    :return:            str -> lemmatized words
+
+    Parameters
+    ----------
+    :param text:                        Text to lemmatize (string)
+    ----------
     """
     return [lemmatizer.lemmatize(word) for word in text]
 
@@ -73,11 +77,14 @@ def summarise(text, stopwords, pos_tag, nlp, sent_count):
     """
     This function summarise the text dataframe
 
-    :param text:         DataFrame
-    :param nlp:          NLP model
-    :param pos_tag:      Text pos tag
-    :param stopwords:    Stopwords
-    :return: str
+    Parameters
+    ----------
+    text:                               DataFrame
+    nlp:                                NLP model
+    pos_tag:                            Text pos tag
+    stopwords:                          Stopwords
+    sent_count:                         Number of sentences to summarise to
+    ----------
     """
 
     try:
@@ -112,13 +119,24 @@ def summarise(text, stopwords, pos_tag, nlp, sent_count):
         summarized_sentences = nlargest(sent_count, sent_strength, key=sent_strength.get)
         final_sentences = [w.text for w in summarized_sentences]
         summary = ' '.join(final_sentences)
-    except Exception as e:
+    except Exception:
         return text
     else:
         return summary
 
 
 def modelIterator(model, vectoriser, top_n, vb=True):
+    """
+    This function prints out and returns the extracted topics for the NLP model passed on to it
+
+    Parameters
+    ----------
+    model:                              NLP Model
+    vectoriser:                         Vectorised text
+    top_n:                              Number of Topics to return
+    vb:                                 Verbose tag (will print out the topics if set to True
+    ---------
+    """
     frame_list = []
 
     for id_, topic in enumerate(model.components_):
@@ -142,7 +160,7 @@ def downloadCorpora(model: str):
 
     Parameter
     ----------
-    models:          A list of names of models the user is trying to download
+    models:                             A list of names of models the user is trying to download
     ----------
     """
     usr_dir = os.path.expanduser(os.getcwd())
@@ -167,23 +185,26 @@ def downloadCorpora(model: str):
 
 
 def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
-                   extract_from: object = None):
+                   extract_from: str or None = None):
     """
     Takes in a Pandas DataFrame and prints out the DataFrame
 
     Parameter
     ----------
-    data:                            Pandas DataFrame or Series object
-    extract_from:                    Name of column to extract data from
-    verbose_level:                   The number of rows of data to display
-    advanced:                        Conduct Advanced Analysis on the DataFrame
-    dtm:                             Special processing for DTMs
+    data:                               Pandas DataFrame or Series object
+    extract_from:                       Name of column to extract data from
+    verbose_level:                      The number of rows of data to display
+    advanced:                           Conduct Advanced Analysis on the DataFrame
+    dtm:                                Special processing for DTMs
     ----------
     """
 
     if verbose_level != 0:
         try:
-            st.dataframe(data.head(verbose_level), height=600, width=800)
+            if extract_from is not None:
+                st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
+            else:
+                st.dataframe(data.head(verbose_level), height=600, width=800)
         except RuntimeError:
             st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
             st.dataframe(data.head(10), height=600, width=800)
@@ -205,7 +226,10 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
                             minimal=True))
     else:
         try:
-            st.dataframe(data, height=600, width=800)
+            if extract_from is not None:
+                st.dataframe(data[[extract_from]], height=600, width=800)
+            else:
+                st.dataframe(data, height=600, width=800)
         except RuntimeError:
             st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
             st.dataframe(data.head(10), height=600, width=800)
@@ -230,6 +254,13 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
 def dominantTopic(vect, model, n_words):
     """
     Returns the topic text
+
+    Parameters
+    ----------
+    vect:                               Vectorizer used
+    model:                              NLP Model
+    n_words:                            Number of Topics to return
+    ----------
     """
     kw = np.array(vect.get_feature_names())
     topic_kw = []
@@ -238,7 +269,3 @@ def dominantTopic(vect, model, n_words):
         topic_kw.append(kw.take(top_kw))
 
     return topic_kw
-
-
-def mapTopic(row, dict_):
-    return dict_[row]

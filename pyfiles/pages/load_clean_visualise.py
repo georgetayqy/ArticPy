@@ -84,6 +84,7 @@ GLOBE_DATA = None
 GLOBE_FIG = None
 MATCH = False
 QUERY = None
+QUERY_SUCCESS = False
 QUERY_MODE = None
 QUERY_DATA = pd.DataFrame()
 FC = 0
@@ -103,7 +104,7 @@ def app():
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
         CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY, \
         TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, ENGLISH_WORDS, FINALISE, ANALYSIS_MODE, WORLD_MAP, GLOBE_DATA, \
-        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH, FC
+        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH, FC, QUERY_SUCCESS
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -285,8 +286,10 @@ def app():
         if QUERY_MODE == 'Single Query':
             QUERY = st.text_input('Key in words/numbers/characters/symbols to Query')
             if len(QUERY) != 0:
+                QUERY_SUCCESS = True
                 st.info('Alert: Words detected.')
             else:
+                QUERY_SUCCESS = False
                 st.info('Alert: No Words detected')
 
         elif QUERY_MODE == 'Multiple Queries':
@@ -295,8 +298,10 @@ def app():
             QUERY = [word.strip() for word in QUERY.split(sep=',')]
             QUERY = '|'.join(map(re.escape, QUERY))
             if len(QUERY) != 0:
+                QUERY_SUCCESS = True
                 st.info('Alert: Words detected.')
             else:
+                QUERY_SUCCESS = False
                 st.info('Alert: No Words detected')
 
 
@@ -653,30 +658,33 @@ def app():
             DATA = DATA.astype(str)
 
             if not DATA.empty:
-                try:
-                    # make a copy of the original dataframe to avoid mutating it with .loc
-                    temp = DATA.copy()
-                    QUERY_DATA = temp.loc[temp[DATA_COLUMN].str.contains(QUERY, case=MATCH)]
-                except Exception as ex:
-                    st.error(f'Error: {ex}')
+                if QUERY_SUCCESS:
+                    try:
+                        # make a copy of the original dataframe to avoid mutating it with .loc
+                        temp = DATA.copy()
+                        QUERY_DATA = temp.loc[temp[DATA_COLUMN].str.contains(QUERY, case=MATCH)]
+                    except Exception as ex:
+                        st.error(f'Error: {ex}')
+                    else:
+                        st.success('Query Successful!')
+
+                    if VERBOSE:
+                        if not QUERY_DATA.empty:
+                            st.markdown('## Query Results')
+                            printDataFrame(data=QUERY_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                        else:
+                            st.error('Error: Query was not Successful. Try again.')
+
+                    if SAVE:
+                        if not QUERY_DATA.empty:
+                            st.markdown('---')
+                            st.markdown('## Save Query')
+                            st.markdown(f'Download data from [downloads/query.csv](downloads/query_id{FC}.csv)')
+                            QUERY_DATA.to_csv(str(DOWNLOAD_PATH / f'query_id{FC}.csv'), index=False)
+                            FC += 1
+                        else:
+                            st.error('Error: Query was not Successful. Try again.')
                 else:
-                    st.success('Query Successful!')
-
-                if VERBOSE:
-                    if not QUERY_DATA.empty:
-                        st.markdown('## Query Results')
-                        printDataFrame(data=QUERY_DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
-                    else:
-                        st.error('Error: Query was not Successful. Try again.')
-
-                if SAVE:
-                    if not QUERY_DATA.empty:
-                        st.markdown('---')
-                        st.markdown('## Save Query')
-                        st.markdown(f'Download data from [downloads/query.csv](downloads/query_id{FC}.csv)')
-                        QUERY_DATA.to_csv(str(DOWNLOAD_PATH / f'query_id{FC}.csv'), index=False)
-                        FC += 1
-                    else:
-                        st.error('Error: Query was not Successful. Try again.')
+                    st.error('Error: Query cannot be empty/empty strings. Try again.')
             else:
                 st.error('Error: File not loaded properly. Try again.')

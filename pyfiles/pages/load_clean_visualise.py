@@ -132,7 +132,7 @@ def app():
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '
                 'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
     ANALYSIS_MODE = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification', 'Data Query'))
-    st.info(f'{ANALYSIS_MODE} Mode Selected!')
+    st.info(f'**{ANALYSIS_MODE}** Mode Selected!')
 
     st.markdown('## Upload Data\n'
                 'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
@@ -164,13 +164,13 @@ def app():
             DATA = readFile(DATA_PATH, MODE)
             if not DATA.empty and MOD_MODE is not 'Inplace Data Modification':
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
-                st.success(f'Data Loaded from {DATA_COLUMN}!')
+                st.success(f'Data Loaded from **{DATA_COLUMN}**!')
         else:
             # RESET
             DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
-        st.info(f'File Format Selected: {MODE}')
+        st.info(f'File Format Selected: **{MODE}**')
         CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':

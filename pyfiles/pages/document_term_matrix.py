@@ -107,7 +107,7 @@ def app():
             DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
-        st.info(f'File Format Selected: {MODE}')
+        st.info(f'File Format Selected: **{MODE}**')
         CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':

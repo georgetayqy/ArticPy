@@ -183,7 +183,7 @@ def app():
             DATA = pd.DataFrame()
 
     elif FILE == 'Large File(s)':
-        st.info(f'File Format Selected: {MODE}')
+        st.info(f'File Format Selected: **{MODE}**')
         CSP = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
         if CSP == 'Azure':
@@ -319,7 +319,7 @@ def app():
             except Exception as ex:
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Efficiency Model Loaded!')
+                st.info('**Efficiency Model** Loaded!')
         elif NLP_MODEL == 'en_core_web_lg':
             try:
                 NLP = spacy.load('en_core_web_lg')
@@ -332,7 +332,7 @@ def app():
             except Exception as ex:
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Accuracy Model Loaded!')
+                st.info('**Accuracy Model** Loaded!')
         VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
             VERBOSITY = st.slider('Choose Number of Data Points to Display',
@@ -435,7 +435,7 @@ def app():
             except Exception as ex:
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Efficiency Model Loaded!')
+                st.info('**Efficiency Model** Loaded!')
         elif NLP_MODEL == 'en_core_web_lg':
             try:
                 NLP = spacy.load('en_core_web_lg')
@@ -448,7 +448,7 @@ def app():
             except Exception as ex:
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
-                st.info('Accuracy Model Loaded!')
+                st.info('**Accuracy Model** Loaded!')
         VERBOSE = st.checkbox('Display Outputs?')
         if VERBOSE:
             VERBOSITY = st.slider('Choose Number of Data Points to Display',
@@ -569,7 +569,7 @@ def app():
                 except Exception as ex:
                     st.error(f'Unknown Error: {ex}. Try again.')
                 else:
-                    st.info('Efficiency Model Loaded!')
+                    st.info('**Efficiency Model** Loaded!')
             elif NLP_MODEL == 'en_core_web_lg':
                 try:
                     NLP = spacy.load('en_core_web_lg')
@@ -582,7 +582,7 @@ def app():
                 except Exception as ex:
                     st.error(f'Unknown Error: {ex}. Try again.')
                 else:
-                    st.info('Accuracy Model Loaded!')
+                    st.info('**Accuracy Model** Loaded!')
             SENT_LEN = st.number_input('Enter the total number of sentences to summarise text to',
                                        min_value=1,
                                        max_value=100,

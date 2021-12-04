@@ -27,6 +27,7 @@ from texthero import preprocessing
 import plotly.express as px
 from utils import csp_downloaders
 from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame
+from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                  INITIAL SETUP                                                   | #
@@ -88,6 +89,9 @@ QUERY_SUCCESS = False
 QUERY_MODE = None
 QUERY_DATA = pd.DataFrame()
 FC = 0
+MOD_MODE = 'Country Extraction'
+FIXED_KEY = True
+HEIGHT = 400
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -104,7 +108,7 @@ def app():
     global FILE, MODE, DATA_PATH, DATA, CSP, CLEAN, CLEAN_MODE, SAVE, VERBOSE, VERBOSITY, CLEANED_DATA, \
         CLEANED_DATA_TOKENIZED, SIMPLE_PIPELINE, ADVANCED_ANALYSIS, FINALISED_DATA_LIST, DATA_COLUMN, QUERY, \
         TOKENIZE, EXTEND_STOPWORD, STOPWORD_LIST, ENGLISH_WORDS, FINALISE, ANALYSIS_MODE, WORLD_MAP, GLOBE_DATA, \
-        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH, FC, QUERY_SUCCESS
+        GLOBE_FIG, QUERY_MODE, QUERY_DATA, MATCH, FC, QUERY_SUCCESS, MOD_MODE, FIXED_KEY, HEIGHT
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -158,7 +162,7 @@ def app():
         DATA_PATH = st.file_uploader(f'Load {MODE} File', type=[MODE])
         if DATA_PATH is not None:
             DATA = readFile(DATA_PATH, MODE)
-            if not DATA.empty:
+            if not DATA.empty and MOD_MODE is not 'Inplace Data Modification':
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
         else:
@@ -179,7 +183,7 @@ def app():
                     DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
 
-            if not DATA.empty:
+            if not DATA.empty and MOD_MODE is not 'Inplace Data Modification':
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
 
@@ -193,7 +197,7 @@ def app():
                     DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
 
-            if not DATA.empty:
+            if not DATA.empty and MOD_MODE is not 'Inplace Data Modification':
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
 
@@ -207,7 +211,7 @@ def app():
                     DATA = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
 
-            if not DATA.empty:
+            if not DATA.empty and MOD_MODE is not 'Inplace Data Modification':
                 DATA_COLUMN = st.selectbox('Choose Column where Data is Stored', list(DATA.columns))
                 st.success(f'Data Loaded from {DATA_COLUMN}!')
 
@@ -215,29 +219,33 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               PROCESSING FLAGS                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Flags\n'
-                'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
-                'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the number '
-                'of data points you wish to visualise or download the file and visualise it through Excel or any other '
-                'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
-                'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
-                'over to and from the Streamlit server.')
-    SAVE = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any saved '
-                                             'outputs. If None mode is chosen, you will not be able to download '
-                                             'the outputs as it is assumed that you already possess that.')
-    VERBOSE = st.checkbox('Display Outputs?')
-    if VERBOSE:
-        VERBOSITY = st.slider('Data Points To Print',
-                              key='Data points to display?',
-                              min_value=0,
-                              max_value=1000,
-                              value=20,
-                              help='Select 0 to display all Data Points')
-        ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
-                                        help='This option will analyse your DataFrame and display advanced '
-                                             'statistics on it. Note that this will require some time and '
-                                             'processing power to complete. Deselect this option if this if '
-                                             'you do not require ')
+    if MOD_MODE is not 'Inplace Data Modification':
+        st.markdown('## Flags\n'
+                    'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
+                    'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the '
+                    'number of data points you wish to visualise or download the file and visualise it through Excel '
+                    'or any other DataFrame visualising Python packages. There is no definitive way to increase the '
+                    'size of the DataFrame that can be printed out due to the inherent limitation on the size of the '
+                    'packets sent over to and from the Streamlit server.')
+        SAVE = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any saved '
+                                                 'outputs. If None mode is chosen, you will not be able to download '
+                                                 'the outputs as it is assumed that you already possess that.\n\n'
+                                                 'Additionally, due to the possibility of files with the same file '
+                                                 'name and content being downloaded again, a unique file identifier is '
+                                                 'tacked onto the filename.')
+        VERBOSE = st.checkbox('Display Outputs?')
+        if VERBOSE:
+            VERBOSITY = st.slider('Data Points To Print',
+                                  key='Data points to display?',
+                                  min_value=0,
+                                  max_value=1000,
+                                  value=20,
+                                  help='Select 0 to display all Data Points')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                            help='This option will analyse your DataFrame and display advanced '
+                                                 'statistics on it. Note that this will require some time and '
+                                                 'processing power to complete. Deselect this option if this if '
+                                                 'you do not require it.')
 
     if ANALYSIS_MODE == 'Data Cleaning':
         CLEAN_MODE = st.selectbox('Select Preprocessing Pipelines', ('None', 'Simple', 'Complex'),
@@ -272,9 +280,16 @@ def app():
     elif ANALYSIS_MODE == 'Data Modification':
         st.markdown('This module will allow you to modify the data passed in by performing certain elementary '
                     'analysis on the data. So far, we have implemented the ability to extract the countries '
-                    'mentioned in your data and to plot out the Data Points on a World Map.')
-        if VERBOSE:
-            WORLD_MAP = st.checkbox('Generate a World Map Representation of the Countries Mentioned?', value=True)
+                    'mentioned in your data and to plot out the Data Points on a World Map and the ability to '
+                    'modify a single value of the inputted DataFrame in place.')
+        st.markdown('## Data Modification Mode')
+        MOD_MODE = st.selectbox('Choose Mode', ('Country Extraction', 'Inplace Data Modification'))
+        if MOD_MODE == 'Country Extraction':
+            if VERBOSE:
+                WORLD_MAP = st.checkbox('Generate a World Map Representation of the Countries Mentioned?', value=True)
+        elif MOD_MODE == 'Inplace Data Modification':
+            FIXED_KEY = st.checkbox('Use Fixed Key for Editing Table?')
+            HEIGHT = st.number_input('Height of Table', min_value=100, max_value=800, value=400)
 
     elif ANALYSIS_MODE == 'Data Query':
         MATCH = st.checkbox('Query Must Match Exactly?', help='Select this option if you want your query string/'
@@ -553,82 +568,156 @@ def app():
 # |                                               COUNTRY EXTRACTION                                                 | #
 # -------------------------------------------------------------------------------------------------------------------- #
     elif ANALYSIS_MODE == 'Data Modification':
-        st.markdown('---')
-        st.markdown('## Country Extraction\n'
-                    'This module will take in a DataFrame containing all documents meant for NLP Analysis and return '
-                    'a new DataFrame whereby countries mentioned in the documents will be extracted. Users can then '
-                    'choose to either output a set of countries mentioned in the document, or generate a graphical '
-                    'representation of the frequency of country name occurrence within the set of documents passed '
-                    'to it.')
+        if MOD_MODE == 'Country Extraction':
+            st.markdown('---')
+            st.markdown('## Country Extraction\n'
+                        'This module will take in a DataFrame containing all documents meant for NLP Analysis and '
+                        'return a new DataFrame whereby countries mentioned in the documents will be extracted. Users '
+                        'can then choose to either output a set of countries mentioned in the document, or generate a '
+                        'graphical representation of the frequency of country name occurrence within the set of '
+                        'documents passed to it.')
 
-        if FILE == 'Small File(s)':
-            if DATA_PATH:
-                st.info('File loaded.')
-            else:
-                st.warning('File has not been loaded.')
-        elif FILE == 'Large File(s)':
-            if not DATA.empty:
-                st.info('File loaded.')
-            else:
-                st.warning('File has not been loaded.')
+            if FILE == 'Small File(s)':
+                if DATA_PATH:
+                    st.info('File loaded.')
+                else:
+                    st.warning('File has not been loaded.')
+            elif FILE == 'Large File(s)':
+                if not DATA.empty:
+                    st.info('File loaded.')
+                else:
+                    st.warning('File has not been loaded.')
 
-        if st.button('Begin Country Extraction', key='country'):
-            GLOBE_DATA = pd.DataFrame()
-            GLOBE_FIG = None
+            if st.button('Begin Country Extraction', key='country'):
+                GLOBE_DATA = pd.DataFrame()
+                GLOBE_FIG = None
 
-            if not DATA.empty:
-                DATA = DATA.astype(object)
-                DATA['COUNTRIES'] = DATA[DATA_COLUMN].astype(str).apply(lambda x: [country.name for country in
-                                                                                   pycountry.countries if
-                                                                                   country.name.lower() in x.lower()])
-                new_list = DATA['COUNTRIES'].to_list()
-                temp = []
-                for ls in new_list:
-                    temp.extend(ls)
-                zipped = list(zip(Counter(temp).keys(), Counter(temp).values()))
+                if not DATA.empty:
+                    DATA = DATA.astype(object)
+                    DATA['COUNTRIES'] = DATA[DATA_COLUMN].astype(str).apply(lambda x: [country.name for country in
+                                                                                       pycountry.countries if
+                                                                                       country.name.lower() in x.lower()])
+                    new_list = DATA['COUNTRIES'].to_list()
+                    temp = []
+                    for ls in new_list:
+                        temp.extend(ls)
+                    zipped = list(zip(Counter(temp).keys(), Counter(temp).values()))
 
-                GLOBE_DATA = pd.DataFrame(data=zipped, index=range(len(zipped)), columns=['country', 'count'])
-                GLOBE_FIG = px.scatter_geo(data_frame=GLOBE_DATA, projection='natural earth', color='country',
-                                           locations='country', size='count', hover_name='country',
-                                           locationmode='country names', title='Country Name Mention Frequency')
+                    GLOBE_DATA = pd.DataFrame(data=zipped, index=range(len(zipped)), columns=['country', 'count'])
+                    GLOBE_FIG = px.scatter_geo(data_frame=GLOBE_DATA, projection='natural earth', color='country',
+                                               locations='country', size='count', hover_name='country',
+                                               locationmode='country names', title='Country Name Mention Frequency')
 
-                if VERBOSE:
-                    st.markdown('## Country Name Mention Frequency')
-                    printDataFrame(data=GLOBE_DATA, verbose_level=VERBOSITY,
-                                   advanced=ADVANCED_ANALYSIS)
-                    if WORLD_MAP:
-                        st.markdown('## World Map Representation')
-                        st.plotly_chart(GLOBE_FIG)
-
-                if SAVE:
-                    try:
-                        st.markdown('---')
-                        st.markdown('## Download Data')
-                        st.markdown('### Country Data')
-                        st.markdown(f'Download data from [downloads/globe_data.csv]'
-                                    f'(downloads/globe_data_id{FC}.csv)')
-                        DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_id{FC}.csv'), index=False)
-                        FC += 1
-
-                        st.markdown('### Country Data (Concatenated)')
-                        st.markdown(f'Download data from [downloads/globe_data_concat.csv]'
-                                    f'(downloads/globe_data_concat_id{FC}.csv)')
-                        GLOBE_DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_concat_id{FC}.csv'), index=False)
-                        FC += 1
-
+                    if VERBOSE:
+                        st.markdown('## Country Name Mention Frequency')
+                        printDataFrame(data=GLOBE_DATA, verbose_level=VERBOSITY,
+                                       advanced=ADVANCED_ANALYSIS)
                         if WORLD_MAP:
-                            st.markdown('### World Map Representation')
-                            st.markdown(f'Download data from [downloads/map.png]'
-                                        f'(downloads/map_id{FC}.png)')
-                            GLOBE_FIG.write_image(str(DOWNLOAD_PATH / f'map_id{FC}.png'))
+                            st.markdown('## World Map Representation')
+                            st.plotly_chart(GLOBE_FIG)
+
+                    if SAVE:
+                        try:
+                            st.markdown('---')
+                            st.markdown('## Download Data')
+                            st.markdown('### Country Data')
+                            st.markdown(f'Download data from [downloads/globe_data.csv]'
+                                        f'(downloads/globe_data_id{FC}.csv)')
+                            DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_id{FC}.csv'), index=False)
                             FC += 1
-                    except ValueError:
-                        st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
-                                   'Connect to the Internet and try again.')
-                    except Exception as ex:
-                        st.error(f'Error: Unknown Fatal Error -> {ex}')
-            else:
-                st.error('Error: No files loaded.')
+
+                            st.markdown('### Country Data (Concatenated)')
+                            st.markdown(f'Download data from [downloads/globe_data_concat.csv]'
+                                        f'(downloads/globe_data_concat_id{FC}.csv)')
+                            GLOBE_DATA.to_csv(str(DOWNLOAD_PATH / f'globe_data_concat_id{FC}.csv'), index=False)
+                            FC += 1
+
+                            if WORLD_MAP:
+                                st.markdown('### World Map Representation')
+                                st.markdown(f'Download data from [downloads/map.png]'
+                                            f'(downloads/map_id{FC}.png)')
+                                GLOBE_FIG.write_image(str(DOWNLOAD_PATH / f'map_id{FC}.png'))
+                                FC += 1
+                        except ValueError:
+                            st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
+                                       'Connect to the Internet and try again.')
+                        except Exception as ex:
+                            st.error(f'Error: Unknown Fatal Error -> {ex}')
+                else:
+                    st.error('Error: No files loaded.')
+
+        elif MOD_MODE == 'Inplace Data Modification':
+            st.markdown('---')
+            st.markdown('## Inplace Data Modification\n'
+                        'This function uses the AgGrid module to create editable tables for your to edit your '
+                        'DataFrame as you would with an Excel sheet.')
+
+            if FILE == 'Small File(s)':
+                if DATA_PATH:
+                    st.info('File loaded.')
+                    gb = GridOptionsBuilder.from_dataframe(DATA)
+                    gb.configure_columns(DATA.columns, editable=True)
+                    go = gb.build()
+
+                    if FIXED_KEY:
+                        ag = AgGrid(
+                            DATA,
+                            gridOptions=go,
+                            height=HEIGHT,
+                            fit_columns_on_grid_load=True,
+                            key='data',
+                            reload_data=False
+                        )
+                    else:
+                        ag = AgGrid(
+                            DATA,
+                            gridOptions=go,
+                            height=HEIGHT,
+                            fit_columns_on_grid_load=True
+                        )
+
+                    if st.button('Generate Modified Data'):
+                        st.markdown('### Modified Data')
+                        st.markdown(f'Download data from [downloads/modified_data.csv]'
+                                    f'(downloads/modified_data_id{FC}.csv)')
+                        ag['data'].to_csv(str(DOWNLOAD_PATH / f'modified_data_id{FC}.csv'), index=False)
+                        FC += 1
+                else:
+                    st.warning('File has not been loaded.')
+
+            elif FILE == 'Large File(s)':
+                if not DATA.empty:
+                    st.info('File loaded.')
+                    gb = GridOptionsBuilder.from_dataframe(DATA)
+                    gb.configure_columns(DATA.columns, editable=True)
+                    go = gb.build()
+
+                    if FIXED_KEY:
+                        ag = AgGrid(
+                            DATA,
+                            gridOptions=go,
+                            height=HEIGHT,
+                            fit_columns_on_grid_load=True,
+                            key='data',
+                            reload_data=False
+                        )
+                    else:
+                        ag = AgGrid(
+                            DATA,
+                            gridOptions=go,
+                            height=HEIGHT,
+                            fit_columns_on_grid_load=True
+                        )
+
+                    if st.button('Generate Modified Data'):
+                        if SAVE:
+                            st.markdown('### Modified Data')
+                            st.markdown(f'Download data from [downloads/modified_data.csv]'
+                                        f'(downloads/modified_data_id{FC}.csv)')
+                            ag['data'].to_csv(str(DOWNLOAD_PATH / f'modified_data_id{FC}.csv'), index=False)
+                            FC += 1
+                else:
+                    st.warning('File has not been loaded.')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

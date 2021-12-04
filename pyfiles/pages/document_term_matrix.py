@@ -164,7 +164,9 @@ def app():
                 'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
                 'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
                 'over to and from the Streamlit server.')
-    SAVE = st.checkbox('Save Outputs?')
+    SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                             'content being downloaded again, a unique file identifier is '
+                                             'tacked onto the filename.')
     VERBOSE_DTM = st.checkbox('Display DataFrame of Document-Term Matrix?')
     if VERBOSE_DTM:
         VERBOSITY_DTM = st.slider('Data Points to Display for Document-Term Matrix?',
@@ -185,9 +187,10 @@ def app():
                                'This parameter is not the same as that above which controls the number of data points '
                                'printed out for the raw DTM DataFrame; Select 0 to display all Data Points')
         ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
-                                        help='This option will analyse your DataFrame and display advanced statistics '
-                                             'on it. Note that this will require some time and processing power to '
-                                             'complete. Deselect this option if this functionality is not required.')
+                                        help='This option will analyse your DataFrame and display advanced '
+                                             'statistics on it. Note that this will require some time and '
+                                             'processing power to complete. Deselect this option if this if '
+                                             'you do not require it.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #

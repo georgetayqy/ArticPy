@@ -22,6 +22,9 @@ import pyLDAvis
 import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
+import tokenizers
+import torch
+from transformers import AutoTokenizer, AutoModelWithLMHead
 
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -96,6 +99,9 @@ L1_RATIO = 0.5
 PLOT = False
 W_PLOT = False
 FC = 0
+MIN_WORDS = 80
+MAX_TENSOR = 512
+SUM_MODE = 'Basic'
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -114,7 +120,8 @@ def app():
         NLP_MODEL, DATA_COLUMN, NLP, ONE_DATAPOINT, DATAPOINT_SELECTOR, NLP_TOPIC_MODEL, MIN_DF, MAX_DF, MAX_ITER, \
         NMF_MODEL, LSI_MODEL, TFIDF_MODEL, TFIDF_VECTORISED, MAR_FIG, WORD_FIG, CV, VECTORISED, \
         COLOUR, COLOUR_BCKGD, COLOUR_TXT, TOPIC_TEXT, LDA_VIS_STR, WIDTH, HEIGHT, SVG, HAC_PLOT, WORKER, MAX_FEATURES, \
-        KW, TOPIC_FRAME, ALPHA, L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA, FC
+        KW, TOPIC_FRAME, ALPHA, L1_RATIO, PLOT, W_PLOT, HAC_PLOT1, LDA_DATA, LSI_DATA, FC, MIN_WORDS, MAX_TENSOR, \
+        SUM_MODE
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -339,7 +346,11 @@ def app():
             else:
                 st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
                         'automatically saved.')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                            help='This option will analyse your DataFrame and display advanced '
+                                                 'statistics on it. Note that this will require some time and '
+                                                 'processing power to complete. Deselect this option if this if '
+                                                 'you do not require it.')
         SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
                                                  'content being downloaded again, a unique file identifier is '
                                                  'tacked onto the filename.')
@@ -446,7 +457,11 @@ def app():
                                   value=20,
                                   help='Select 0 to display all Data Points')
             ONE_DATAPOINT = st.checkbox('Visualise One Data Point?')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                            help='This option will analyse your DataFrame and display advanced '
+                                                 'statistics on it. Note that this will require some time and '
+                                                 'processing power to complete. Deselect this option if this if '
+                                                 'you do not require it.')
             if ONE_DATAPOINT:
                 DATAPOINT_SELECTOR = st.selectbox('Choose Data Point From Data', range(len(DATA)))
                 COLOUR_BCKGD = st.color_picker('Choose Colour of Render Background', value='#000000')
@@ -515,95 +530,209 @@ def app():
     elif APP_MODE == 'Summarise':
         st.markdown('---')
         st.markdown('# Summarization of Text')
-        st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
-                    'large chunks of text, prepare to wait for hours for the summarization process to finish. We are '
-                    'looking to implement multiprocessing into the app to optimise it.\n\n'
+        st.markdown('For this function, you are able to upload a piece of document or multiple pieces of documents '
+                    'in a CSV file to create a summary for the documents of interest.\n\n'
+                    'However, do note that this module takes a long time to process a long piece of text. '
+                    'If you intend to process large chunks of text, prepare to wait for hours for the summarization '
+                    'process to finish. We are looking to implement multiprocessing into the app to optimise it.\n\n'
                     'In the meantime, it may be better to process your data in smaller batches to speed up your '
-                    'workflow.')
+                    'workflow.\n\n'
+                    'In an effort to enhance this module to provide users with meaningful summaries of their document, '
+                    ' we have implemented two modes of summarization in this function, namely Basic and Advanced '
+                    'Mode.\n '
+                    '**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
+                    'sentences. No machine learning model was used to produce a unique summary of the text.\n'
+                    '**Advanced Mode** uses the Pytorch and Huggingface Transformers library to produce summaries '
+                    'using Google\'s T5 Model.')
 
-        # FLAGS
-        st.markdown('## Flags')
-        st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
-                    'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
-        NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'),
-                             help='Be careful when using the Accuracy Model. Due to caching issues in the app, '
-                                  'changes to the column where data is extracted from in the file uploaded will '
-                                  'reset the portions of the app that follows.')
-        if NLP_MODEL == 'en_core_web_sm':
-            try:
-                NLP = spacy.load('en_core_web_sm')
-            except OSError:
-                st.warning('Model not found, downloading...')
-                try:
-                    os.system('python -m spacy download en_core_web_sm')
-                except Exception as ex:
-                    st.error(f'Unable to download Model. Error: {ex}')
-            except Exception as ex:
-                st.error(f'Unknown Error: {ex}. Try again.')
-            else:
-                st.info('Efficiency Model Loaded!')
-        elif NLP_MODEL == 'en_core_web_lg':
-            try:
-                NLP = spacy.load('en_core_web_lg')
-            except OSError:
-                st.warning('Model not found, downloading...')
-                try:
-                    os.system('python -m spacy download en_core_web_lg')
-                except Exception as ex:
-                    st.error(f'Unable to download Model. Error: {ex}')
-            except Exception as ex:
-                st.error(f'Unknown Error: {ex}. Try again.')
-            else:
-                st.info('Accuracy Model Loaded!')
-        SENT_LEN = st.number_input('Enter the total number of sentences to summarise text to',
-                                   min_value=1,
-                                   max_value=100,
-                                   value=3)
-        SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
-                                                 'content being downloaded again, a unique file identifier is '
-                                                 'tacked onto the filename.')
-        VERBOSE = st.checkbox('Display Outputs?')
-        if VERBOSE:
-            VERBOSITY = st.slider('Data points',
-                                  key='Data points to display?',
-                                  min_value=0,
-                                  max_value=1000,
-                                  value=20,
-                                  help='Select 0 to display all Data Points')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+        st.markdown('## Summary Complexity')
+        SUM_MODE = st.selectbox('Choose Mode', ('Basic', 'Advanced'))
 
-        # MAIN PROCESSING
-        if st.button('Summarise Text', key='runner'):
-            if not DATA.empty:
+        if SUM_MODE == 'Basic':
+            # FLAGS
+            st.markdown('## Flags')
+            st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
+                        'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
+            NLP_MODEL = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'),
+                                 help='Be careful when using the Accuracy Model. Due to caching issues in the app, '
+                                      'changes to the column where data is extracted from in the file uploaded will '
+                                      'reset the portions of the app that follows.')
+            if NLP_MODEL == 'en_core_web_sm':
                 try:
-                    # CLEAN UP AND STANDARDISE DATAFRAMES
-                    DATA = DATA[[DATA_COLUMN]]
-                    DATA['SUMMARY'] = np.nan
-                    DATA = DATA.astype(str)
-                except KeyError:
-                    st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
+                    NLP = spacy.load('en_core_web_sm')
+                except OSError:
+                    st.warning('Model not found, downloading...')
+                    try:
+                        os.system('python -m spacy download en_core_web_sm')
+                    except Exception as ex:
+                        st.error(f'Unable to download Model. Error: {ex}')
                 except Exception as ex:
-                    st.error(ex)
+                    st.error(f'Unknown Error: {ex}. Try again.')
                 else:
-                    stopwords = list(STOP_WORDS)
-                    pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
-                    DATA['SUMMARY'] = DATA[DATA_COLUMN].apply(lambda x: summarise(x, stopwords, pos_tag, NLP, SENT_LEN))
+                    st.info('Efficiency Model Loaded!')
+            elif NLP_MODEL == 'en_core_web_lg':
+                try:
+                    NLP = spacy.load('en_core_web_lg')
+                except OSError:
+                    st.warning('Model not found, downloading...')
+                    try:
+                        os.system('python -m spacy download en_core_web_lg')
+                    except Exception as ex:
+                        st.error(f'Unable to download Model. Error: {ex}')
+                except Exception as ex:
+                    st.error(f'Unknown Error: {ex}. Try again.')
+                else:
+                    st.info('Accuracy Model Loaded!')
+            SENT_LEN = st.number_input('Enter the total number of sentences to summarise text to',
+                                       min_value=1,
+                                       max_value=100,
+                                       value=3)
+            SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                     'content being downloaded again, a unique file identifier is '
+                                                     'tacked onto the filename.')
+            VERBOSE = st.checkbox('Display Outputs?')
+            if VERBOSE:
+                VERBOSITY = st.slider('Data points',
+                                      key='Data points to display?',
+                                      min_value=0,
+                                      max_value=1000,
+                                      value=20,
+                                      help='Select 0 to display all Data Points')
+                ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                                help='This option will analyse your DataFrame and display advanced '
+                                                     'statistics on it. Note that this will require some time and '
+                                                     'processing power to complete. Deselect this option if this if '
+                                                     'you do not require it.')
 
-                # SHOW DATASETS
+            # MAIN PROCESSING
+            if st.button('Summarise Text', key='runner'):
+                if not DATA.empty:
+                    try:
+                        # CLEAN UP AND STANDARDISE DATAFRAMES
+                        DATA = DATA[[DATA_COLUMN]]
+                        DATA['SUMMARY'] = np.nan
+                        DATA = DATA.astype(str)
+                    except KeyError:
+                        st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
+                    except Exception as ex:
+                        st.error(ex)
+                    else:
+                        stopwords = list(STOP_WORDS)
+                        pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
+                        DATA['SUMMARY'] = DATA[DATA_COLUMN].apply(lambda x: summarise(x, stopwords, pos_tag, NLP, SENT_LEN))
+
+                    # SHOW DATASETS
+                    if VERBOSE:
+                        st.markdown('## Summary DataFrame')
+                        printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+
+                    # SAVE DATA
+                    if SAVE:
+                        st.markdown('---')
+                        st.markdown('## Download Summarised Data')
+                        st.markdown('Download summarised data from [downloads/summarised.csv]'
+                                    f'(downloads/summarised_id{FC}.csv)')
+                        DATA.to_csv(str(DOWNLOAD_PATH / f'summarised_id{FC}.csv'), index=False)
+                        FC += 1
+                else:
+                    st.error('Error: Data not loaded properly. Try again.')
+
+        elif SUM_MODE == 'Advanced':
+            # FLAGS
+            st.markdown('## Flags')
+            st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
+                        'advanced user, you may choose to modify the number of input tensors for the model. If '
+                        'you do not wish to modify the setting, a default value of 512 will be used for your '
+                        'summmary.\n\n'
+                        'If your system has a GPU enabled, you may wish to install the GPU (CUDA) enabled version '
+                        'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
+                        'and to check if your GPU is enabled.')
+            with st.expander('GPU-enabled Features'):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown('### PyTorch for CUDA 10.2')
+                    if st.button('Install Relevant Packages', key='10.2'):
+                        os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
+                                  ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
+                with col2:
+                    st.markdown('### PyTorch for CUDA 11.3')
+                    if st.button('Install Relevant Packages', key='11.3'):
+                        os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
+                                  ' -f https://download.pytorch.org/whl/cu113/torch_stable.html')
+                st.markdown('---')
+                if st.button('Check if GPU is properly installed'):
+                    st.info(f'GPU Installation Status: **{torch.cuda.is_available()}**')
+                if st.button('Check GPU used'):
+                    try:
+                        st.info(f'GPU Device **{torch.cuda.get_device_name(torch.cuda.current_device())}** in use.')
+                    except AssertionError:
+                        st.error('Your version of PyTorch is CPU-optimised. Download and install any of the above two '
+                                 'supported GPU-enabled PyTorch versions to use your GPU and silence this error.')
+                    except Exception as ex:
+                        st.error(ex)
+
+            SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
+                                                     'content being downloaded again, a unique file identifier is '
+                                                     'tacked onto the filename.')
+            VERBOSE = st.checkbox('Display Outputs?')
+
+            if VERBOSE:
+                VERBOSITY = st.slider('Data points',
+                                      key='Data points to display?',
+                                      min_value=0,
+                                      max_value=1000,
+                                      value=20,
+                                      help='Select 0 to display all Data Points')
+                ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                                help='This option will analyse your DataFrame and display advanced '
+                                                     'statistics on it. Note that this will require some time and '
+                                                     'processing power to complete. Deselect this option if this if '
+                                                     'you do not require it.')
+
+            MIN_WORDS = st.number_input('Key in the minimum number of words to summarise to',
+                                        min_value=1,
+                                        max_value=1000,
+                                        value=80)
+            MAX_WORDS = st.number_input('Key in the maximum number of words to summarise to',
+                                        min_value=80,
+                                        max_value=1000,
+                                        value=150)
+            MAX_TENSOR = st.number_input('Key in the maximum number of vectors to consider',
+                                         min_value=1,
+                                         max_value=10000,
+                                         value=512)
+
+            if st.button('Summarise', key='summary_t5'):
+                tokenizer = AutoTokenizer.from_pretrained('t5-base')
+                model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
+
+                if not DATA.empty:
+                    # to work with tensors, we need to convert the dataframe to a complex datatype
+                    DATA = DATA.astype(object)
+                    DATA['ENCODED'] = DATA[DATA_COLUMN].apply(lambda x: tokenizer.encode('summarize: ' + x,
+                                                                                         return_tensors='pt',
+                                                                                         max_length=MAX_TENSOR,
+                                                                                         truncation=True))
+                    DATA['OUTPUTS'] = DATA['ENCODED'].apply(lambda x: model.generate(x,
+                                                                                     max_length=MAX_WORDS,
+                                                                                     min_length=MIN_WORDS,
+                                                                                     length_penalty=5.0,
+                                                                                     num_beams=2))
+                    DATA['SUMMARISED'] = DATA['OUTPUTS'].apply(lambda x: tokenizer.decode(x[0]))
+                    DATA.drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
+                    DATA = DATA.astype(str)
+
                 if VERBOSE:
-                    st.markdown('## Summary DataFrame')
-                    printDataFrame(data=DATA, verbose_level=VERBOSITY, advanced=ADVANCED_ANALYSIS)
+                    st.markdown('## Summarised Text')
+                    printDataFrame(DATA, VERBOSITY, ADVANCED_ANALYSIS)
 
-                # SAVE DATA
                 if SAVE:
                     st.markdown('---')
                     st.markdown('## Download Summarised Data')
                     st.markdown('Download summarised data from [downloads/summarised.csv]'
                                 f'(downloads/summarised_id{FC}.csv)')
                     DATA.to_csv(str(DOWNLOAD_PATH / f'summarised_id{FC}.csv'), index=False)
-            else:
-                st.error('Error: Data not loaded properly. Try again.')
-
+                    FC += 1
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -622,7 +751,8 @@ def app():
                                         help='VADER is more optimised for texts extracted from Social Media platforms '
                                              '(where slangs and emoticons are used) while TextBlob performs better '
                                              'for more formal pieces of text. If you are not sure which to choose, '
-                                             'TextBlob is recommended.')
+                                             'VADER is recommended due to its higher accuracy of analysis compared to '
+                                             'Textblob.')
         SAVE = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
                                                  'content being downloaded again, a unique file identifier is '
                                                  'tacked onto the filename.')
@@ -636,7 +766,11 @@ def app():
                                   help='Select 0 to display all Data Points')
             if BACKEND_ANALYSER == 'VADER':
                 COLOUR = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                            help='This option will analyse your DataFrame and display advanced '
+                                                 'statistics on it. Note that this will require some time and '
+                                                 'processing power to complete. Deselect this option if this if '
+                                                 'you do not require it.')
 
         # MAIN PROCESSING
         if st.button('Start Analysis', key='analysis'):
@@ -829,7 +963,11 @@ def app():
                                   max_value=1000,
                                   value=20,
                                   help='Select 0 to display all Data Points')
-            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?')
+            ADVANCED_ANALYSIS = st.checkbox('Display Advanced DataFrame Statistics?',
+                                            help='This option will analyse your DataFrame and display advanced '
+                                                 'statistics on it. Note that this will require some time and '
+                                                 'processing power to complete. Deselect this option if this if '
+                                                 'you do not require it.')
         NUM_TOPICS = st.number_input('Choose Number of Topics to Generate Per Text',
                                      min_value=1,
                                      max_value=100,

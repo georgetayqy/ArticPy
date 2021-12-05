@@ -720,6 +720,7 @@ def app():
                                                                                      num_beams=2))
                     DATA['SUMMARISED'] = DATA['OUTPUTS'].apply(lambda x: tokenizer.decode(x[0]))
                     DATA.drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
+                    DATA['SUMMARISED'] = DATA['SUMMARISED'].str.replace('<pad> ', '').str.replace('</s>', '')
                     DATA = DATA.astype(str)
 
                 if VERBOSE:

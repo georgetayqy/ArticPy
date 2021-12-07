@@ -18,10 +18,14 @@ streamlit-pandas-profiling==0.1.2
 wordcloud==1.8.1
 textblob==0.15.3
 openpyxl==3.0.9
-scikit-learn==0.24.2
+scikit-learn~=0.24.2
 chart-studio==1.1.0
 kaleido==0.2.1
 pycountry==20.7.3
 streamlit-aggrid==0.2.2.post4
-torch==1.9.1
-transformers==4.10.2
+torch~=1.9.0
+transformers~=4.8.2
+pytorch-lightning==1.5.4
+pathlib~=1.0.1
+sklearn~=0.0
+pyyaml~=5.4.1

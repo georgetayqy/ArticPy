@@ -1,6 +1,13 @@
 """
 This file is used to store some of the basic helper functions that are used frequently in the app
 """
+
+import os
+from collections import Counter
+from heapq import nlargest
+from string import punctuation
+import nltk
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -8,12 +15,6 @@ import numpy as np
 import pandas
 import pandas as pd
 import streamlit as st
-import nltk
-import os
-
-from string import punctuation
-from collections import Counter
-from heapq import nlargest
 from nltk.stem import WordNetLemmatizer
 import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report

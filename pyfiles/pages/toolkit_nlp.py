@@ -10,6 +10,7 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 import multiprocessing
 import os
 import pathlib
+import matplotlib
 import numpy as np
 import pandas as pd
 import spacy
@@ -22,7 +23,14 @@ import pyLDAvis
 import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
+import textattack.models.wrappers
 import torch
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from datetime import datetime
+import subprocess
+
+import transformers
 
 from config import toolkit, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
 from operator import itemgetter
@@ -71,89 +79,111 @@ def app():
     toolkit['APP_MODE'] = st.selectbox('Select the NLP Operation to execute',
                                        ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
                                         'Named Entity Recognition', 'POS Tagging', 'Summarise',
-                                        'Real/Fake News Detector'))
+                                        'NLP Model Trainer and Predictor'))
     st.info(f'**{toolkit["APP_MODE"]}** Selected')
 
-    st.markdown('## Upload Data\n'
-                'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. To circumvent this limitation, you may choose to '
-                'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
-                '`streamlit run app.py` command and define the maximum size of file you can upload '
-                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                'is only available for users who run the app using the app\'s source code or through Docker. '
-                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
-                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
-                'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
-                'supported Cloud Service Providers into the app.\n\n'
-                'After selecting the size of your file, select the file format you wish to upload. You are warned '
-                'that if you fail to define the correct file format you wish to upload, the app will not let you '
-                'upload your file (if you are using the Small File option, only the defined file format will be '
-                'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
-    toolkit['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
-    toolkit['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+    if toolkit['APP_MODE'] != 'News Classifier':
+        st.markdown('## Upload Data\n'
+                    'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be '
+                    'loaded with the widget. To circumvent this limitation, you may choose to '
+                    'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
+                    '`streamlit run app.py` command and define the maximum size of file you can upload '
+                    'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
+                    'is only available for users who run the app using the app\'s source code or through Docker. '
+                    'For Docker, you will need to append the tag above behind the Docker Image name when running the '
+                    '`run` command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do '
+                    'not use the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
+                    'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
+                    'supported Cloud Service Providers into the app.\n\n'
+                    'After selecting the size of your file, select the file format you wish to upload. You are warned '
+                    'that if you fail to define the correct file format you wish to upload, the app will not let you '
+                    'upload your file (if you are using the Small File option, only the defined file format will be '
+                    'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
+        toolkit['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+        toolkit['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    if toolkit['FILE'] == 'Small File(s)':
-        st.markdown('### Upload File\n')
-        toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
-        if toolkit['DATA_PATH'] is not None:
-            toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
-            if not toolkit['DATA'].empty:
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
-                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                      list(toolkit['DATA'].columns))
-                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-        else:
-            toolkit['DATA'] = pd.DataFrame()
+        if toolkit['FILE'] == 'Small File(s)':
+            st.markdown('### Upload File\n')
+            toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
+            if toolkit['DATA_PATH'] is not None:
+                toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
+                if not toolkit['DATA'].empty:
+                    toolkit['DATA'] = toolkit['DATA'].astype(str)
+                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                          list(toolkit['DATA'].columns))
+                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+            else:
+                toolkit['DATA'] = pd.DataFrame()
 
-    elif toolkit['FILE'] == 'Large File(s)':
-        st.info(f'File Format Selected: **{toolkit["MODE"]}**')
-        toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+        elif toolkit['FILE'] == 'Large File(s)':
+            st.info(f'File Format Selected: **{toolkit["MODE"]}**')
+            toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
-        if toolkit['CSP'] == 'Azure':
-            azure = csp_downloaders.AzureDownloader()
-            if azure.SUCCESSFUL:
-                try:
-                    azure.downloadBlob()
-                    toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            if toolkit['CSP'] == 'Azure':
+                azure = csp_downloaders.AzureDownloader()
+                if azure.SUCCESSFUL:
+                    try:
+                        azure.downloadBlob()
+                        toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
+                    except Exception as ex:
+                        st.error(f'Error: {ex}. Try again.')
 
-            if not toolkit['DATA'].empty:
-                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                      list(toolkit['DATA'].columns))
-                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+                if not toolkit['DATA'].empty:
+                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                          list(toolkit['DATA'].columns))
+                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
 
-        elif toolkit['CSP'] == 'Amazon':
-            aws = csp_downloaders.AWSDownloader()
-            if aws.SUCCESSFUL:
-                try:
-                    aws.downloadFile()
-                    toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            elif toolkit['CSP'] == 'Amazon':
+                aws = csp_downloaders.AWSDownloader()
+                if aws.SUCCESSFUL:
+                    try:
+                        aws.downloadFile()
+                        toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
+                    except Exception as ex:
+                        st.error(f'Error: {ex}. Try again.')
 
-            if not toolkit['DATA'].empty:
-                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                      list(toolkit['DATA'].columns))
-                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+                if not toolkit['DATA'].empty:
+                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                          list(toolkit['DATA'].columns))
+                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
 
-        elif toolkit['CSP'] == 'Google':
-            gcs = csp_downloaders.GoogleDownloader()
-            if gcs.SUCCESSFUL:
-                try:
-                    gcs.downloadBlob()
-                    toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
-                except Exception as ex:
-                    st.error(f'Error: {ex}. Try again.')
+            elif toolkit['CSP'] == 'Google':
+                gcs = csp_downloaders.GoogleDownloader()
+                if gcs.SUCCESSFUL:
+                    try:
+                        gcs.downloadBlob()
+                        toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
+                    except Exception as ex:
+                        st.error(f'Error: {ex}. Try again.')
 
-            if not toolkit['DATA'].empty:
-                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                      list(toolkit['DATA'].columns))
-                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+                if not toolkit['DATA'].empty:
+                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                          list(toolkit['DATA'].columns))
+                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+    # special uploader for ml training
+    else:
+        st.markdown('## Upload Data\n'
+                    'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be '
+                    'loaded with the widget. To circumvent this limitation, you may choose to '
+                    'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
+                    '`streamlit run app.py` command and define the maximum size of file you can upload '
+                    'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this '
+                    'option is only available for users who run the app using the app\'s source code or through '
+                    'Docker. For Docker, you will need to append the tag above behind the Docker Image name when '
+                    'running the `run` command, e.g. '
+                    '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do '
+                    'not use the tag, the app will run with a default maximum upload size of 200 MB.\n\n')
+
+        if toolkit['MODEL_MODE'] == 'Training':
+            pass
+
+        elif toolkit['MODEL_MODE'] == 'Optimisation' or 'Evaluation':
+            st.markdown('### Upload PyTorch Model File')
+            toolkit['MODEL_FILE'] = st.file_uploader('Upload Model', type=['BIN'])
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
@@ -1315,86 +1345,3 @@ def app():
                             f'(downloads/classified_id{toolkit["FC"]}.csv)')
                 toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'classified_id{toolkit["FC"]}.csv'), index=False)
                 toolkit['FC'] += 1
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                 FAKE NEWS DETECTOR                                               | #
-# -------------------------------------------------------------------------------------------------------------------- #
-    elif toolkit['APP_MODE'] == 'Real/Fake News Detector':
-        st.markdown('---')
-        st.markdown('# Real/Fake News Detector')
-        st.markdown('This function allows you to distinguish between real and fake pieces of news using Google\'s T5 '
-                    'model. To allow this function to work properly, it is crucial to enable GPU functionalities '
-                    'as the model takes a long time to train and infer data.')
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown('### PyTorch for CUDA 10.2')
-            if st.button('Install Relevant Packages', key='10.2'):
-                os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
-                          ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
-        with col2:
-            st.markdown('### PyTorch for CUDA 11.3')
-            if st.button('Install Relevant Packages', key='11.3'):
-                os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
-                          ' -f https://download.pytorch.org/whl/cu113/torch_stable.html')
-        st.markdown('---')
-        if st.button('Check if GPU is properly installed'):
-            st.info(f'GPU Installation Status: **{torch.cuda.is_available()}**')
-        if st.button('Check GPU used'):
-            try:
-                st.info(f'GPU Device **{torch.cuda.get_device_name(torch.cuda.current_device())}** in use.')
-            except AssertionError:
-                st.error('Your version of PyTorch is CPU-optimised. Download and install any of the above two '
-                         'supported GPU-enabled PyTorch versions to use your GPU and silence this error.')
-            except Exception as ex:
-                st.error(ex)
-
-        st.markdown('## Flags')
-        toolkit['SAVE'] = st.checkbox('Save Outputs?',
-                                      help='Due to the possibility of files with the same file name and content being '
-                                           'downloaded again, a unique file identifier is tacked onto the filename.')
-        toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
-
-        if toolkit['VERBOSE']:
-            toolkit['VERBOSITY'] = st.slider('Data points',
-                                             key='Data points to display?',
-                                             min_value=0,
-                                             max_value=1000,
-                                             value=20,
-                                             help='Select 0 to display all Data Points')
-            toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
-                                                       help='This option will analyse your DataFrame and display '
-                                                            'advanced statistics on it. Note that this will require '
-                                                            'some time and processing power to complete. Deselect this '
-                                                            'option if this if you do not require it.')
-        toolkit['MAX_TENSOR'] = st.number_input('Key in the maximum number of vectors to consider',
-                                                min_value=1,
-                                                max_value=10000,
-                                                value=512)
-        if st.button('Proceed'):
-            # tokenizer = AutoTokenizer.from_pretrained('ghanashyamvtatti/roberta-fake-news')
-            # model = AutoModelForSequenceClassification.from_pretrained('ghanashyamvtatti/roberta-fake-news')
-            #
-            # if not DATA.empty:
-            #     DATA = DATA.astype(object)
-            #     DATA['ENCODED'] = DATA[DATA_COLUMN].apply(lambda x: tokenizer.encode('inputs: ' + x,
-            #                                                                          return_tensors='pt',
-            #                                                                          max_length=MAX_TENSOR,
-            #                                                                          truncation=True))
-            #     DATA['OUTPUTS'] = DATA['ENCODED'].apply(lambda x: model.generate(x))
-            #     DATA['SUMMARISED'] = DATA['OUTPUTS'].apply(lambda x: tokenizer.decode(x[0]))
-            #     DATA.drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
-            #     DATA = DATA.astype(str)
-            #
-            #     if VERBOSE:
-            #         st.markdown('## Summarised Text')
-            #         printDataFrame(DATA, VERBOSITY, ADVANCED_ANALYSIS)
-            #
-            #     if SAVE:
-            #         st.markdown('---')
-            #         st.markdown('## Download Summarised Data')
-            #         st.markdown('Download summarised data from [downloads/discriminator.csv]'
-            #                     f'(downloads/discriminator_id{FC}.csv)')
-            #         DATA.to_csv(str(DOWNLOAD_PATH / f'discriminator_id{FC}.csv'), index=False)
-            #         FC += 1
-            raise NotImplementedError

@@ -1,6 +1,7 @@
 """
 This file contains all the default parameters used in the app
 """
+import typing
 
 import pandas as pd
 import nltk
@@ -144,7 +145,10 @@ toolkit = {
     'W_PLOT': False,
     'FC': 0,
     'MIN_WORDS': 80,
-    'SUM_MODE': 'Basic',
+    'SUM_MODE': 'Basic'
+}
+
+trainer = {
     'MODEL_MODE': 'Training',
     'MODEL_FILE': None,
     'TRAINING_PARAMS': [],
@@ -260,10 +264,10 @@ toolkit = {
                                'subjqa', 'OTHERS'),
     # mappings area split -> dataset: [(subsets), (dataset_columns), (split)]
     'SUBSET_MAPPINGS': {'super_glue': [('boolq', 'cb', 'copa', 'multirc', 'record', 'rte', 'wic', 'wsc', 'wsc.fixed',
-                                       'axb', 'axg'), (), ('train', 'test', 'validation')],
+                                        'axb', 'axg'), (), ('train', 'test', 'validation')],
                         'glue': [('cola', 'sst2', 'mrpc', 'qqp', 'stsb', 'mnli', 'mnli_mismatched', 'mnli_matched',
-                                 'qnli', 'rte', 'wnli', 'ax'), (), ('train', 'test', 'validation')],
-                        'anli': [(), (), ('train_r1', 'dev_r1', 'test_r1',  'train_r2', 'dev_r2', 'test_r2',
+                                  'qnli', 'rte', 'wnli', 'ax'), (), ('train', 'test', 'validation')],
+                        'anli': [(), (), ('train_r1', 'dev_r1', 'test_r1', 'train_r2', 'dev_r2', 'test_r2',
                                           'train_r3', 'dev_r3', 'test_r3')],
                         'wino_bias': [('type1_pro', 'type1_anti', 'type2_pro', 'type2_anti'), (),
                                       ('test', 'validation')],
@@ -343,7 +347,6 @@ toolkit = {
                                  'sd', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sq', 'sr', 'st', 'su', 'sv', 'sw', 'ta',
                                  'te', 'tg', 'th', 'tr', 'uk', 'und', 'ur', 'uz', 'vi', 'xh', 'yi', 'yo', 'zh',
                                  'zh-Latn', 'zu'), (), ('train', 'test', 'validation')],
-
 
                         'conll2003': [(), (), ('train', 'test', 'validation')],
                         'dbpedia_14': [(), (), ('train', 'test')],
@@ -571,5 +574,16 @@ toolkit = {
                        'Improved Genetic Algorithm', 'Input Reduction', 'Kuleshov2017', 'MORPHEUS2020',
                        'Pruthi2019: Combating with Robust Word Recognition', 'Particle Swarm Optimization', 'PWWS',
                        'Seq2Sick', 'TextBugger', 'TextFooler (Is BERT Really Robust?)'),
-    'ATTACK_MODEL': None
+    'ATTACK_MODEL': None,
+    'PRED_FILE': None,
+    'FILE': 'Small File(s)',
+    'MODE': 'CSV',
+    'CSP': None,
+    'DATA_COLUMN': None,
+    'MODEL_PATH': None,
+    'PRED_FILEPATH': None,
+    'PRED_DATA': [pd.DataFrame, list],
+    'PATH_EXIST': False,
+    'PRED_SEQ': None,
+    'PREDS': []
 }

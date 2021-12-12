@@ -27,11 +27,9 @@ import textattack.models.wrappers
 import torch
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from datetime import datetime
-import subprocess
-
 import transformers
 
+from datetime import datetime
 from config import toolkit, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
 from operator import itemgetter
 from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline, AutoModelForSequenceClassification
@@ -163,26 +161,6 @@ def app():
                     toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
                                                           list(toolkit['DATA'].columns))
                     st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-    # special uploader for ml training
-    else:
-        st.markdown('## Upload Data\n'
-                    'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be '
-                    'loaded with the widget. To circumvent this limitation, you may choose to '
-                    'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
-                    '`streamlit run app.py` command and define the maximum size of file you can upload '
-                    'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this '
-                    'option is only available for users who run the app using the app\'s source code or through '
-                    'Docker. For Docker, you will need to append the tag above behind the Docker Image name when '
-                    'running the `run` command, e.g. '
-                    '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do '
-                    'not use the tag, the app will run with a default maximum upload size of 200 MB.\n\n')
-
-        if toolkit['MODEL_MODE'] == 'Training':
-            pass
-
-        elif toolkit['MODEL_MODE'] == 'Optimisation' or 'Evaluation':
-            st.markdown('### Upload PyTorch Model File')
-            toolkit['MODEL_FILE'] = st.file_uploader('Upload Model', type=['BIN'])
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

@@ -5,42 +5,19 @@ This module allows the user to train models and to predict NLP data
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import multiprocessing
 import os
 import pathlib
-import matplotlib
 import numpy as np
 import pandas as pd
-import spacy
 import streamlit as st
-import plotly.graph_objs as go
-import plotly.figure_factory as ff
-import plotly.express as px
-import nltk
-import pyLDAvis
-import pyLDAvis.gensim_models
-import pyLDAvis.sklearn
-import streamlit.components.v1
 import textattack.models.wrappers
 import torch
-import tensorflow as tf
-import matplotlib.pyplot as plt
 from datetime import datetime
 import subprocess
 import transformers
 
-from config import toolkit, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
-from operator import itemgetter
-from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline, AutoModelForSequenceClassification
-from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from streamlit_pandas_profiling import st_profile_report
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-from spacy.lang.en.stop_words import STOP_WORDS
-from spacy.lang.en import English
-from spacy import displacy
-from wordcloud import WordCloud
-from textblob import TextBlob
+from config import trainer, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from utils import csp_downloaders
 from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic
 
@@ -53,9 +30,6 @@ def app():
     Main function that will be called when the app is run
     """
 
-    # -------------------------------------------------------------------------------------------------------------------- #
-    # |                                                    INIT                                                          | #
-    # -------------------------------------------------------------------------------------------------------------------- #
     # CREATE THE DOWNLOAD PATH WHERE FILES CREATED WILL BE STORED AND AVAILABLE FOR DOWNLOADING
     if not DOWNLOAD_PATH.is_dir():
         DOWNLOAD_PATH.mkdir()
@@ -93,20 +67,20 @@ def app():
 
     st.markdown('---')
     st.markdown('## Mode Selector')
-    toolkit['MODEL_MODE'] = st.selectbox('Select the actions you want to perform', ('Training', 'Evaluation'))
+    trainer['MODEL_MODE'] = st.selectbox('Select the actions you want to perform', ('Training', 'Evaluation'))
 
-    if toolkit['MODEL_MODE'] == 'Training':
+    if trainer['MODEL_MODE'] == 'Training':
         st.markdown('## Flags\n\n'
                     '### Training Parameters')
-        toolkit['API'] = st.checkbox('Use Training API?',
+        trainer['API'] = st.checkbox('Use Training API?',
                                      help='Note that with this option selected, you must ensure that your GPU has '
                                           'sufficient GPU memory to run the networks/models you selected. If you '
                                           'are unsure, it is better to use the Command Line Argument API to fine '
                                           'tune the model parameters before starting the training.',
                                      value=True)
 
-        if toolkit['API']:
-            toolkit['TRAINING_PARAMS'] = st.multiselect('Select Training Parameters',
+        if trainer['API']:
+            trainer['TRAINING_PARAMS'] = st.multiselect('Select Training Parameters',
                                                         ('num_epochs', 'num_clean_epochs', 'attack_epoch_interval',
                                                          'early_stopping_epochs', 'learning_rate',
                                                          'num_warmup_steps',
@@ -120,37 +94,37 @@ def app():
                                                          'save_last', 'log_to_tb', 'tb_log_dir', 'log_to_wandb',
                                                          'wandb_project', 'logging_interval_step'),
                                                         default=('num_epochs', 'per_device_train_batch_size'))
-            if 'num_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['num_epochs'] = st.number_input('Total number of epochs for training',
+            if 'num_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['num_epochs'] = st.number_input('Total number of epochs for training',
                                                         min_value=1,
                                                         max_value=1000000,
                                                         value=3,
                                                         key='num_epochs')
-            if 'num_clean_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
+            if 'num_clean_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
                                                               'training dataset before adversarial training',
                                                               min_value=1,
                                                               max_value=1000000,
                                                               value=1,
                                                               key='num_clean_epochs')
-            if 'attack_epoch_interval' in toolkit['TRAINING_PARAMS']:
-                toolkit['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
+            if 'attack_epoch_interval' in trainer['TRAINING_PARAMS']:
+                trainer['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
                                                                    'N epochs',
                                                                    min_value=1,
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='attack_epoch_interval')
-            if 'early_stopping_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
+            if 'early_stopping_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
                                                                    'before stopping early',
                                                                    min_value=1,
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='early_stopping_epochs')
             else:
-                toolkit['early_stopping_epochs'] = None
-            if 'learning_rate' in toolkit['TRAINING_PARAMS']:
-                toolkit['learning_rate'] = st.number_input('Number of epochs validation must increase before '
+                trainer['early_stopping_epochs'] = None
+            if 'learning_rate' in trainer['TRAINING_PARAMS']:
+                trainer['learning_rate'] = st.number_input('Number of epochs validation must increase before '
                                                            'stopping early',
                                                            min_value=0,
                                                            max_value=1,
@@ -158,9 +132,9 @@ def app():
                                                            step=0.000001,
                                                            format='.%6f',
                                                            key='learning_rate')
-            if 'num_warmup_steps' in toolkit['TRAINING_PARAMS']:
+            if 'num_warmup_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define in float?'):
-                    toolkit['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
+                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
                                                                   'linear scheduler',
                                                                   min_value=0,
                                                                   max_value=1,
@@ -169,66 +143,66 @@ def app():
                                                                   format='.%3f',
                                                                   key='num_warmup_steps')
                 else:
-                    toolkit['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
+                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
                                                                   'linear scheduler',
                                                                   min_value=1,
                                                                   max_value=1000000,
                                                                   value=500,
                                                                   key='num_warmup_steps')
-            if 'weight_decay' in toolkit['TRAINING_PARAMS']:
-                toolkit['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
+            if 'weight_decay' in trainer['TRAINING_PARAMS']:
+                trainer['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
                                                           min_value=0,
                                                           max_value=1,
                                                           value=0.01,
                                                           step=0.01,
                                                           format='.%2f',
                                                           key='weight_decay')
-            if 'per_device_train_batch_size' in toolkit['TRAINING_PARAMS']:
-                toolkit['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
+            if 'per_device_train_batch_size' in trainer['TRAINING_PARAMS']:
+                trainer['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
                                                                          min_value=1,
                                                                          max_value=1000000,
                                                                          value=8,
                                                                          key='per_device_train_batch_size')
-            if 'per_device_eval_batch_size' in toolkit['TRAINING_PARAMS']:
-                toolkit['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
+            if 'per_device_eval_batch_size' in trainer['TRAINING_PARAMS']:
+                trainer['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
                                                                         min_value=1,
                                                                         max_value=1000000,
                                                                         value=32,
                                                                         key='per_device_eval_batch_size')
-            if 'gradient_accumulation_steps' in toolkit['TRAINING_PARAMS']:
-                toolkit['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
+            if 'gradient_accumulation_steps' in trainer['TRAINING_PARAMS']:
+                trainer['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
                                                                          'the gradients before performing a '
                                                                          'backward/update pass',
                                                                          min_value=1,
                                                                          max_value=1000000,
                                                                          value=32,
                                                                          key='gradient_accumulation_steps')
-            if 'random_seed' in toolkit['TRAINING_PARAMS']:
-                toolkit['random_seed'] = st.number_input('Random seed for reproducibility',
+            if 'random_seed' in trainer['TRAINING_PARAMS']:
+                trainer['random_seed'] = st.number_input('Random seed for reproducibility',
                                                          min_value=1,
                                                          max_value=1000000,
                                                          value=32,
                                                          key='random_seed')
-            if 'parallel' in toolkit['TRAINING_PARAMS']:
-                toolkit['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
+            if 'parallel' in trainer['TRAINING_PARAMS']:
+                trainer['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
                                                   value=False,
                                                   key='parallel')
-            if 'load_best_model_at_end' in toolkit['TRAINING_PARAMS']:
-                toolkit['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
+            if 'load_best_model_at_end' in trainer['TRAINING_PARAMS']:
+                trainer['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
                                                                 'load it at the end',
                                                                 value=False,
                                                                 key='parallel')
-            if 'alpha' in toolkit['TRAINING_PARAMS']:
-                toolkit['alpha'] = st.number_input('The weight for adversarial loss',
+            if 'alpha' in trainer['TRAINING_PARAMS']:
+                trainer['alpha'] = st.number_input('The weight for adversarial loss',
                                                    min_value=0,
                                                    max_value=1,
                                                    value=0.50,
                                                    step=0.001,
                                                    format='.%3f',
                                                    key='alpha')
-            if 'num_train_adv_examples' in toolkit['TRAINING_PARAMS']:
+            if 'num_train_adv_examples' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Use Float Parameters?'):
-                    toolkit['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
+                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
                                                                         'attack when generating adversarial '
                                                                         'training set before start of every epoch',
                                                                         min_value=0,
@@ -238,85 +212,85 @@ def app():
                                                                         format='.%3f',
                                                                         key='num_train_adv_examples')
                 else:
-                    toolkit['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
+                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
                                                                         'attack when generating adversarial '
                                                                         'training set before start of every epoch',
                                                                         min_value=1,
                                                                         max_value=1000000,
                                                                         value=8,
                                                                         key='per_device_train_batch_size')
-            if 'query_budget_train' in toolkit['TRAINING_PARAMS']:
+            if 'query_budget_train' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Max Query Budget?', value=False):
-                    toolkit['query_budget_train'] = st.number_input('The max query budget to use when generating '
+                    trainer['query_budget_train'] = st.number_input('The max query budget to use when generating '
                                                                     'adversarial training set',
                                                                     min_value=1,
                                                                     max_value=1000000,
                                                                     value=1,
                                                                     key='query_budget_train')
                 else:
-                    toolkit['query_budget_train'] = None
-            if 'attack_num_workers_per_device' in toolkit['TRAINING_PARAMS']:
+                    trainer['query_budget_train'] = None
+            if 'attack_num_workers_per_device' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Number of Worker Process to run attack?', value=False):
-                    toolkit['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
+                    trainer['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
                                                                                'per device for attack',
                                                                                min_value=1,
                                                                                max_value=1000000,
                                                                                value=1,
                                                                                key='attack_num_workers_per_device')
                 else:
-                    toolkit['attack_num_workers_per_device'] = 1
-            if 'output_dir' in toolkit['TRAINING_PARAMS']:
+                    trainer['attack_num_workers_per_device'] = 1
+            if 'output_dir' in trainer['TRAINING_PARAMS']:
                 dt = datetime.now()
-                toolkit['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
+                trainer['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=f'/outputs/{dt.strftime("%Y-%m-%d-%H-%M-%S-%f")}',
                                                       key='output_dir')
-            if 'checkpoint_interval_steps' in toolkit['TRAINING_PARAMS']:
+            if 'checkpoint_interval_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N updates?'):
-                    toolkit['checkpoint_interval_steps'] = st.number_input('Save after N updates',
+                    trainer['checkpoint_interval_steps'] = st.number_input('Save after N updates',
                                                                            min_value=1,
                                                                            max_value=1000000,
                                                                            value=1,
                                                                            key='checkpoint_interval_steps')
                 else:
-                    toolkit['checkpoint_interval_steps'] = None
-            if 'checkpoint_interval_epochs' in toolkit['TRAINING_PARAMS']:
+                    trainer['checkpoint_interval_steps'] = None
+            if 'checkpoint_interval_epochs' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N epochs?'):
-                    toolkit['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
+                    trainer['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
                                                                             min_value=1,
                                                                             max_value=1000000,
                                                                             value=1,
                                                                             key='checkpoint_interval_epochs')
                 else:
-                    toolkit['checkpoint_interval_epochs'] = None
-            if 'save_last' in toolkit['TRAINING_PARAMS']:
-                toolkit['save_last'] = st.checkbox('Save the model at end of training',
+                    trainer['checkpoint_interval_epochs'] = None
+            if 'save_last' in trainer['TRAINING_PARAMS']:
+                trainer['save_last'] = st.checkbox('Save the model at end of training',
                                                    value=True,
                                                    key='save_last')
-            if 'log_to_tb' in toolkit['TRAINING_PARAMS']:
-                toolkit['log_to_tb'] = st.checkbox('Log to Tensorboard',
+            if 'log_to_tb' in trainer['TRAINING_PARAMS']:
+                trainer['log_to_tb'] = st.checkbox('Log to Tensorboard',
                                                    value=False,
                                                    key='log_to_tb')
-            if 'tb_log_dir' in toolkit['TRAINING_PARAMS']:
-                toolkit['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
+            if 'tb_log_dir' in trainer['TRAINING_PARAMS']:
+                trainer['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=r'./runs',
                                                       key='tb_log_dir')
-            if 'log_to_wandb' in toolkit['TRAINING_PARAMS']:
-                toolkit['log_to_wandb'] = st.checkbox('Log to Wandb',
+            if 'log_to_wandb' in trainer['TRAINING_PARAMS']:
+                trainer['log_to_wandb'] = st.checkbox('Log to Wandb',
                                                       value=False,
                                                       key='log_to_wandb')
-            if 'wandb_project' in toolkit['TRAINING_PARAMS']:
-                toolkit['wandb_project'] = st.text_input('Name of Wandb project for logging',
+            if 'wandb_project' in trainer['TRAINING_PARAMS']:
+                trainer['wandb_project'] = st.text_input('Name of Wandb project for logging',
                                                          value=r'textattack',
                                                          key='wandb_project')
-            if 'logging_interval_step' in toolkit['TRAINING_PARAMS']:
-                toolkit['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
+            if 'logging_interval_step' in trainer['TRAINING_PARAMS']:
+                trainer['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
                                                                    'steps',
                                                                    min_value=1,
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='logging_interval_step')
         else:
-            toolkit['TRAINING_PARAMS'] = st.multiselect('Select Training Parameters',
+            trainer['TRAINING_PARAMS'] = st.multiselect('Select Training Parameters',
                                                         ('attack', 'model_max_length',
                                                          'model_num_labels', 'dataset_train_split',
                                                          'dataset_eval_split', 'filter_train_by_labels',
@@ -334,69 +308,69 @@ def app():
                                                          'wandb_project', 'logging_interval_step'),
                                                         default=('model_max_length', 'num_epochs',
                                                                  'per_device_train_batch_size'))
-            if 'attack' in toolkit['TRAINING_PARAMS']:
-                toolkit['num_epochs'] = st.text_input('Attack string', key='attack')
-            if 'model_max_length' in toolkit['TRAINING_PARAMS']:
+            if 'attack' in trainer['TRAINING_PARAMS']:
+                trainer['num_epochs'] = st.text_input('Attack string', key='attack')
+            if 'model_max_length' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define Model Max Length'):
-                    toolkit['model_max_length'] = st.number_input('Model Max Length',
+                    trainer['model_max_length'] = st.number_input('Model Max Length',
                                                                   min_value=1,
                                                                   max_value=1000000,
                                                                   value=64,
                                                                   key='model_max_length')
                 else:
-                    toolkit['model_max_length'] = None
-            if 'model_num_labels' in toolkit['TRAINING_PARAMS']:
+                    trainer['model_max_length'] = None
+            if 'model_num_labels' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define Number of Labels'):
-                    toolkit['model_num_labels'] = st.number_input('Number of Labels',
+                    trainer['model_num_labels'] = st.number_input('Number of Labels',
                                                                   min_value=1,
                                                                   max_value=1000000,
                                                                   value=1,
                                                                   key='model_num_labels')
                 else:
-                    toolkit['model_num_labels'] = None
-            if 'filter_train_by_labels' in toolkit['TRAINING_PARAMS']:
-                toolkit['filter_train_by_labels'] = st.text_input('Filter Train Data By Labels',
+                    trainer['model_num_labels'] = None
+            if 'filter_train_by_labels' in trainer['TRAINING_PARAMS']:
+                trainer['filter_train_by_labels'] = st.text_input('Filter Train Data By Labels',
                                                                   key='filter_train')
-                toolkit['filter_train_by_labels'] = [
-                    label for label in toolkit['filter_train_by_labels'].split(',')
+                trainer['filter_train_by_labels'] = [
+                    label for label in trainer['filter_train_by_labels'].split(',')
                 ]
-            if 'filter_eval_by_labels' in toolkit['TRAINING_PARAMS']:
-                toolkit['filter_eval_by_labels'] = st.text_input('Filter Test Data By Labels',
+            if 'filter_eval_by_labels' in trainer['TRAINING_PARAMS']:
+                trainer['filter_eval_by_labels'] = st.text_input('Filter Test Data By Labels',
                                                                  key='filter_test')
-                toolkit['filter_eval_by_labels'] = [
-                    label for label in toolkit['filter_eval_by_labels'].split(',')
+                trainer['filter_eval_by_labels'] = [
+                    label for label in trainer['filter_eval_by_labels'].split(',')
                 ]
-            if 'num_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['num_epochs'] = st.number_input('Total number of epochs for training',
+            if 'num_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['num_epochs'] = st.number_input('Total number of epochs for training',
                                                         min_value=1,
                                                         max_value=1000000,
                                                         value=3,
                                                         key='num_epochs')
-            if 'num_clean_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
+            if 'num_clean_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
                                                               'training dataset before adversarial training',
                                                               min_value=1,
                                                               max_value=1000000,
                                                               value=1,
                                                               key='num_clean_epochs')
-            if 'attack_epoch_interval' in toolkit['TRAINING_PARAMS']:
-                toolkit['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
+            if 'attack_epoch_interval' in trainer['TRAINING_PARAMS']:
+                trainer['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
                                                                    'N epochs',
                                                                    min_value=1,
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='attack_epoch_interval')
-            if 'early_stopping_epochs' in toolkit['TRAINING_PARAMS']:
-                toolkit['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
+            if 'early_stopping_epochs' in trainer['TRAINING_PARAMS']:
+                trainer['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
                                                                    'before stopping early',
                                                                    min_value=1,
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='early_stopping_epochs')
             else:
-                toolkit['early_stopping_epochs'] = None
-            if 'learning_rate' in toolkit['TRAINING_PARAMS']:
-                toolkit['learning_rate'] = st.number_input('Number of epochs validation must increase before '
+                trainer['early_stopping_epochs'] = None
+            if 'learning_rate' in trainer['TRAINING_PARAMS']:
+                trainer['learning_rate'] = st.number_input('Number of epochs validation must increase before '
                                                            'stopping early',
                                                            min_value=0,
                                                            max_value=1,
@@ -404,9 +378,9 @@ def app():
                                                            step=0.000001,
                                                            format='.%6f',
                                                            key='learning_rate')
-            if 'num_warmup_steps' in toolkit['TRAINING_PARAMS']:
+            if 'num_warmup_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define in float?'):
-                    toolkit['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
+                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
                                                                   'linear scheduler',
                                                                   min_value=0,
                                                                   max_value=1,
@@ -415,66 +389,66 @@ def app():
                                                                   format='.%3f',
                                                                   key='num_warmup_steps')
                 else:
-                    toolkit['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
+                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
                                                                   'linear scheduler',
                                                                   min_value=1,
                                                                   max_value=1000000,
                                                                   value=500,
                                                                   key='num_warmup_steps')
-            if 'weight_decay' in toolkit['TRAINING_PARAMS']:
-                toolkit['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
+            if 'weight_decay' in trainer['TRAINING_PARAMS']:
+                trainer['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
                                                           min_value=0,
                                                           max_value=1,
                                                           value=0.01,
                                                           step=0.01,
                                                           format='.%2f',
                                                           key='weight_decay')
-            if 'per_device_train_batch_size' in toolkit['TRAINING_PARAMS']:
-                toolkit['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
+            if 'per_device_train_batch_size' in trainer['TRAINING_PARAMS']:
+                trainer['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
                                                                          min_value=1,
                                                                          max_value=1000000,
                                                                          value=8,
                                                                          key='per_device_train_batch_size')
-            if 'per_device_eval_batch_size' in toolkit['TRAINING_PARAMS']:
-                toolkit['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
+            if 'per_device_eval_batch_size' in trainer['TRAINING_PARAMS']:
+                trainer['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
                                                                         min_value=1,
                                                                         max_value=1000000,
                                                                         value=32,
                                                                         key='per_device_eval_batch_size')
-            if 'gradient_accumulation_steps' in toolkit['TRAINING_PARAMS']:
-                toolkit['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
+            if 'gradient_accumulation_steps' in trainer['TRAINING_PARAMS']:
+                trainer['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
                                                                          'the gradients before performing a '
                                                                          'backward/update pass',
                                                                          min_value=1,
                                                                          max_value=1000000,
                                                                          value=32,
                                                                          key='gradient_accumulation_steps')
-            if 'random_seed' in toolkit['TRAINING_PARAMS']:
-                toolkit['random_seed'] = st.number_input('Random seed for reproducibility',
+            if 'random_seed' in trainer['TRAINING_PARAMS']:
+                trainer['random_seed'] = st.number_input('Random seed for reproducibility',
                                                          min_value=1,
                                                          max_value=1000000,
                                                          value=32,
                                                          key='random_seed')
-            if 'parallel' in toolkit['TRAINING_PARAMS']:
-                toolkit['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
+            if 'parallel' in trainer['TRAINING_PARAMS']:
+                trainer['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
                                                   value=False,
                                                   key='parallel')
-            if 'load_best_model_at_end' in toolkit['TRAINING_PARAMS']:
-                toolkit['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
+            if 'load_best_model_at_end' in trainer['TRAINING_PARAMS']:
+                trainer['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
                                                                 'load it at the end',
                                                                 value=False,
                                                                 key='parallel')
-            if 'alpha' in toolkit['TRAINING_PARAMS']:
-                toolkit['alpha'] = st.number_input('The weight for adversarial loss',
+            if 'alpha' in trainer['TRAINING_PARAMS']:
+                trainer['alpha'] = st.number_input('The weight for adversarial loss',
                                                    min_value=0,
                                                    max_value=1,
                                                    value=0.50,
                                                    step=0.001,
                                                    format='.%3f',
                                                    key='alpha')
-            if 'num_train_adv_examples' in toolkit['TRAINING_PARAMS']:
+            if 'num_train_adv_examples' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Use Float Parameters?'):
-                    toolkit['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
+                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
                                                                         'attack when generating adversarial '
                                                                         'training set before start of every epoch',
                                                                         min_value=0,
@@ -484,78 +458,78 @@ def app():
                                                                         format='.%3f',
                                                                         key='num_train_adv_examples')
                 else:
-                    toolkit['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
+                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
                                                                         'attack when generating adversarial '
                                                                         'training set before start of every epoch',
                                                                         min_value=1,
                                                                         max_value=1000000,
                                                                         value=8,
                                                                         key='per_device_train_batch_size')
-            if 'query_budget_train' in toolkit['TRAINING_PARAMS']:
+            if 'query_budget_train' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Max Query Budget?', value=False):
-                    toolkit['query_budget_train'] = st.number_input('The max query budget to use when generating '
+                    trainer['query_budget_train'] = st.number_input('The max query budget to use when generating '
                                                                     'adversarial training set',
                                                                     min_value=1,
                                                                     max_value=1000000,
                                                                     value=1,
                                                                     key='query_budget_train')
                 else:
-                    toolkit['query_budget_train'] = None
-            if 'attack_num_workers_per_device' in toolkit['TRAINING_PARAMS']:
+                    trainer['query_budget_train'] = None
+            if 'attack_num_workers_per_device' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Number of Worker Process to run attack?', value=False):
-                    toolkit['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
+                    trainer['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
                                                                                'per device for attack',
                                                                                min_value=1,
                                                                                max_value=1000000,
                                                                                value=1,
                                                                                key='attack_num_workers_per_device')
                 else:
-                    toolkit['attack_num_workers_per_device'] = 1
-            if 'output_dir' in toolkit['TRAINING_PARAMS']:
+                    trainer['attack_num_workers_per_device'] = 1
+            if 'output_dir' in trainer['TRAINING_PARAMS']:
                 dt = datetime.now()
-                toolkit['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
+                trainer['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=f'/outputs/{dt.strftime("%Y-%m-%d-%H-%M-%S-%f")}',
                                                       key='output_dir')
-            if 'checkpoint_interval_steps' in toolkit['TRAINING_PARAMS']:
+            if 'checkpoint_interval_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N updates?'):
-                    toolkit['checkpoint_interval_steps'] = st.number_input('Save after N updates',
+                    trainer['checkpoint_interval_steps'] = st.number_input('Save after N updates',
                                                                            min_value=1,
                                                                            max_value=1000000,
                                                                            value=1,
                                                                            key='checkpoint_interval_steps')
                 else:
-                    toolkit['checkpoint_interval_steps'] = None
-            if 'checkpoint_interval_epochs' in toolkit['TRAINING_PARAMS']:
+                    trainer['checkpoint_interval_steps'] = None
+            if 'checkpoint_interval_epochs' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N epochs?'):
-                    toolkit['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
+                    trainer['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
                                                                             min_value=1,
                                                                             max_value=1000000,
                                                                             value=1,
                                                                             key='checkpoint_interval_epochs')
                 else:
-                    toolkit['checkpoint_interval_epochs'] = None
-            if 'save_last' in toolkit['TRAINING_PARAMS']:
-                toolkit['save_last'] = st.checkbox('Save the model at end of training',
+                    trainer['checkpoint_interval_epochs'] = None
+            if 'save_last' in trainer['TRAINING_PARAMS']:
+                trainer['save_last'] = st.checkbox('Save the model at end of training',
                                                    value=True,
                                                    key='save_last')
-            if 'log_to_tb' in toolkit['TRAINING_PARAMS']:
-                toolkit['log_to_tb'] = st.checkbox('Log to Tensorboard',
+            if 'log_to_tb' in trainer['TRAINING_PARAMS']:
+                trainer['log_to_tb'] = st.checkbox('Log to Tensorboard',
                                                    value=False,
                                                    key='log_to_tb')
-            if 'tb_log_dir' in toolkit['TRAINING_PARAMS']:
-                toolkit['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
+            if 'tb_log_dir' in trainer['TRAINING_PARAMS']:
+                trainer['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=r'./runs',
                                                       key='tb_log_dir')
-            if 'log_to_wandb' in toolkit['TRAINING_PARAMS']:
-                toolkit['log_to_wandb'] = st.checkbox('Log to Wandb',
+            if 'log_to_wandb' in trainer['TRAINING_PARAMS']:
+                trainer['log_to_wandb'] = st.checkbox('Log to Wandb',
                                                       value=False,
                                                       key='log_to_wandb')
-            if 'wandb_project' in toolkit['TRAINING_PARAMS']:
-                toolkit['wandb_project'] = st.text_input('Name of Wandb project for logging',
+            if 'wandb_project' in trainer['TRAINING_PARAMS']:
+                trainer['wandb_project'] = st.text_input('Name of Wandb project for logging',
                                                          value=r'textattack',
                                                          key='wandb_project')
-            if 'logging_interval_step' in toolkit['TRAINING_PARAMS']:
-                toolkit['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
+            if 'logging_interval_step' in trainer['TRAINING_PARAMS']:
+                trainer['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
                                                                    'steps',
                                                                    min_value=1,
                                                                    max_value=1000000,
@@ -563,59 +537,59 @@ def app():
                                                                    key='logging_interval_step')
 
         st.markdown('### Model and Data Selection')
-        toolkit['MODEL'] = st.selectbox('Choose Model to Use',
-                                        toolkit['ML_POSSIBLE_PICKS'])
-        toolkit['DATASET'] = st.selectbox('Choose Dataset to Use',
-                                          toolkit['DATASET_POSSIBLE_PICKS'],
+        trainer['MODEL'] = st.selectbox('Choose Model to Use',
+                                        trainer['ML_POSSIBLE_PICKS'])
+        trainer['DATASET'] = st.selectbox('Choose Dataset to Use',
+                                          trainer['DATASET_POSSIBLE_PICKS'],
                                           help='Due to the sheer number of datasets availble on HuggingFace, '
                                                'we have only provided the top 100 datasets on the website. If you '
                                                'wish to use another dataset not specified here, choose OTHERS.')
 
-        if toolkit['DATASET'] == 'OTHERS':
-            toolkit['DATASET'] = st.text_input('Key in the dataset name you wish to use from HuggingFace', key='ds')
-        toolkit['TASK_TYPE'] = st.selectbox('Choose Task for Model to Complete', ('classification', 'regression'))
+        if trainer['DATASET'] == 'OTHERS':
+            trainer['DATASET'] = st.text_input('Key in the dataset name you wish to use from HuggingFace', key='ds')
+        trainer['TASK_TYPE'] = st.selectbox('Choose Task for Model to Complete', ('classification', 'regression'))
 
-        if len(toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][0]) != 0:
-            toolkit['SUBSET'] = st.selectbox('Select Subset of Data to Use',
-                                             toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][0])
+        if len(trainer['SUBSET_MAPPINGS'][trainer['DATASET']][0]) != 0:
+            trainer['SUBSET'] = st.selectbox('Select Subset of Data to Use',
+                                             trainer['SUBSET_MAPPINGS'][trainer['DATASET']][0])
         else:
-            toolkit['SUBSET'] = None
+            trainer['SUBSET'] = None
 
-        if len(toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][1]) != 0:
-            toolkit['MODEL_COL'] = st.selectbox('Select Data Columns to Use',
-                                                toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][1],
+        if len(trainer['SUBSET_MAPPINGS'][trainer['DATASET']][1]) != 0:
+            trainer['MODEL_COL'] = st.selectbox('Select Data Columns to Use',
+                                                trainer['SUBSET_MAPPINGS'][trainer['DATASET']][1],
                                                 key='column_dat')
         else:
-            toolkit['MODEL_COL'] = None
+            trainer['MODEL_COL'] = None
 
-        if len(toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][2]) > 0:
-            toolkit['SPLIT_TRAIN'] = st.selectbox('Select Training Split to Use',
-                                                  toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][2],
+        if len(trainer['SUBSET_MAPPINGS'][trainer['DATASET']][2]) > 0:
+            trainer['SPLIT_TRAIN'] = st.selectbox('Select Training Split to Use',
+                                                  trainer['SUBSET_MAPPINGS'][trainer['DATASET']][2],
                                                   key='train')
-            toolkit['SPLIT_TEST'] = st.selectbox('Select Testing Split to Use',
-                                                 toolkit['SUBSET_MAPPINGS'][toolkit['DATASET']][2],
+            trainer['SPLIT_TEST'] = st.selectbox('Select Testing Split to Use',
+                                                 trainer['SUBSET_MAPPINGS'][trainer['DATASET']][2],
                                                  key='test')
-            if toolkit['SPLIT_TRAIN'] == toolkit['SPLIT_TEST']:
+            if trainer['SPLIT_TRAIN'] == trainer['SPLIT_TEST']:
                 st.warning('**Warning**: Your Training and Testing Dataset should not be the same. Ensure that '
                            'you have selected the right dataset to use for your model.')
         else:
             st.warning('**Warning:** This dataset does not have data split properly. You may wish to use another '
                        'dataset or to edit the dataset before passing it into the model for training.')
-            toolkit['SPLIT_TRAIN'] = None
-            toolkit['SPLIT_TEST'] = None
+            trainer['SPLIT_TRAIN'] = None
+            trainer['SPLIT_TEST'] = None
 
         st.markdown('### Dataset Explorer\n\n'
                     'Use the above flags to define the Dataset to download and explore.')
-        st.info(f'**Current Dataset Chosen**: {toolkit["DATASET"]}')
-        if st.button(f'Explore {toolkit["DATASET"]}'):
-            train = textattack.datasets.HuggingFaceDataset(name_or_dataset=toolkit['DATASET'],
-                                                           subset=toolkit['SUBSET'],
-                                                           dataset_columns=toolkit['MODEL_COL'],
-                                                           split=toolkit['SPLIT_TRAIN'])
-            test = textattack.datasets.HuggingFaceDataset(name_or_dataset=toolkit['DATASET'],
-                                                          subset=toolkit['SUBSET'],
-                                                          dataset_columns=toolkit['MODEL_COL'],
-                                                          split=toolkit['SPLIT_TEST'])
+        st.info(f'**Current Dataset Chosen**: {trainer["DATASET"]}')
+        if st.button(f'Explore {trainer["DATASET"]}'):
+            train = textattack.datasets.HuggingFaceDataset(name_or_dataset=trainer['DATASET'],
+                                                           subset=trainer['SUBSET'],
+                                                           dataset_columns=trainer['MODEL_COL'],
+                                                           split=trainer['SPLIT_TRAIN'])
+            test = textattack.datasets.HuggingFaceDataset(name_or_dataset=trainer['DATASET'],
+                                                          subset=trainer['SUBSET'],
+                                                          dataset_columns=trainer['MODEL_COL'],
+                                                          split=trainer['SPLIT_TEST'])
             st.markdown(f'### Training Data\n\n'
                         f'**First Entry**: {train[0]}\n\n'
                         f'**Last Entry**: {train[-1]}\n\n'
@@ -626,172 +600,303 @@ def app():
                         f'**Length of Dataset**: {len(test)}')
 
         if st.checkbox('Attack Model with confusion datasets?', value=False):
-            toolkit['ATTACK'] = st.selectbox('Choose Attack recipes to execute on Model',
-                                             toolkit['ATTACK_RECIPES'])
-            if toolkit['ATTACK'] == 'None':
-                toolkit['ATTACK_MODEL'] = None
+            trainer['ATTACK'] = st.selectbox('Choose Attack recipes to execute on Model',
+                                             trainer['ATTACK_RECIPES'])
+            if trainer['ATTACK'] == 'None':
+                trainer['ATTACK_MODEL'] = None
 
     st.markdown('## Begin Training\n\n'
                 'Kindly ensure that the models you have chosen above is compatible with the dataset ')
     if st.button('Proceed'):
-        if toolkit['API']:
-            toolkit['ML_MODEL'] = transformers.AutoModelForSequenceClassification.from_pretrained(toolkit['MODEL'])
-            toolkit['TOKENIZER'] = transformers.AutoTokenizer.from_pretrained(toolkit['MODEL'])
-            toolkit['WRAPPED_MODEL'] = textattack.models.wrappers.HuggingFaceModelWrapper(toolkit['ML_MODEL'],
-                                                                                          toolkit['TOKENIZER'])
-            toolkit['TRAINING_DATA'] = textattack.datasets.HuggingFaceDataset(
-                name_or_dataset=toolkit['DATASET'],
-                subset=toolkit['SUBSET'],
-                dataset_columns=toolkit['MODEL_COL'],
-                split=toolkit['SPLIT_TRAIN']
+        if trainer['API']:
+            trainer['ML_MODEL'] = transformers.AutoModelForSequenceClassification.from_pretrained(trainer['MODEL'])
+            trainer['TOKENIZER'] = transformers.AutoTokenizer.from_pretrained(trainer['MODEL'])
+            trainer['WRAPPED_MODEL'] = textattack.models.wrappers.HuggingFaceModelWrapper(trainer['ML_MODEL'],
+                                                                                          trainer['TOKENIZER'])
+            trainer['TRAINING_DATA'] = textattack.datasets.HuggingFaceDataset(
+                name_or_dataset=trainer['DATASET'],
+                subset=trainer['SUBSET'],
+                dataset_columns=trainer['MODEL_COL'],
+                split=trainer['SPLIT_TRAIN']
             )
-            toolkit['EVAL_DATA'] = textattack.datasets.HuggingFaceDataset(
-                name_or_dataset=toolkit['DATASET'],
-                subset=toolkit['SUBSET'],
-                dataset_columns=toolkit['MODEL_COL'],
-                split=toolkit['SPLIT_TEST']
+            trainer['EVAL_DATA'] = textattack.datasets.HuggingFaceDataset(
+                name_or_dataset=trainer['DATASET'],
+                subset=trainer['SUBSET'],
+                dataset_columns=trainer['MODEL_COL'],
+                split=trainer['SPLIT_TEST']
             )
 
-            if toolkit['ATTACK'] != 'None':
-                if toolkit['ATTACK'] == 'A2T (A2T: Attack for Adversarial Training Recipe)':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.A2TYoo2021.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'BAE (BAE: BERT-Based Adversarial Examples)':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.BAEGarg2019.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'BERT-Attack':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.BERTAttackLi2020.build(
-                        toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'CheckList':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.CheckList2020.build(
-                        toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'CLARE Recipe':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.CLARE2020.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'DeepWordBug':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.DeepWordBugGao2018. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Faster Alzantot Genetic Algorithm':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.FasterGeneticAlgorithmJia2019. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Alzantot Genetic Algorithm':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.GeneticAlgorithmAlzantot2018. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'HotFlip':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.HotFlipEbrahimi2017. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Improved Genetic Algorithm':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.IGAWang2019.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Input Reduction':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.InputReductionFeng2018. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Kuleshov2017':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.Kuleshov2017.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'MORPHEUS2020':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.MorpheusTan2020.build(
-                        toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Pruthi2019: Combating with Robust Word Recognition':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.Pruthi2019.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Particle Swarm Optimization':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.PSOZang2020.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'PWWS':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.PWWSRen2019.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'Seq2Sick':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.Seq2SickCheng2018BlackBox. \
-                        build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'TextBugger':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.TextBuggerLi2018.build(toolkit['WRAPPED_MODEL'])
-                elif toolkit['ATTACK'] == 'TextFooler (Is BERT Really Robust?)':
-                    toolkit['ATTACK_MODEL'] = textattack.attack_recipes.TextFoolerJin2019. \
-                        build(toolkit['WRAPPED_MODEL'])
+            if trainer['ATTACK'] != 'None':
+                if trainer['ATTACK'] == 'A2T (A2T: Attack for Adversarial Training Recipe)':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.A2TYoo2021.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'BAE (BAE: BERT-Based Adversarial Examples)':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.BAEGarg2019.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'BERT-Attack':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.BERTAttackLi2020.build(
+                        trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'CheckList':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.CheckList2020.build(
+                        trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'CLARE Recipe':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.CLARE2020.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'DeepWordBug':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.DeepWordBugGao2018. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Faster Alzantot Genetic Algorithm':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.FasterGeneticAlgorithmJia2019. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Alzantot Genetic Algorithm':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.GeneticAlgorithmAlzantot2018. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'HotFlip':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.HotFlipEbrahimi2017. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Improved Genetic Algorithm':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.IGAWang2019.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Input Reduction':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.InputReductionFeng2018. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Kuleshov2017':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.Kuleshov2017.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'MORPHEUS2020':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.MorpheusTan2020.build(
+                        trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Pruthi2019: Combating with Robust Word Recognition':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.Pruthi2019.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Particle Swarm Optimization':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.PSOZang2020.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'PWWS':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.PWWSRen2019.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'Seq2Sick':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.Seq2SickCheng2018BlackBox. \
+                        build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'TextBugger':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.TextBuggerLi2018.build(trainer['WRAPPED_MODEL'])
+                elif trainer['ATTACK'] == 'TextFooler (Is BERT Really Robust?)':
+                    trainer['ATTACK_MODEL'] = textattack.attack_recipes.TextFoolerJin2019. \
+                        build(trainer['WRAPPED_MODEL'])
 
-            toolkit['TRAINING_ARGS'] = textattack.TrainingArgs(
-                num_epochs=toolkit['num_epochs'],
-                num_clean_epochs=toolkit['num_clean_epochs'],
-                attack_epoch_interval=toolkit['attack_epoch_interval'],
-                early_stopping_epochs=toolkit['early_stopping_epochs'],
-                learning_rate=toolkit['learning_rate'],
-                num_warmup_steps=toolkit['num_warmup_steps'],
-                weight_decay=toolkit['weight_decay'],
-                per_device_train_batch_size=toolkit['per_device_train_batch_size'],
-                per_device_eval_batch_size=toolkit['per_device_eval_batch_size'],
-                gradient_accumulation_steps=toolkit['gradient_accumulation_steps'],
-                random_seed=toolkit['random_seed'],
-                parallel=toolkit['parallel'],
-                load_best_model_at_end=toolkit['load_best_model_at_end'],
-                alpha=toolkit['alpha'],
-                num_train_adv_examples=toolkit['num_train_adv_examples'],
-                query_budget_train=toolkit['query_budget_train'],
-                attack_num_workers_per_device=toolkit['attack_num_workers_per_device'],
-                output_dir=toolkit['output_dir'],
-                checkpoint_interval_steps=toolkit['checkpoint_interval_steps'],
-                checkpoint_interval_epochs=toolkit['checkpoint_interval_epochs'],
-                save_last=toolkit['save_last'],
-                log_to_tb=toolkit['log_to_tb'],
-                tb_log_dir=toolkit['tb_log_dir'],
-                log_to_wandb=toolkit['log_to_wandb'],
-                wandb_project=toolkit['wandb_project'],
-                logging_interval_step=toolkit['logging_interval_step']
+            trainer['TRAINING_ARGS'] = textattack.TrainingArgs(
+                num_epochs=trainer['num_epochs'],
+                num_clean_epochs=trainer['num_clean_epochs'],
+                attack_epoch_interval=trainer['attack_epoch_interval'],
+                early_stopping_epochs=trainer['early_stopping_epochs'],
+                learning_rate=trainer['learning_rate'],
+                num_warmup_steps=trainer['num_warmup_steps'],
+                weight_decay=trainer['weight_decay'],
+                per_device_train_batch_size=trainer['per_device_train_batch_size'],
+                per_device_eval_batch_size=trainer['per_device_eval_batch_size'],
+                gradient_accumulation_steps=trainer['gradient_accumulation_steps'],
+                random_seed=trainer['random_seed'],
+                parallel=trainer['parallel'],
+                load_best_model_at_end=trainer['load_best_model_at_end'],
+                alpha=trainer['alpha'],
+                num_train_adv_examples=trainer['num_train_adv_examples'],
+                query_budget_train=trainer['query_budget_train'],
+                attack_num_workers_per_device=trainer['attack_num_workers_per_device'],
+                output_dir=trainer['output_dir'],
+                checkpoint_interval_steps=trainer['checkpoint_interval_steps'],
+                checkpoint_interval_epochs=trainer['checkpoint_interval_epochs'],
+                save_last=trainer['save_last'],
+                log_to_tb=trainer['log_to_tb'],
+                tb_log_dir=trainer['tb_log_dir'],
+                log_to_wandb=trainer['log_to_wandb'],
+                wandb_project=trainer['wandb_project'],
+                logging_interval_step=trainer['logging_interval_step']
             )
-            toolkit['TRAINER'] = textattack.Trainer(
-                model_wrapper=toolkit['WRAPPED_MODEL'],
-                task_type=toolkit['TASK_TYPE'],
-                attack=toolkit['ATTACK_MODEL'],
-                train_dataset=toolkit['TRAINING_DATA'],
-                eval_dataset=toolkit['EVAL_DATA'],
-                training_args=toolkit['TRAINING_ARGS']
+            trainer['TRAINER'] = textattack.Trainer(
+                model_wrapper=trainer['WRAPPED_MODEL'],
+                task_type=trainer['TASK_TYPE'],
+                attack=trainer['ATTACK_MODEL'],
+                train_dataset=trainer['TRAINING_DATA'],
+                eval_dataset=trainer['EVAL_DATA'],
+                training_args=trainer['TRAINING_ARGS']
             )
 
             with st.spinner('Training Model... Refer to your Terminal for more information...'):
                 try:
-                    toolkit['TRAINER'].train()
+                    trainer['TRAINER'].train()
                 except Exception as ex:
                     st.error(ex)
                 else:
-                    st.success(f'Successfully trained model! Model saved in {os.getcwd()}{toolkit["output_dir"]}.')
+                    st.success(f'Successfully trained model! Model saved in {os.getcwd()}{trainer["output_dir"]}.')
 
         else:
             with st.spinner('Training Model... Refer to your Terminal for more information...'):
                 try:
                     var_list = ['textattack', 'train',
-                                '--model_name_or_path', toolkit['ML_MODEL'],
-                                '--attack', toolkit['attack'],
-                                '--dataset', toolkit['DATASET'],
-                                '--task_type', toolkit['TASK_TYPE'],
-                                '--model_max_length', toolkit['model_max_length'],
-                                '--model_num_labels', toolkit['model_num_labels'],
-                                '--dataset_train_split', toolkit['dataset_train_split'],
-                                '--dataset_eval_split', toolkit['dataset_eval_split'],
-                                '--filter_train_by_labels', toolkit['filter_train_by_labels'],
-                                '--filter_eval_by_labels', toolkit['filter_eval_by_labels'],
-                                '--num_epochs', toolkit['num_epochs'],
-                                '--num_clean_epochs', toolkit['num_clean_epochs'],
-                                '--attack_epoch_interval', toolkit['attack_epoch_interval'],
-                                '--early_stopping_epochs', toolkit['early_stopping_epochs'],
-                                '--learning_rate', toolkit['learning_rate'],
-                                '--num_warmup_steps', toolkit['num_warmup_steps'],
-                                '--weight_decay', toolkit['weight_decay'],
-                                '--per_device_train_batch_size', toolkit['per_device_train_batch_size'],
-                                '--per_device_eval_batch_size', toolkit['per_device_eval_batch_size'],
-                                '--gradient_accumulation_steps', toolkit['gradient_accumulation_steps'],
-                                '--random_seed', toolkit['random_seed'],
-                                '--parallel', toolkit['parallel'],
-                                '--load_best_model_at_end', toolkit['load_best_model_at_end'],
-                                '--alpha', toolkit['alpha'],
-                                '--num_train_adv_examples', toolkit['num_train_adv_examples'],
-                                '--query_budget_train', toolkit['query_budget_train'],
-                                '--attack_num_workers_per_device', toolkit['attack_num_workers_per_device'],
-                                '--output_dir', toolkit['output_dir'],
-                                '--checkpoint_interval_steps', toolkit['checkpoint_interval_steps'],
-                                '--checkpoint_interval_epochs', toolkit['checkpoint_interval_epochs'],
-                                '--save_last', toolkit['save_last'],
-                                '--log_to_tb', toolkit['log_to_tb'],
-                                '--tb_log_dir', toolkit['tb_log_dir'],
-                                '--log_to_wandb', toolkit['log_to_wandb'],
-                                '--wandb_project', toolkit['wandb_project'],
-                                '--logging_interval_step', toolkit['logging_interval_step']]
+                                '--model_name_or_path', trainer['ML_MODEL'],
+                                '--attack', trainer['attack'],
+                                '--dataset', trainer['DATASET'],
+                                '--task_type', trainer['TASK_TYPE'],
+                                '--model_max_length', trainer['model_max_length'],
+                                '--model_num_labels', trainer['model_num_labels'],
+                                '--dataset_train_split', trainer['dataset_train_split'],
+                                '--dataset_eval_split', trainer['dataset_eval_split'],
+                                '--filter_train_by_labels', trainer['filter_train_by_labels'],
+                                '--filter_eval_by_labels', trainer['filter_eval_by_labels'],
+                                '--num_epochs', trainer['num_epochs'],
+                                '--num_clean_epochs', trainer['num_clean_epochs'],
+                                '--attack_epoch_interval', trainer['attack_epoch_interval'],
+                                '--early_stopping_epochs', trainer['early_stopping_epochs'],
+                                '--learning_rate', trainer['learning_rate'],
+                                '--num_warmup_steps', trainer['num_warmup_steps'],
+                                '--weight_decay', trainer['weight_decay'],
+                                '--per_device_train_batch_size', trainer['per_device_train_batch_size'],
+                                '--per_device_eval_batch_size', trainer['per_device_eval_batch_size'],
+                                '--gradient_accumulation_steps', trainer['gradient_accumulation_steps'],
+                                '--random_seed', trainer['random_seed'],
+                                '--parallel', trainer['parallel'],
+                                '--load_best_model_at_end', trainer['load_best_model_at_end'],
+                                '--alpha', trainer['alpha'],
+                                '--num_train_adv_examples', trainer['num_train_adv_examples'],
+                                '--query_budget_train', trainer['query_budget_train'],
+                                '--attack_num_workers_per_device', trainer['attack_num_workers_per_device'],
+                                '--output_dir', trainer['output_dir'],
+                                '--checkpoint_interval_steps', trainer['checkpoint_interval_steps'],
+                                '--checkpoint_interval_epochs', trainer['checkpoint_interval_epochs'],
+                                '--save_last', trainer['save_last'],
+                                '--log_to_tb', trainer['log_to_tb'],
+                                '--tb_log_dir', trainer['tb_log_dir'],
+                                '--log_to_wandb', trainer['log_to_wandb'],
+                                '--wandb_project', trainer['wandb_project'],
+                                '--logging_interval_step', trainer['logging_interval_step']]
                     processor = subprocess.run(var_list)
                 except Exception as ex:
                     st.error(ex)
                 else:
-                    st.success(f'Successfully trained model! Model saved in {os.getcwd()}{toolkit["output_dir"]}.')
+                    st.success(f'Successfully trained model! Model saved in {os.getcwd()}{trainer["output_dir"]}.')
 
-    elif toolkit['MODEL_MODE'] == 'Evaluation':
-        st.info('This functionality is not implemented yet.')
+    elif trainer['MODEL_MODE'] == 'Evaluation':
+        st.markdown('## Flags')
+        trainer['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
+                                                            'and content being downloaded again, a unique file '
+                                                            'identifier is tacked onto the filename.')
+        trainer['VERBOSE'] = st.checkbox('Display Outputs?')
+
+        if trainer['VERBOSE']:
+            trainer['VERBOSITY'] = st.slider('Data points',
+                                             key='Data points to display?',
+                                             min_value=0,
+                                             max_value=1000,
+                                             value=20,
+                                             help='Select 0 to display all Data Points')
+            trainer['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
+                                                       help='This option will analyse your DataFrame and display '
+                                                            'advanced statistics on it. Note that this will require '
+                                                            'some time and processing power to complete. Deselect this '
+                                                            'option if this if you do not require it.')
+        trainer['PRED_FILE'] = st.checkbox('Load Predictions from File?', key='preds')
+
+        if trainer['PRED_FILE']:
+            st.markdown('## Upload Data\n'
+                        'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be '
+                        'loaded with the widget. To circumvent this limitation, you may choose to '
+                        'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
+                        '`streamlit run app.py` command and define the maximum size of file you can upload '
+                        'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this '
+                        'option is only available for users who run the app using the app\'s source code or through '
+                        'Docker. For Docker, you will need to append the tag above behind the Docker Image name when '
+                        'running the `run` command, e.g. '
+                        '`docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do '
+                        'not use the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
+                        'Alternatively, you may use the Large File option to pull your dataset from any one of the '
+                        'four supported Cloud Service Providers into the app.\n\n'
+                        'After selecting the size of your file, select the file format you wish to upload.\n\n')
+            trainer['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
+            trainer['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                                 FILE UPLOADING                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+            if trainer['FILE'] == 'Small File(s)':
+                st.markdown('### Upload File\n')
+                trainer['PRED_FILEPATH'] = st.file_uploader(f'Load {trainer["MODE"]} File', type=[trainer['MODE']])
+                if trainer['PRED_FILEPATH'] is not None:
+                    trainer['PRED_DATA'] = readFile(trainer['PRED_FILEPATH'], trainer['MODE'])
+                    if not trainer['PRED_DATA'].empty:
+                        trainer['PRED_DATA'] = trainer['PRED_DATA'].astype(str)
+                        trainer['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                              list(trainer['PRED_DATA'].columns))
+                        st.success(f'Data Loaded from {trainer["DATA_COLUMN"]}!')
+                else:
+                    trainer['PRED_DATA'] = pd.DataFrame()
+
+            elif trainer['FILE'] == 'Large File(s)':
+                st.info(f'File Format Selected: **{trainer["MODE"]}**')
+                trainer['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+
+                if trainer['CSP'] == 'Azure':
+                    azure = csp_downloaders.AzureDownloader()
+                    if azure.SUCCESSFUL:
+                        try:
+                            azure.downloadBlob()
+                            trainer['PRED_DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, trainer['MODE'])
+                        except Exception as ex:
+                            st.error(f'Error: {ex}. Try again.')
+
+                    if not trainer['PRED_DATA'].empty:
+                        trainer['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                              list(trainer['PRED_DATA'].columns))
+                        st.success(f'Data Loaded from {trainer["DATA_COLUMN"]}!')
+
+                elif trainer['CSP'] == 'Amazon':
+                    aws = csp_downloaders.AWSDownloader()
+                    if aws.SUCCESSFUL:
+                        try:
+                            aws.downloadFile()
+                            trainer['PRED_DATA'] = readFile(aws.AWS_FILE_NAME, trainer['MODE'])
+                        except Exception as ex:
+                            st.error(f'Error: {ex}. Try again.')
+
+                    if not trainer['PRED_DATA'].empty:
+                        trainer['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                              list(trainer['PRED_DATA'].columns))
+                        st.success(f'Data Loaded from {trainer["DATA_COLUMN"]}!')
+
+                elif trainer['CSP'] == 'Google':
+                    gcs = csp_downloaders.GoogleDownloader()
+                    if gcs.SUCCESSFUL:
+                        try:
+                            gcs.downloadBlob()
+                            trainer['PRED_DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, trainer['MODE'])
+                        except Exception as ex:
+                            st.error(f'Error: {ex}. Try again.')
+
+                    if not trainer['PRED_DATA'].empty:
+                        trainer['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                              list(trainer['PRED_DATA'].columns))
+                        st.success(f'Data Loaded from {trainer["DATA_COLUMN"]}!')
+
+            st.markdown('## Upload Model'
+                        'Due to the tendency for model files to be larger than the 200 MB limit of the File Uploader '
+                        'Widget, you will need to provide a path to the model. The following text input widget will '
+                        'display the current working directory where this app is launched from.')
+            trainer['MODEL_PATH'] = st.text_input('Key in the path to the model below',
+                                                  value=os.getcwd(),
+                                                  key='model_path')
+            if os.path.exists(trainer['MODEL_PATH']):
+                st.success(f'File Path {trainer["MODEL_PATH"]} exists!')
+                trainer['PATH_EXIST'] = True
+            else:
+                st.error(f'Error: {trainer["MODEL_PATH"]} is invalid!')
+                trainer['PATH_EXIST'] = False
+
+            # begin predictions
+            st.markdown('## Prediction')
+            if st.button('Proceed?'):
+                if trainer['PATH_EXIST']:
+                    trainer['PRED_DATA'] = trainer['PRED_DATA'][[trainer['DATA_COLUMN']]]
+                    trainer['PRED_DATA'] = trainer['PRED_DATA'].to_list()
+
+                    try:
+                        # load model
+                        trainer['ML_MODEL'] = torch.load('MODEL_PATH')
+                        trainer['ML_MODEL'].eval()
+                    except Exception as ex:
+                        st.error(ex)
+
+                else:
+                    st.error('Error: Model File Path is not valid. Try again.')
+
+                raise NotImplementedError

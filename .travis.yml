@@ -5,6 +5,7 @@ python:
  
 install:
   - pip install -r requirements.txt
+  - python -m nltk.downloader all
 
 script:
   - streamlit run app.py

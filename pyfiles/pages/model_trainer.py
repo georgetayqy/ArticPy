@@ -5,6 +5,7 @@ This module allows the user to train models and to predict NLP data
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import contextlib
 import os
 import pathlib
 import numpy as np
@@ -12,10 +13,11 @@ import pandas as pd
 import streamlit as st
 import textattack.models.wrappers
 import torch
-from datetime import datetime
 import subprocess
 import transformers
 
+from datetime import datetime
+from io import StringIO
 from config import trainer, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from utils import csp_downloaders
@@ -94,201 +96,6 @@ def app():
                                                          'save_last', 'log_to_tb', 'tb_log_dir', 'log_to_wandb',
                                                          'wandb_project', 'logging_interval_step'),
                                                         default=('num_epochs', 'per_device_train_batch_size'))
-            if 'num_epochs' in trainer['TRAINING_PARAMS']:
-                trainer['num_epochs'] = st.number_input('Total number of epochs for training',
-                                                        min_value=1,
-                                                        max_value=1000000,
-                                                        value=3,
-                                                        key='num_epochs')
-            if 'num_clean_epochs' in trainer['TRAINING_PARAMS']:
-                trainer['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
-                                                              'training dataset before adversarial training',
-                                                              min_value=1,
-                                                              max_value=1000000,
-                                                              value=1,
-                                                              key='num_clean_epochs')
-            if 'attack_epoch_interval' in trainer['TRAINING_PARAMS']:
-                trainer['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
-                                                                   'N epochs',
-                                                                   min_value=1,
-                                                                   max_value=1000000,
-                                                                   value=1,
-                                                                   key='attack_epoch_interval')
-            if 'early_stopping_epochs' in trainer['TRAINING_PARAMS']:
-                trainer['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
-                                                                   'before stopping early',
-                                                                   min_value=1,
-                                                                   max_value=1000000,
-                                                                   value=1,
-                                                                   key='early_stopping_epochs')
-            else:
-                trainer['early_stopping_epochs'] = None
-            if 'learning_rate' in trainer['TRAINING_PARAMS']:
-                trainer['learning_rate'] = st.number_input('Number of epochs validation must increase before '
-                                                           'stopping early',
-                                                           min_value=0,
-                                                           max_value=1,
-                                                           value=5e-5,
-                                                           step=0.000001,
-                                                           format='.%6f',
-                                                           key='learning_rate')
-            if 'num_warmup_steps' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Define in float?'):
-                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
-                                                                  'linear scheduler',
-                                                                  min_value=0,
-                                                                  max_value=1,
-                                                                  value=0.50,
-                                                                  step=0.001,
-                                                                  format='.%3f',
-                                                                  key='num_warmup_steps')
-                else:
-                    trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
-                                                                  'linear scheduler',
-                                                                  min_value=1,
-                                                                  max_value=1000000,
-                                                                  value=500,
-                                                                  key='num_warmup_steps')
-            if 'weight_decay' in trainer['TRAINING_PARAMS']:
-                trainer['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
-                                                          min_value=0,
-                                                          max_value=1,
-                                                          value=0.01,
-                                                          step=0.01,
-                                                          format='.%2f',
-                                                          key='weight_decay')
-            if 'per_device_train_batch_size' in trainer['TRAINING_PARAMS']:
-                trainer['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
-                                                                         min_value=1,
-                                                                         max_value=1000000,
-                                                                         value=8,
-                                                                         key='per_device_train_batch_size')
-            if 'per_device_eval_batch_size' in trainer['TRAINING_PARAMS']:
-                trainer['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
-                                                                        min_value=1,
-                                                                        max_value=1000000,
-                                                                        value=32,
-                                                                        key='per_device_eval_batch_size')
-            if 'gradient_accumulation_steps' in trainer['TRAINING_PARAMS']:
-                trainer['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
-                                                                         'the gradients before performing a '
-                                                                         'backward/update pass',
-                                                                         min_value=1,
-                                                                         max_value=1000000,
-                                                                         value=32,
-                                                                         key='gradient_accumulation_steps')
-            if 'random_seed' in trainer['TRAINING_PARAMS']:
-                trainer['random_seed'] = st.number_input('Random seed for reproducibility',
-                                                         min_value=1,
-                                                         max_value=1000000,
-                                                         value=32,
-                                                         key='random_seed')
-            if 'parallel' in trainer['TRAINING_PARAMS']:
-                trainer['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
-                                                  value=False,
-                                                  key='parallel')
-            if 'load_best_model_at_end' in trainer['TRAINING_PARAMS']:
-                trainer['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
-                                                                'load it at the end',
-                                                                value=False,
-                                                                key='parallel')
-            if 'alpha' in trainer['TRAINING_PARAMS']:
-                trainer['alpha'] = st.number_input('The weight for adversarial loss',
-                                                   min_value=0,
-                                                   max_value=1,
-                                                   value=0.50,
-                                                   step=0.001,
-                                                   format='.%3f',
-                                                   key='alpha')
-            if 'num_train_adv_examples' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Use Float Parameters?'):
-                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
-                                                                        'attack when generating adversarial '
-                                                                        'training set before start of every epoch',
-                                                                        min_value=0,
-                                                                        max_value=1,
-                                                                        value=0.50,
-                                                                        step=0.001,
-                                                                        format='.%3f',
-                                                                        key='num_train_adv_examples')
-                else:
-                    trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
-                                                                        'attack when generating adversarial '
-                                                                        'training set before start of every epoch',
-                                                                        min_value=1,
-                                                                        max_value=1000000,
-                                                                        value=8,
-                                                                        key='per_device_train_batch_size')
-            if 'query_budget_train' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Set Max Query Budget?', value=False):
-                    trainer['query_budget_train'] = st.number_input('The max query budget to use when generating '
-                                                                    'adversarial training set',
-                                                                    min_value=1,
-                                                                    max_value=1000000,
-                                                                    value=1,
-                                                                    key='query_budget_train')
-                else:
-                    trainer['query_budget_train'] = None
-            if 'attack_num_workers_per_device' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Set Number of Worker Process to run attack?', value=False):
-                    trainer['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
-                                                                               'per device for attack',
-                                                                               min_value=1,
-                                                                               max_value=1000000,
-                                                                               value=1,
-                                                                               key='attack_num_workers_per_device')
-                else:
-                    trainer['attack_num_workers_per_device'] = 1
-            if 'output_dir' in trainer['TRAINING_PARAMS']:
-                dt = datetime.now()
-                trainer['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
-                                                      value=f'/outputs/{dt.strftime("%Y-%m-%d-%H-%M-%S-%f")}',
-                                                      key='output_dir')
-            if 'checkpoint_interval_steps' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Save Model Checkpoint after every N updates?'):
-                    trainer['checkpoint_interval_steps'] = st.number_input('Save after N updates',
-                                                                           min_value=1,
-                                                                           max_value=1000000,
-                                                                           value=1,
-                                                                           key='checkpoint_interval_steps')
-                else:
-                    trainer['checkpoint_interval_steps'] = None
-            if 'checkpoint_interval_epochs' in trainer['TRAINING_PARAMS']:
-                if st.checkbox('Save Model Checkpoint after every N epochs?'):
-                    trainer['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
-                                                                            min_value=1,
-                                                                            max_value=1000000,
-                                                                            value=1,
-                                                                            key='checkpoint_interval_epochs')
-                else:
-                    trainer['checkpoint_interval_epochs'] = None
-            if 'save_last' in trainer['TRAINING_PARAMS']:
-                trainer['save_last'] = st.checkbox('Save the model at end of training',
-                                                   value=True,
-                                                   key='save_last')
-            if 'log_to_tb' in trainer['TRAINING_PARAMS']:
-                trainer['log_to_tb'] = st.checkbox('Log to Tensorboard',
-                                                   value=False,
-                                                   key='log_to_tb')
-            if 'tb_log_dir' in trainer['TRAINING_PARAMS']:
-                trainer['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
-                                                      value=r'./runs',
-                                                      key='tb_log_dir')
-            if 'log_to_wandb' in trainer['TRAINING_PARAMS']:
-                trainer['log_to_wandb'] = st.checkbox('Log to Wandb',
-                                                      value=False,
-                                                      key='log_to_wandb')
-            if 'wandb_project' in trainer['TRAINING_PARAMS']:
-                trainer['wandb_project'] = st.text_input('Name of Wandb project for logging',
-                                                         value=r'textattack',
-                                                         key='wandb_project')
-            if 'logging_interval_step' in trainer['TRAINING_PARAMS']:
-                trainer['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
-                                                                   'steps',
-                                                                   min_value=1,
-                                                                   max_value=1000000,
-                                                                   value=1,
-                                                                   key='logging_interval_step')
         else:
             trainer['TRAINING_PARAMS'] = st.multiselect('Select Training Parameters',
                                                         ('attack', 'model_max_length',
@@ -307,9 +114,12 @@ def app():
                                                          'save_last', 'log_to_tb', 'tb_log_dir', 'log_to_wandb',
                                                          'wandb_project', 'logging_interval_step'),
                                                         default=('model_max_length', 'num_epochs',
-                                                                 'per_device_train_batch_size'))
+                                                                 'per_device_train_batch_size', 'model_num_labels'))
             if 'attack' in trainer['TRAINING_PARAMS']:
-                trainer['num_epochs'] = st.text_input('Attack string', key='attack')
+                trainer['attack'] = st.text_input('Attack string', key='attack')
+            else:
+                trainer['attack'] = None
+
             if 'model_max_length' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define Model Max Length'):
                     trainer['model_max_length'] = st.number_input('Model Max Length',
@@ -319,6 +129,7 @@ def app():
                                                                   key='model_max_length')
                 else:
                     trainer['model_max_length'] = None
+
             if 'model_num_labels' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define Number of Labels'):
                     trainer['model_num_labels'] = st.number_input('Number of Labels',
@@ -328,24 +139,37 @@ def app():
                                                                   key='model_num_labels')
                 else:
                     trainer['model_num_labels'] = None
+
             if 'filter_train_by_labels' in trainer['TRAINING_PARAMS']:
                 trainer['filter_train_by_labels'] = st.text_input('Filter Train Data By Labels',
                                                                   key='filter_train')
                 trainer['filter_train_by_labels'] = [
                     label for label in trainer['filter_train_by_labels'].split(',')
                 ]
+            else:
+                trainer['filter_train_by_labels'] = None
+
             if 'filter_eval_by_labels' in trainer['TRAINING_PARAMS']:
                 trainer['filter_eval_by_labels'] = st.text_input('Filter Test Data By Labels',
                                                                  key='filter_test')
                 trainer['filter_eval_by_labels'] = [
                     label for label in trainer['filter_eval_by_labels'].split(',')
                 ]
+            else:
+                trainer['filter_eval_by_labels'] = None
+
             if 'num_epochs' in trainer['TRAINING_PARAMS']:
                 trainer['num_epochs'] = st.number_input('Total number of epochs for training',
                                                         min_value=1,
                                                         max_value=1000000,
                                                         value=3,
                                                         key='num_epochs')
+            else:
+                if trainer['API']:
+                    trainer['num_epochs'] = 3
+                else:
+                    trainer['num_epochs'] = None
+
             if 'num_clean_epochs' in trainer['TRAINING_PARAMS']:
                 trainer['num_clean_epochs'] = st.number_input('Number of epochs to train on just the original '
                                                               'training dataset before adversarial training',
@@ -353,6 +177,12 @@ def app():
                                                               max_value=1000000,
                                                               value=1,
                                                               key='num_clean_epochs')
+            else:
+                if trainer['API']:
+                    trainer['num_clean_epochs'] = 1
+                else:
+                    trainer['num_clean_epochs'] = None
+
             if 'attack_epoch_interval' in trainer['TRAINING_PARAMS']:
                 trainer['attack_epoch_interval'] = st.number_input('Generate a new adversarial training set every '
                                                                    'N epochs',
@@ -360,6 +190,12 @@ def app():
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='attack_epoch_interval')
+            else:
+                if trainer['API']:
+                    trainer['attack_epoch_interval'] = 1
+                else:
+                    trainer['attack_epoch_interval'] = None
+
             if 'early_stopping_epochs' in trainer['TRAINING_PARAMS']:
                 trainer['early_stopping_epochs'] = st.number_input('Number of epochs validation must increase '
                                                                    'before stopping early',
@@ -369,6 +205,7 @@ def app():
                                                                    key='early_stopping_epochs')
             else:
                 trainer['early_stopping_epochs'] = None
+
             if 'learning_rate' in trainer['TRAINING_PARAMS']:
                 trainer['learning_rate'] = st.number_input('Number of epochs validation must increase before '
                                                            'stopping early',
@@ -378,6 +215,12 @@ def app():
                                                            step=0.000001,
                                                            format='.%6f',
                                                            key='learning_rate')
+            else:
+                if trainer['API']:
+                    trainer['learning_rate'] = 5e-5
+                else:
+                    trainer['learning_rate'] = None
+
             if 'num_warmup_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Define in float?'):
                     trainer['num_warmup_steps'] = st.number_input('The number of steps for the warmup phase of '
@@ -395,6 +238,12 @@ def app():
                                                                   max_value=1000000,
                                                                   value=500,
                                                                   key='num_warmup_steps')
+            else:
+                if trainer['API']:
+                    trainer['num_warmup_steps'] = 500
+                else:
+                    trainer['num_warmup_steps'] = None
+
             if 'weight_decay' in trainer['TRAINING_PARAMS']:
                 trainer['weight_decay'] = st.number_input('Weight decay (L2 penalty)',
                                                           min_value=0,
@@ -403,18 +252,36 @@ def app():
                                                           step=0.01,
                                                           format='.%2f',
                                                           key='weight_decay')
+            else:
+                if trainer['API']:
+                    trainer['weight_decay'] = 0.01
+                else:
+                    trainer['weight_decay'] = None
+
             if 'per_device_train_batch_size' in trainer['TRAINING_PARAMS']:
                 trainer['per_device_train_batch_size'] = st.number_input('The batch size per GPU/CPU for training',
                                                                          min_value=1,
                                                                          max_value=1000000,
                                                                          value=8,
                                                                          key='per_device_train_batch_size')
+            else:
+                if trainer['API']:
+                    trainer['per_device_train_batch_size'] = 8
+                else:
+                    trainer['per_device_train_batch_size'] = None
+
             if 'per_device_eval_batch_size' in trainer['TRAINING_PARAMS']:
                 trainer['per_device_eval_batch_size'] = st.number_input('The batch size per GPU/CPU for evaluation',
                                                                         min_value=1,
                                                                         max_value=1000000,
                                                                         value=32,
                                                                         key='per_device_eval_batch_size')
+            else:
+                if trainer['API']:
+                    trainer['per_device_eval_batch_size'] = 32
+                else:
+                    trainer['per_device_eval_batch_size'] = None
+
             if 'gradient_accumulation_steps' in trainer['TRAINING_PARAMS']:
                 trainer['gradient_accumulation_steps'] = st.number_input('Number of updates steps to accumulate '
                                                                          'the gradients before performing a '
@@ -423,21 +290,42 @@ def app():
                                                                          max_value=1000000,
                                                                          value=32,
                                                                          key='gradient_accumulation_steps')
+            else:
+                if trainer['API']:
+                    trainer['gradient_accumulation_steps'] = 1
+                else:
+                    trainer['gradient_accumulation_steps'] = None
+
             if 'random_seed' in trainer['TRAINING_PARAMS']:
                 trainer['random_seed'] = st.number_input('Random seed for reproducibility',
                                                          min_value=1,
                                                          max_value=1000000,
-                                                         value=32,
+                                                         value=786,
                                                          key='random_seed')
+            else:
+                if trainer['API']:
+                    trainer['random_seed'] = 786
+                else:
+                    trainer['random_seed'] = None
+
             if 'parallel' in trainer['TRAINING_PARAMS']:
                 trainer['parallel'] = st.checkbox('Use Multiple GPUs using torch.DataParallel class?',
                                                   value=False,
                                                   key='parallel')
+            else:
+                if trainer['API']:
+                    trainer['parallel'] = False
+                else:
+                    trainer['parallel'] = None
+
             if 'load_best_model_at_end' in trainer['TRAINING_PARAMS']:
                 trainer['load_best_model_at_end'] = st.checkbox('keep track of the best model across training and '
                                                                 'load it at the end',
                                                                 value=False,
                                                                 key='parallel')
+            else:
+                trainer['load_best_model_at_end'] = False
+
             if 'alpha' in trainer['TRAINING_PARAMS']:
                 trainer['alpha'] = st.number_input('The weight for adversarial loss',
                                                    min_value=0,
@@ -446,6 +334,12 @@ def app():
                                                    step=0.001,
                                                    format='.%3f',
                                                    key='alpha')
+            else:
+                if trainer['API']:
+                    trainer['alpha'] = 1.0
+                else:
+                    trainer['alpha'] = None
+
             if 'num_train_adv_examples' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Use Float Parameters?'):
                     trainer['num_train_adv_examples'] = st.number_input('The number of samples to successfully '
@@ -465,6 +359,12 @@ def app():
                                                                         max_value=1000000,
                                                                         value=8,
                                                                         key='per_device_train_batch_size')
+            else:
+                if trainer['API']:
+                    trainer['num_train_adv_examples'] = -1
+                else:
+                    trainer['num_train_adv_examples'] = None
+
             if 'query_budget_train' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Max Query Budget?', value=False):
                     trainer['query_budget_train'] = st.number_input('The max query budget to use when generating '
@@ -475,6 +375,7 @@ def app():
                                                                     key='query_budget_train')
                 else:
                     trainer['query_budget_train'] = None
+
             if 'attack_num_workers_per_device' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Set Number of Worker Process to run attack?', value=False):
                     trainer['attack_num_workers_per_device'] = st.number_input('Number of worker processes to run '
@@ -484,12 +385,19 @@ def app():
                                                                                value=1,
                                                                                key='attack_num_workers_per_device')
                 else:
-                    trainer['attack_num_workers_per_device'] = 1
+                    if trainer['API']:
+                        trainer['attack_num_workers_per_device'] = 1
+                    else:
+                        trainer['attack_num_workers_per_device'] = None
+
             if 'output_dir' in trainer['TRAINING_PARAMS']:
                 dt = datetime.now()
                 trainer['output_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=f'/outputs/{dt.strftime("%Y-%m-%d-%H-%M-%S-%f")}',
                                                       key='output_dir')
+            else:
+                trainer['output_dir'] = f'/outputs/{datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")}'
+
             if 'checkpoint_interval_steps' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N updates?'):
                     trainer['checkpoint_interval_steps'] = st.number_input('Save after N updates',
@@ -499,6 +407,7 @@ def app():
                                                                            key='checkpoint_interval_steps')
                 else:
                     trainer['checkpoint_interval_steps'] = None
+
             if 'checkpoint_interval_epochs' in trainer['TRAINING_PARAMS']:
                 if st.checkbox('Save Model Checkpoint after every N epochs?'):
                     trainer['checkpoint_interval_epochs'] = st.number_input('Save after N epochs',
@@ -508,26 +417,54 @@ def app():
                                                                             key='checkpoint_interval_epochs')
                 else:
                     trainer['checkpoint_interval_epochs'] = None
+
             if 'save_last' in trainer['TRAINING_PARAMS']:
                 trainer['save_last'] = st.checkbox('Save the model at end of training',
                                                    value=True,
                                                    key='save_last')
+            else:
+                if trainer['API']:
+                    trainer['save_last'] = True
+                else:
+                    trainer['save_last'] = None
+
             if 'log_to_tb' in trainer['TRAINING_PARAMS']:
                 trainer['log_to_tb'] = st.checkbox('Log to Tensorboard',
                                                    value=False,
                                                    key='log_to_tb')
+            else:
+                if trainer['API']:
+                    trainer['log_to_tb'] = False
+                else:
+                    trainer['log_to_tb'] = None
+
             if 'tb_log_dir' in trainer['TRAINING_PARAMS']:
                 trainer['tb_log_dir'] = st.text_input('Directory to output training logs and checkpoints',
                                                       value=r'./runs',
                                                       key='tb_log_dir')
+            else:
+                trainer['tb_log_dir'] = r'./runs'
+
             if 'log_to_wandb' in trainer['TRAINING_PARAMS']:
                 trainer['log_to_wandb'] = st.checkbox('Log to Wandb',
                                                       value=False,
                                                       key='log_to_wandb')
+            else:
+                if trainer['API']:
+                    trainer['log_to_wandb'] = False
+                else:
+                    trainer['log_to_wandb'] = None
+
             if 'wandb_project' in trainer['TRAINING_PARAMS']:
                 trainer['wandb_project'] = st.text_input('Name of Wandb project for logging',
                                                          value=r'textattack',
                                                          key='wandb_project')
+            else:
+                if trainer['API']:
+                    trainer['wandb_project'] = 'textattack'
+                else:
+                    trainer['wandb_project'] = None
+
             if 'logging_interval_step' in trainer['TRAINING_PARAMS']:
                 trainer['logging_interval_step'] = st.number_input('Log to Tensorboard/Wandb every N training '
                                                                    'steps',
@@ -535,6 +472,11 @@ def app():
                                                                    max_value=1000000,
                                                                    value=1,
                                                                    key='logging_interval_step')
+            else:
+                if trainer['API']:
+                    trainer['logging_interval_step'] = 1
+                else:
+                    trainer['logging_interval_step'] = None
 
         st.markdown('### Model and Data Selection')
         trainer['MODEL'] = st.selectbox('Choose Model to Use',
@@ -723,44 +665,65 @@ def app():
 
         else:
             with st.spinner('Training Model... Refer to your Terminal for more information...'):
+                var_list = ['textattack', 'train']
+                maps = {
+                    'model_name_or_path': ['--model-name-or-path', trainer['MODEL']],
+                    'dataset': ['--dataset', trainer['DATASET']],
+                    'attack': ['--attack', trainer['attack']],
+                    'task_type': ['--task-type', trainer['TASK_TYPE']],
+                    'model_max_length': ['--model-max-length', trainer['model_max_length']],
+                    'model_num_labels': ['--model-num-labels', trainer['model_num_labels']],
+                    'dataset_train_split': ['--dataset-train-split', trainer['dataset_train_split']],
+                    'dataset_eval_split': ['--dataset-eval-split', trainer['dataset_eval_split']],
+                    'filter_train_by_labels': ['--filter-train-by-labels', trainer['filter_train_by_labels']],
+                    'filter_eval_by_labels': ['--filter-eval-by-labels', trainer['filter_eval_by_labels']],
+                    'num_epochs': ['--num-epochs', trainer['num_epochs']],
+                    'num_clean_epochs': ['--num-clean-epochs', trainer['num_clean_epochs']],
+                    'attack_epoch_interval': ['--attack-epoch-interval', trainer['attack_epoch_interval']],
+                    'early_stopping_epochs': ['--early-stopping-epochs', trainer['early_stopping_epochs']],
+                    'learning_rate': ['--learning-rate', trainer['learning_rate']],
+                    'num_warmup_steps': ['--num-warmup-steps', trainer['num_warmup_steps']],
+                    'weight_decay': ['--weight-decay', trainer['weight_decay']],
+                    'per_device_train_batch_size': ['--per-device-train-batch-size',
+                                                    trainer['per_device_train_batch_size']],
+                    'per_device_eval_batch_size': ['--per-device-eval-batch-size',
+                                                   trainer['per_device_eval_batch_size']],
+                    'gradient_accumulation_steps': ['--gradient-accumulation-steps',
+                                                    trainer['gradient_accumulation_steps']],
+                    'random_seed': ['--random-seed', trainer['random_seed']],
+                    'parallel': ['--parallel', trainer['parallel']],
+                    'load_best_model_at_end': ['--load-best-model-at-end', trainer['load_best_model_at_end']],
+                    'alpha': ['--alpha', trainer['alpha']],
+                    'num_train_adv_examples': ['--num-train-adv-examples', trainer['num_train_adv_examples']],
+                    'query_budget_train': ['--query-budget-train', trainer['query_budget_train']],
+                    'attack_num_workers_per_device': ['--attack-num-workers-per-device',
+                                                      trainer['attack_num_workers_per_device']],
+                    'output_dir': ['--output-dir', trainer['output_dir']],
+                    'checkpoint_interval_steps': ['--checkpoint-interval-steps',
+                                                  trainer['checkpoint_interval_steps']],
+                    'checkpoint_interval_epochs': ['--checkpoint-interval-epochs',
+                                                   trainer['checkpoint_interval_epochs']],
+                    'save_last': ['--save-last', trainer['save_last']],
+                    'log_to_tb': ['--log-to-tb', trainer['log_to_tb']],
+                    'tb_log_dir': ['--tb-log-dir', trainer['tb_log_dir']],
+                    'log_to_wandb': ['--log-to-wandb', trainer['log_to_wandb']],
+                    'wandb_project': ['--wandb-project', trainer['wandb_project']],
+                    'logging_interval_step': ['--logging-interval-step',
+                                              trainer['logging_interval_step']]
+                }
+
+                # only include variables that are defined
+                bools = [None, True, False]
+                maps = {key: value for key, value in maps.items() if value[1] not in bools}
+                for k, v in maps.items():
+                    var_list.extend(v)
+
+                var_list = [str(iter_) for iter_ in var_list]
+
+                # run the command
+                # code taken from https://gist.github.com/andfanilo/aa3e4a6a15124c58e88262e193e1febf
+                st.markdown('### Outputs')
                 try:
-                    var_list = ['textattack', 'train',
-                                '--model_name_or_path', trainer['ML_MODEL'],
-                                '--attack', trainer['attack'],
-                                '--dataset', trainer['DATASET'],
-                                '--task_type', trainer['TASK_TYPE'],
-                                '--model_max_length', trainer['model_max_length'],
-                                '--model_num_labels', trainer['model_num_labels'],
-                                '--dataset_train_split', trainer['dataset_train_split'],
-                                '--dataset_eval_split', trainer['dataset_eval_split'],
-                                '--filter_train_by_labels', trainer['filter_train_by_labels'],
-                                '--filter_eval_by_labels', trainer['filter_eval_by_labels'],
-                                '--num_epochs', trainer['num_epochs'],
-                                '--num_clean_epochs', trainer['num_clean_epochs'],
-                                '--attack_epoch_interval', trainer['attack_epoch_interval'],
-                                '--early_stopping_epochs', trainer['early_stopping_epochs'],
-                                '--learning_rate', trainer['learning_rate'],
-                                '--num_warmup_steps', trainer['num_warmup_steps'],
-                                '--weight_decay', trainer['weight_decay'],
-                                '--per_device_train_batch_size', trainer['per_device_train_batch_size'],
-                                '--per_device_eval_batch_size', trainer['per_device_eval_batch_size'],
-                                '--gradient_accumulation_steps', trainer['gradient_accumulation_steps'],
-                                '--random_seed', trainer['random_seed'],
-                                '--parallel', trainer['parallel'],
-                                '--load_best_model_at_end', trainer['load_best_model_at_end'],
-                                '--alpha', trainer['alpha'],
-                                '--num_train_adv_examples', trainer['num_train_adv_examples'],
-                                '--query_budget_train', trainer['query_budget_train'],
-                                '--attack_num_workers_per_device', trainer['attack_num_workers_per_device'],
-                                '--output_dir', trainer['output_dir'],
-                                '--checkpoint_interval_steps', trainer['checkpoint_interval_steps'],
-                                '--checkpoint_interval_epochs', trainer['checkpoint_interval_epochs'],
-                                '--save_last', trainer['save_last'],
-                                '--log_to_tb', trainer['log_to_tb'],
-                                '--tb_log_dir', trainer['tb_log_dir'],
-                                '--log_to_wandb', trainer['log_to_wandb'],
-                                '--wandb_project', trainer['wandb_project'],
-                                '--logging_interval_step', trainer['logging_interval_step']]
                     processor = subprocess.run(var_list)
                 except Exception as ex:
                     st.error(ex)
@@ -890,13 +853,12 @@ def app():
                     trainer['PRED_DATA'] = trainer['PRED_DATA'].to_list()
 
                     try:
-                        # load model
                         trainer['ML_MODEL'] = torch.load('MODEL_PATH')
-                        trainer['ML_MODEL'].eval()
+                        predictions = trainer['ML_MODEL'](trainer['PRED_DATA'])
                     except Exception as ex:
                         st.error(ex)
+                    else:
+                        st.write(predictions)
 
                 else:
                     st.error('Error: Model File Path is not valid. Try again.')
-
-                raise NotImplementedError

@@ -1,6 +1,7 @@
 """
 This file contains all the default parameters used in the app
 """
+import os
 import typing
 
 import pandas as pd
@@ -177,12 +178,13 @@ trainer = {
     'num_train_adv_examples': -1,
     'query_budget_train': None,
     'attack_num_workers_per_device': 1,
-    'output_dir': f'/outputs/{datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")}',
+    'output_dir': f'./outputs/{datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")}',
     'checkpoint_interval_steps': None,
     'checkpoint_interval_epochs': None,
     'save_last': True,
     'log_to_tb': False,
-    'tb_log_dir': r'./runs',
+    'tb_log_dir': None,
+    # 'tb_log_dir': r'./runs',
     'log_to_wandb': False,
     'wandb_project': 'textattack',
     'logging_interval_step': 1,

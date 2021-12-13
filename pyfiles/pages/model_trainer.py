@@ -5,7 +5,6 @@ This module allows the user to train models and to predict NLP data
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import contextlib
 import os
 import pathlib
 import numpy as np
@@ -17,7 +16,6 @@ import subprocess
 import transformers
 
 from datetime import datetime
-from io import StringIO
 from config import trainer, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from utils import csp_downloaders

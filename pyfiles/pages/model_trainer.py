@@ -71,7 +71,15 @@ def app():
 
     if trainer['MODEL_MODE'] == 'Training':
         st.markdown('## Flags\n\n'
-                    '### Training Parameters')
+                    '### Transformers Selection')
+        trainer['TRANSFORMERS_SELECTION'] = st.selectbox('Choose Transformers Auto Model Class to Use',
+                                                         options=trainer['TRANSFORMERS_CHOICES'],
+                                                         help='Note that this selection is important as failure to '
+                                                              'use the correct class will result in errors when '
+                                                              'running the Training step.',
+                                                         key='transformers')
+
+        st.markdown('### Training Parameters')
         trainer['API'] = st.checkbox('Use Training API?',
                                      help='Note that with this option selected, you must ensure that your GPU has '
                                           'sufficient GPU memory to run the networks/models you selected. If you '
@@ -549,7 +557,29 @@ def app():
                 'Kindly ensure that the models you have chosen above is compatible with the dataset ')
     if st.button('Proceed'):
         if trainer['API']:
-            trainer['ML_MODEL'] = transformers.AutoModelForSequenceClassification.from_pretrained(trainer['MODEL'])
+            # transformers model selector
+            st.info(f'Loading {trainer["TRANSFORMERS_SELECTION"]} Class...')
+            if trainer['TRANSFORMERS_SELECTION'] == 'Pre Training':
+                trainer['ML_MODEL'] = transformers.AutoModelForPreTraining.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'CausalLM':
+                trainer['ML_MODEL'] = transformers.AutoModelForCausalLM.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'MaskedLM':
+                trainer['ML_MODEL'] = transformers.AutoModelForMaskedLM.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'Seq2SeqLM':
+                trainer['ML_MODEL'] = transformers.AutoModelForSeq2SeqLM.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'SequenceClassification':
+                trainer['ML_MODEL'] = transformers.AutoModelForSequenceClassification.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'MultipleChoice':
+                trainer['ML_MODEL'] = transformers.AutoModelForMultipleChoice.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'NextSentencePrediction':
+                trainer['ML_MODEL'] = transformers.AutoModelForNextSentencePrediction.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'TokenClassificaition':
+                trainer['ML_MODEL'] = transformers.AutoModelForTokenClassification.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'QuestionAnswering':
+                trainer['ML_MODEL'] = transformers.AutoModelForQuestionAnswering.from_pretrained(trainer['MODEL'])
+            elif trainer['TRANSFORMERS_SELECTION'] == 'TableQuestionAnswering':
+                trainer['ML_MODEL'] = transformers.AutoModelForTableQuestionAnswering.from_pretrained(trainer['MODEL'])
+
             trainer['TOKENIZER'] = transformers.AutoTokenizer.from_pretrained(trainer['MODEL'])
             trainer['WRAPPED_MODEL'] = textattack.models.wrappers.HuggingFaceModelWrapper(trainer['ML_MODEL'],
                                                                                           trainer['TOKENIZER'])
@@ -711,18 +741,17 @@ def app():
                 }
 
                 # only include variables that are defined
-                bools = [None, True, False]
-                maps = {key: value for key, value in maps.items() if value[1] not in bools}
+                maps = {key: value for key, value in maps.items() if value[1] is not None}
                 for k, v in maps.items():
                     var_list.extend(v)
 
-                var_list = [str(iter_) for iter_ in var_list]
+                var_list = [str(iter_) for iter_ in var_list if type(iter_) is not bool]
+                print(var_list)
 
                 # run the command
-                # code taken from https://gist.github.com/andfanilo/aa3e4a6a15124c58e88262e193e1febf
                 st.markdown('### Outputs')
                 try:
-                    processor = subprocess.run(var_list)
+                    subprocess.run(var_list)
                 except Exception as ex:
                     st.error(ex)
                 else:

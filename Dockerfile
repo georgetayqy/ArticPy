@@ -7,5 +7,6 @@ RUN python -m nltk.downloader all
 RUN python -m spacy download en_core_web_sm
 RUN python -m spacy download en_core_web_lg
 COPY . .
+EXPOSE 8501
 
 ENTRYPOINT ["streamlit", "run", "app.py"]

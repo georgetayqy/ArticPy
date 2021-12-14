@@ -150,6 +150,10 @@ toolkit = {
 }
 
 trainer = {
+    'TRANSFORMERS_CHOICES': ('Pre Training', 'CausalLM', 'MaskedLM', 'Seq2SeqLM', 'SequenceClassification',
+                             'MultipleChoice', 'NextSentencePrediction', 'TokenClassificaition', 'QuestionAnswering',
+                             'TableQuestionAnswering'),
+    'TRANSFORMERS_SELECTION': None,
     'MODEL_MODE': 'Training',
     'MODEL_FILE': None,
     'TRAINING_PARAMS': [],
@@ -178,7 +182,8 @@ trainer = {
     'num_train_adv_examples': -1,
     'query_budget_train': None,
     'attack_num_workers_per_device': 1,
-    'output_dir': f'./outputs/{datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")}',
+    'output_dir': None,
+    # 'output_dir': f'{os.getcwd()}/outputs/{datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")}',
     'checkpoint_interval_steps': None,
     'checkpoint_interval_epochs': None,
     'save_last': True,

@@ -65,19 +65,8 @@ There are 4 main modules in this app, each performing an important step of the w
 ### Load, Clean and Analyse
 This module is the first module you will be using to preprocess your data before conducting further analysis on it.
 
-
-https://user-images.githubusercontent.com/73705042/146008762-75ad3b28-78e7-4938-99e3-821cd6f5d6fd.mp4
-
-
-
 ### Document-Term Matrix
 This module will allow you to create Document-Term Matrix and Word Use Frequency Data.
-
-
-
-https://user-images.githubusercontent.com/73705042/146009654-358b56fb-d078-4e09-a4e1-8d5075d3acac.mp4
-
-
 
 ### NLP Toolkit
 This module will allow you to conduct advanced NLP analyses on your processed dataset. You are able to perform the 

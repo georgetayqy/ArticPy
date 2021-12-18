@@ -39,9 +39,6 @@ def app():
     Main function that will be called when the app is run and this module is called
     """
 
-    # # DOWNLOAD THE NECESSARY CORPUS
-    nltk.download('words')
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #

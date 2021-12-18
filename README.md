@@ -5,8 +5,6 @@
 
 An app built to simplify and condense NLP tasks into one simple yet powerful Interface. 
 
-<hr>
-
 ## Setup
 ### Clone the Repository
 To use this app, simple clone the repository onto your local system, navigate into the directory of the cloned 
@@ -56,8 +54,6 @@ If you do not wish to set up your system at all, and you do not mind using the a
 the app on the website https://share.streamlit.io/asdfghjkxd/articpy/main/app.py! Do note that for this method, you 
 are unable to upload files that are larger than 200 MB in size; for the other methods, you are able to override this 
 limitation and upload files of sizes far larger than 200 MB to parse.
-
-<hr>
 
 ## Usage
 There are 4 main modules in this app, each performing an important step of the way for NLP analysis.

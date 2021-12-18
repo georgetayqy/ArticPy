@@ -13,6 +13,10 @@ from datetime import datetime
 
 STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
 DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
+
+# download the corpus
+nltk.download('words')
+
 load_clean_visualise = {
     'FILE': 'Small File(s)',
     'MODE': 'CSV',

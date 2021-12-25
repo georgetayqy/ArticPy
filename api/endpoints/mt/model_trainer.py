@@ -1,20 +1,9 @@
 import os
-import pathlib
-import numpy as np
-import pandas as pd
-import streamlit as st
-import textattack.models.wrappers
-import torch
 import subprocess
-import transformers
 import zipfile
 
 from fastapi import HTTPException, APIRouter
-from fastapi.responses import StreamingResponse, FileResponse
-from fastapi.encoders import jsonable_encoder
-from datetime import datetime
-from config import trainer, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from fastapi.responses import FileResponse
 
 router = APIRouter(prefix='/endpoints',
                    tags=['trainer'],
@@ -22,29 +11,27 @@ router = APIRouter(prefix='/endpoints',
                               404: {'description': 'Resource Not Found'},
                               415: {'description': 'Unsupported Media Type'}})
 
-path = os.getcwd()
-
 
 @router.post('/trainer')
-def trainer(model_name_or_path: str, dataset: str, attack: str, task_type: str = 'classification',
-            model_max_length: str = None, model_num_labels: int = None,
-            dataset_train_split: float = None,
-            dataset_eval_split: float = None,
-            filter_train_by_labels: str = None,
-            filter_eval_by_labels: str = None, num_epochs: int = 3,
-            num_clean_epochs: int = 1, attack_epoch_interval: int = 1,
-            early_stopping_epochs: int = None, learning_rate: float = 5e-5,
-            num_warmup_steps: int = 500, weight_decay: float = 0.01,
-            per_device_train_batch_size: int = 8, per_device_eval_batch_size: int = 32,
-            gradient_accumulation_steps: int = 1, random_seed: int = 786,
-            parallel: bool = False, load_best_model_at_end: bool = False,
-            alpha: float = 1.0, num_train_adv_examples: int = -1,
-            query_budget_train: float = None,
-            attack_num_workers_per_device: int = 1, output_dir: str = './output',
-            checkpoint_interval_steps: float = None, checkpoint_interval_epochs: int = None,
-            save_last: bool = True, log_to_tb: bool = False,
-            tb_log_dir: str = None, log_to_wandb: bool = False,
-            wandb_project: str = 'textattack', logging_interval_step: int = 1):
+async def trainer(model_name_or_path: str, dataset: str, attack: str, task_type: str = 'classification',
+                  model_max_length: str = None, model_num_labels: int = None,
+                  dataset_train_split: float = None,
+                  dataset_eval_split: float = None,
+                  filter_train_by_labels: str = None,
+                  filter_eval_by_labels: str = None, num_epochs: int = 3,
+                  num_clean_epochs: int = 1, attack_epoch_interval: int = 1,
+                  early_stopping_epochs: int = None, learning_rate: float = 5e-5,
+                  num_warmup_steps: int = 500, weight_decay: float = 0.01,
+                  per_device_train_batch_size: int = 8, per_device_eval_batch_size: int = 32,
+                  gradient_accumulation_steps: int = 1, random_seed: int = 786,
+                  parallel: bool = False, load_best_model_at_end: bool = False,
+                  alpha: float = 1.0, num_train_adv_examples: int = -1,
+                  query_budget_train: float = None,
+                  attack_num_workers_per_device: int = 1, output_dir: str = './output',
+                  checkpoint_interval_steps: float = None, checkpoint_interval_epochs: int = None,
+                  save_last: bool = True, log_to_tb: bool = False,
+                  tb_log_dir: str = None, log_to_wandb: bool = False,
+                  wandb_project: str = 'textattack', logging_interval_step: int = 1):
     """
     This function is used to call the textattack CLI to run model training using the target system
     
@@ -123,7 +110,7 @@ def trainer(model_name_or_path: str, dataset: str, attack: str, task_type: str =
 
     **logging_interval_step**: Log to Tensorboard/Wandb every N training steps
     """
-    
+
     var_list = ['textattack', 'train']
     maps = {
         'model_name_or_path': ['--model-name-or-path', model_name_or_path],
@@ -185,3 +172,5 @@ def trainer(model_name_or_path: str, dataset: str, attack: str, task_type: str =
                 raise HTTPException(status_code=404, detail=ex)
             else:
                 return FileResponse('file.zip', media_type='application/zip', filename='file.zip')
+        else:
+            raise HTTPException(status_code=404, detail='Error: The model directory is not found. Try again.')

@@ -2,18 +2,36 @@ import pathlib
 import nltk
 import numpy as np
 import pandas as pd
-import streamlit as st
 import texthero as hero
 import fastapi
 
+from texthero import preprocessing
+from io import StringIO
+from typing import Union
 from fastapi.encoders import jsonable_encoder
-from fastapi import APIRouter, HTTPException
-from config import load_clean_visualise as lcv
-from typing import Optional
+from fastapi import APIRouter, HTTPException, File, UploadFile
 from texthero import stopwords
 from nltk.stem import WordNetLemmatizer
 
+# define constants
 lemmatizer = WordNetLemmatizer()
+SIMPLE_PIPELINE = [
+    preprocessing.remove_html_tags,
+    preprocessing.remove_diacritics,
+    preprocessing.remove_whitespace,
+    preprocessing.remove_urls,
+    preprocessing.drop_no_content
+    ]
+PIPELINE = [
+    preprocessing.fillna,
+    preprocessing.lowercase,
+    preprocessing.remove_punctuation,
+    preprocessing.remove_html_tags,
+    preprocessing.remove_diacritics,
+    preprocessing.remove_whitespace,
+    preprocessing.remove_urls,
+    preprocessing.drop_no_content
+    ]
 
 
 def lemmatizeText(text):
@@ -28,7 +46,7 @@ def lemmatizeText(text):
     return [lemmatizer.lemmatize(word) for word in text]
 
 
-# create an instance of the app
+# API router
 router = APIRouter(prefix='/endpoints/lca/clean',
                    tags=['clean'],
                    responses={200: {'description': 'OK'},
@@ -37,31 +55,38 @@ router = APIRouter(prefix='/endpoints/lca/clean',
 
 
 @router.post('/no-clean')
-def no_clean(json_file, data_column: str = 'data'):
+async def no_clean(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data'):
     """
     This function takes in JSON data that is compatible with a pandas DataFrame, encodes it in the ASCII format and
     decodes it back into ASCII
 
 
-    **json_file**:                      JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**:                    Column in the pandas DataFrame to process
     """
 
     try:
-        lcv['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
-        raise HTTPException(status_code=415, detail=ex)
+        raise HTTPException(status_code=404, detail=ex)
     else:
-        if not lcv['DATA'].empty:
-            # en/decode the data first
-            lcv['DATA'] = lcv['DATA'].astype(str)
-            lcv['DATA'][data_column] = lcv['DATA'][data_column].str.encode('ascii', 'ignore') \
+        if not raw_data.empty:
+            raw_data[data_column] = raw_data[data_column].str.encode('ascii', 'ignore') \
                 .str.decode('ascii')
-            lcv['DATA'] = pd.DataFrame(data=lcv['DATA'])
-            lcv['DATA'] = lcv['DATA'].dropna()
+            raw_data = pd.DataFrame(data=raw_data)
+            raw_data = raw_data.dropna()
             data = {
-                'original': lcv['DATA'].to_json()
+                'original': raw_data.to_json()
             }
             return jsonable_encoder(data)
         else:
@@ -69,66 +94,72 @@ def no_clean(json_file, data_column: str = 'data'):
 
 
 @router.post('/simple-clean')
-def simple_clean(json_file, data_column: str = 'data', tokenize: bool = True):
+async def simple_clean(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', tokenize: bool = True):
     """
     This function takes in JSON data that is compatible with a pandas DataFrame, encodes it in the ASCII format and
-    decodes back into ASCII, and finally apply the 'Simple' Cleaning Pipeline and tokenzing the data (if the flag is
+    decodes back into ASCII, and finally apply the 'Simple' Cleaning Pipeline and tokenizing the data (if the flag is
     set to True)
 
 
-    **json_file**:                      JSON Data
+    **file**: Data
 
-    **data_column**:                    Column in the pandas DataFrame to process
+    **ftype**: The file format to read the input data as
 
-    **tokenize**:                       Flag to determine whether to tokenize the data and to return it
+    **data_column**: Column in the pandas DataFrame to process
+
+    **tokenize**: Flag to determine whether to tokenize the data and to return it
     """
 
+    cleaned_data_tokenized = None
+
     try:
-        lcv['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not lcv['DATA'].empty:
-            # en/decode the data first
-            lcv['DATA'] = lcv['DATA'].astype(str)
-            lcv['DATA'][data_column] = lcv['DATA'][data_column].str.encode('ascii', 'ignore') \
+        if not raw_data.empty:
+            raw_data[data_column] = raw_data[data_column].str.encode('ascii', 'ignore') \
                 .str.decode('ascii')
-            lcv['DATA'] = pd.DataFrame(data=lcv['DATA'])
-            lcv['DATA'] = lcv['DATA'].dropna()
+            raw_data = pd.DataFrame(data=raw_data)
+            raw_data = raw_data.dropna()
 
-            # now we clean it
             try:
-                lcv['CLEANED_DATA'] = lcv['DATA'][[data_column]]
-                lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA'][data_column],
-                                                                    lcv['SIMPLE_PIPELINE'])
-                lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
-                lcv['CLEANED_DATA'].dropna(inplace=True, subset=['CLEANED CONTENT'])
+                cleaned_data = raw_data[[data_column]]
+                cleaned_data['CLEANED CONTENT'] = hero.clean(cleaned_data[data_column], SIMPLE_PIPELINE)
+                cleaned_data['CLEANED CONTENT'].replace('', np.nan, inplace=True)
+                cleaned_data.dropna(inplace=True, subset=['CLEANED CONTENT'])
 
-                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+                cleaned_data = cleaned_data.astype(str)
             except Exception as ex:
-                return {'description': ex}
+                raise HTTPException(status_code=404, detail=ex)
             else:
                 if tokenize:
                     try:
-                        lcv['CLEANED_DATA_TOKENIZE'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
-                        lcv['CLEANED_DATA_TOKENIZE'] = lcv['CLEANED_DATA_TOKENIZE'].to_frame().astype(str)
+                        cleaned_data_tokenized = hero.tokenize(cleaned_data['CLEANED CONTENT']).to_frame().astype(str)
                     except Exception as ex:
-                        return {'description': ex}
+                        raise HTTPException(status_code=404, detail=ex)
 
-            if not lcv['CLEANED_DATA'].empty and not lcv['CLEANED_DATA_TOKENIZE']:
+            if not cleaned_data.empty and not cleaned_data_tokenized.empty:
                 data = {
-                    'cleaned_untokenized': lcv['CLEANED_DATA'].to_json(),
-                    'cleaned_tokenized': lcv['CLEANED_DATA_TOKENIZE'].to_json()
+                    'cleaned_untokenized': cleaned_data.to_json(),
+                    'cleaned_tokenized': cleaned_data_tokenized.to_json()
                 }
                 return data
-            elif not lcv['CLEANED_DATA'].empty and lcv['CLEANED_DATA_TOKENIZE'].empty:
+            elif not cleaned_data.empty and cleaned_data_tokenized.empty:
                 data = {
-                    'cleaned_untokenized': lcv['CLEANED_DATA'].to_json()
+                    'cleaned_untokenized': cleaned_data.to_json()
                 }
                 return data
-            elif lcv['CLEANED_DATA'].empty and not lcv['CLEANED_DATA_TOKENIZE'].empty:
+            elif cleaned_data.empty and not cleaned_data_tokenized.empty:
                 data = {
-                    'cleaned_tokenized': lcv['CLEANED_DATA_TOKENIZE'].to_json()
+                    'cleaned_tokenized': cleaned_data_tokenized.to_json()
                 }
                 return jsonable_encoder(data)
             else:
@@ -136,107 +167,113 @@ def simple_clean(json_file, data_column: str = 'data', tokenize: bool = True):
 
 
 @router.post('/complex-clean')
-def complex_clean(json_file, data_column: str = 'data', tokenize: bool = True, stopwords_list: str = None):
+async def complex_clean(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data',
+                        tokenize: bool = True, stopwords_list: Union[str, list] = None):
     """
     This function takes in JSON data that is compatible with a pandas DataFrame, encodes it in the ASCII format and
     decodes back into ASCII, and finally apply the 'Complex' Cleaning Pipeline and tokenzing the data (if the flag is
     set to True)
 
 
-    **json_file**:                      JSON Data
+    **file**: Data
 
-    **data_column**:                    Column in the pandas DataFrame to process
+    **ftype**: The file format to read the input data as
 
-    **tokenize**:                       Flag to determine whether to tokenize the data and to return it
+    **data_column**: Column in the pandas DataFrame to process
 
-    **stopwords_list**:                 A string (delimited by commas) or a list containing words to extend onto the
-                                        default stopwords list.
+    **tokenize**: Flag to determine whether to tokenize the data and to return it
+
+    **stopwords_list**: A string (delimited by commas) or a list containing words to extend onto the default stopwords
+                        list.
     """
 
+    finalised = None
+
     try:
-        lcv['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
         # stopwords check
         if stopwords_list is not None:
-            try:
-                if len(stopwords_list) != 0:
-                    lcv['STOPWORD_LIST'] = set(word.strip().lower() for word in stopwords_list.
-                                               split(sep=','))
-                    st.info(f'Stopwords accepted: {[word for word in lcv["STOPWORD_LIST"]]}!')
-                    lcv['STOPWORD_LIST'] = stopwords.DEFAULT.union(stopwords_list)
-                    lcv['FINALISE'] = True
-            except Exception as ex:
-                st.error(f'Error: {ex}')
+            if type(stopwords_list) is str:
+                try:
+                    if len(stopwords_list) != 0:
+                        stopwords_list = stopwords.DEFAULT.union(set(word.strip().lower() for word in
+                                                                     stopwords_list.split(sep=',')))
+                        finalised = True
+                except Exception as ex:
+                    raise HTTPException(status_code=404, detail=ex)
+            elif type(stopwords_list) is list:
+                stopwords_list = stopwords.DEFAULT.union(stopwords_list)
+                finalised = True
+            else:
+                raise HTTPException(status_code=404, detail='Invalid type for stopwords_list ')
         else:
-            lcv['STOPWORD_LIST'] = stopwords.DEFAULT
-            lcv['FINALISE'] = True
+            stopwords_list = stopwords.DEFAULT
+            finalised = True
 
-        # NO ELSE CONDITION AS ELSE CONDITION IS EXPLICITLY SPECIFIED IN THE PREVIOUS EXCEPTION/ERROR
-        if lcv['FINALISE']:
+        if finalised:
             try:
-                lcv['CLEANED_DATA'] = lcv['DATA'][[data_column]]
+                cleaned_data = raw_data[[data_column]]
+                cleaned_data['CLEANED CONTENT'] = hero.clean(cleaned_data[data_column], PIPELINE)
+                cleaned_data['CLEANED CONTENT'] = hero.remove_digits(cleaned_data['CLEANED CONTENT'], only_blocks=False)
+                cleaned_data['CLEANED CONTENT'] = hero.remove_stopwords(cleaned_data['CLEANED CONTENT'], stopwords_list)
+                cleaned_data_tokenized = hero.tokenize(cleaned_data['CLEANED CONTENT'])
+                cleaned_data_tokenized = cleaned_data_tokenized.apply(lemmatizeText)
 
-                # PREPROCESSING AND CLEANING
-                lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA']
-                                                                    [data_column],
-                                                                    lcv['PIPELINE'])
-                lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.remove_digits(lcv['CLEANED_DATA']
-                                                                            ['CLEANED CONTENT'],
-                                                                            only_blocks=False)
-                lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.remove_stopwords(lcv['CLEANED_DATA']
-                                                                               ['CLEANED CONTENT'],
-                                                                               lcv["STOPWORD_LIST"])
+                fin_list = [[word for word in text if word.lower() in set(nltk.corpus.words.words()) or not
+                             word.isalpha()] for text in cleaned_data_tokenized]
 
-                lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
-                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].apply(lemmatizeText)
-
-                # ACCEPT ONLY ENGLISH WORDS
-                fin_list = [[word for word in text if word.lower() in lcv['ENGLISH_WORDS'] or not
-                             word.isalpha()] for text in lcv['CLEANED_DATA_TOKENIZED']]
-
-                # UPDATE TOKENS
-                lcv['CLEANED_DATA']['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
-                lcv['CLEANED_DATA_TOKENIZED'].update([str(text) for text in fin_list])
-                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
-                lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
-                lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
-                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+                cleaned_data['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
+                cleaned_data_tokenized.update([str(text) for text in fin_list])
+                cleaned_data_tokenized = cleaned_data_tokenized.to_frame().astype(str)
+                cleaned_data['CLEANED CONTENT'].replace('', np.nan, inplace=True)
+                cleaned_data.dropna(subset=['CLEANED CONTENT'], inplace=True)
+                cleaned_data = cleaned_data.astype(str)
             except Exception as ex:
-                return {'description': ex}
-
-            if not lcv['CLEANED_DATA'].empty and not lcv['CLEANED_DATA_TOKENIZED'].empty:
-                if tokenize:
+                raise HTTPException(status_code=404, detail=ex)
+            else:
+                if not cleaned_data.empty and not cleaned_data_tokenized.empty:
+                    if tokenize:
+                        data = {
+                            'original': raw_data.to_json(),
+                            'cleaned_untokenized': cleaned_data.to_json(),
+                            'cleaned_tokenized': cleaned_data_tokenized.to_json()
+                        }
+                        return jsonable_encoder(data)
+                    else:
+                        data = {
+                            'original': raw_data.to_json(),
+                            'cleaned_tokenized': cleaned_data.to_json()
+                        }
+                        return jsonable_encoder(data)
+                elif not cleaned_data.empty and cleaned_data_tokenized.empty:
                     data = {
-                        'original': lcv['DATA'].to_json(),
-                        'cleaned_untokenized': lcv['CLEANED_DATA'].to_json(),
-                        'cleaned_tokenized': lcv['CLEANED_DATA_TOKENIZED'].to_json()
+                        'original': raw_data.to_json(),
+                        'cleaned_untokenized': cleaned_data.to_json()
                     }
                     return jsonable_encoder(data)
-                else:
-                    data = {
-                        'original': lcv['DATA'].to_json(),
-                        'cleaned_tokenized': lcv['CLEANED_DATA'].to_json()
-                    }
-                    return jsonable_encoder(data)
-            elif not lcv['CLEANED_DATA'].empty and lcv['CLEANED_DATA_TOKENIZED'].empty:
-                data = {
-                    'original': lcv['DATA'].to_json(),
-                    'cleaned_untokenized': lcv['CLEANED_DATA'].to_json()
-                }
-                return jsonable_encoder(data)
-            elif lcv['CLEANED_DATA'].empty and not lcv['CLEANED_DATA_TOKENIZED'].empty:
-                if tokenize:
-                    data = {
-                        'original': lcv['DATA'].to_json(),
-                        'cleaned_tokenized': lcv['CLEANED_DATA_TOKENIZED'].to_json()
-                    }
-                    return jsonable_encoder(data)
-                else:
-                    data = {
-                        'original': lcv['DATA'].to_json()
-                    }
-                    return jsonable_encoder(data)
-            elif lcv['CLEANED_DATA'].empty and lcv['CLEANED_DATA_TOKENIZED'].empty:
-                raise HTTPException(status_code=404, detail='Data is not properly loaded. Try again.')
+                elif cleaned_data.empty and not cleaned_data_tokenized.empty:
+                    if tokenize:
+                        data = {
+                            'original': raw_data.to_json(),
+                            'cleaned_tokenized': cleaned_data_tokenized.to_json()
+                        }
+                        return jsonable_encoder(data)
+                    else:
+                        data = {
+                            'original': raw_data.to_json()
+                        }
+                        return jsonable_encoder(data)
+                elif cleaned_data.empty and cleaned_data_tokenized.empty:
+                    raise HTTPException(status_code=404, detail='Data is not properly loaded. Try again.')
+        else:
+            raise HTTPException(status_code=404, detail='Data is not properly processed. Try again.')

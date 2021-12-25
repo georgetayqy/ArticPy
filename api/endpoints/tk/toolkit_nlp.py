@@ -3,7 +3,6 @@ import os
 from collections import Counter
 from heapq import nlargest
 from string import punctuation
-import io
 import numpy as np
 import pandas as pd
 import spacy
@@ -21,9 +20,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import transformers
 
-from fastapi import APIRouter, HTTPException
+from io import StringIO
+from fastapi import APIRouter, HTTPException, File, UploadFile
 from fastapi.encoders import jsonable_encoder
-from config import toolkit
 from operator import itemgetter
 from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline, AutoModelForSequenceClassification
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
@@ -34,6 +33,16 @@ from spacy.lang.en import English
 from spacy import displacy
 from wordcloud import WordCloud
 from textblob import TextBlob
+
+# API router
+router = APIRouter(prefix='/endpoints/toolkit',
+                   tags=['toolkit'],
+                   responses={200: {'description': 'OK'},
+                              404: {'description': 'Resource Not Found'},
+                              415: {'description': 'Unsupported Media Type'}})
+
+# file counter
+fc = 0
 
 
 def summarise(text, stopwords, pos_tag, nlp, sent_count):
@@ -137,21 +146,16 @@ def dominantTopic(vect, model, n_words):
     return topic_kw
 
 
-router = APIRouter(prefix='/endpoints/toolkit',
-                   tags=['toolkit'],
-                   responses={200: {'description': 'OK'},
-                              404: {'description': 'Resource Not Found'},
-                              415: {'description': 'Unsupported Media Type'}})
-
-
 @router.post('/wordcloud')
-def wordcloud(json_file, data_column: str = 'data', max_word: int = 200, contour: int = 3, width: int = 800,
-              height: int = 400, colour: str = 'steelblue'):
+async def wordcloud(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', max_word: int = 200,
+                    contour: int = 3, width: int = 800, height: int = 400, colour: str = 'steelblue'):
     """
     Wordcloud creation
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -165,21 +169,28 @@ def wordcloud(json_file, data_column: str = 'data', max_word: int = 200, contour
     
     **colour**: Colour of the background
     """
-    
+
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not toolkit['DATA'].empty:
-            toolkit['DATA'] = toolkit['DATA'][[data_column]]
+        if not raw_data.empty:
+            raw_data = raw_data[[data_column]]
             wc = WordCloud(background_color='white',
                            max_words=max_word,
                            contour_width=contour,
                            width=width,
                            height=height,
                            contour_color=colour)
-            wc.generate(' '.join(toolkit['DATA'][data_column]))
+            wc.generate(' '.join(raw_data[data_column]))
             img = wc.to_image()
             data = {
                 'image': str(img.tobytes())
@@ -192,12 +203,15 @@ def wordcloud(json_file, data_column: str = 'data', max_word: int = 200, contour
 
 
 @router.post('/ner')
-def ner(json_file, data_column: str = 'data', model='en_core_web_sm', one_datapoint_analyser: int = None):
+async def ner(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data',
+              model: str = 'en_core_web_sm', one_datapoint_analyser: int = None):
     """
     Conduct NER analysis
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -205,22 +219,31 @@ def ner(json_file, data_column: str = 'data', model='en_core_web_sm', one_datapo
     
     **one_datapoint_analyser**: The datapoint to render into HTML format
     """
-    
+
+    NLP = None
+
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not toolkit['DATA'].empty:
+        if not raw_data.empty:
             # init the required columns
-            toolkit['DATA'] = toolkit['DATA'][[data_column]]
-            toolkit['DATA']['NER'] = ''
-            toolkit['DATA']['COMPILED_LABELS'] = ''
-            toolkit['DATA'] = toolkit['DATA'].astype(str)
+            raw_data = raw_data[[data_column]]
+            raw_data['NER'] = ''
+            raw_data['COMPILED_LABELS'] = ''
+            raw_data = raw_data.astype(str)
 
             if model == 'en_core_web_sm':
                 try:
-                    toolkit['NLP'] = spacy.load('en_core_web_sm')
+                    NLP = spacy.load('en_core_web_sm')
                 except OSError:
                     logging.warning('Model not found, downloading...')
                     try:
@@ -232,7 +255,7 @@ def ner(json_file, data_column: str = 'data', model='en_core_web_sm', one_datapo
                     raise HTTPException(status_code=415, detail=ex)
             elif model == 'en_core_web_lg':
                 try:
-                    toolkit['NLP'] = spacy.load('en_core_web_lg')
+                    NLP = spacy.load('en_core_web_lg')
                 except OSError:
                     logging.warning('Model not found, downloading...')
                     try:
@@ -243,41 +266,43 @@ def ner(json_file, data_column: str = 'data', model='en_core_web_sm', one_datapo
                 except Exception as ex:
                     raise HTTPException(status_code=415, detail=ex)
 
-            for index in range(len(toolkit['DATA'])):
-                temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                toolkit['DATA'].at[index, 'NER'] = str(list(zip([word.text for word in temp_nlp.ents],
-                                                                [word.label_ for word in temp_nlp.ents])))
-                toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.label_ for word
-                                                                             in temp_nlp.ents])))
+            for index in range(len(raw_data)):
+                temp_nlp = NLP(raw_data[data_column][index])
+                raw_data.at[index, 'NER'] = str(list(zip([word.text for word in temp_nlp.ents],
+                                                         [word.label_ for word in temp_nlp.ents])))
+                raw_data.at[index, 'COMPILED_LABELS'] = str(list(set([word.label_ for word in temp_nlp.ents])))
 
             if one_datapoint_analyser is not None:
-                cpy = toolkit['DATA'].copy()
+                cpy = raw_data.copy()
                 temp = cpy[data_column][one_datapoint_analyser]
-                render = displacy.render(list(toolkit['NLP'](str(temp)).sents),
+                render = displacy.render(list(NLP(str(temp)).sents),
                                          style='ent',
                                          page=True)
                 data = {
-                    'data': toolkit['DATA'].to_json(),
+                    'data': raw_data.to_json(),
                     'render': render
                 }
                 return jsonable_encoder(data)
             else:
                 data = {
-                    'data': toolkit['DATA'].to_json()
+                    'data': raw_data.to_json()
                 }
                 return jsonable_encoder(data)
         else:
-            raise HTTPException(status_code=415, detail='Error: Data not loaded properly. Try again.')
+            raise HTTPException(status_code=404, detail='Error: Data not loaded properly. Try again.')
 
 
 @router.post('/pos')
-def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_analyser: int = None,
-        compact: bool = True, colour: str = 'steelblue', bg: str = 'white'):
+async def pos(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = '',
+              model: str = 'en_core_web_sm', one_datapoint_analyser: int = None, compact: bool = True,
+              colour: str = 'steelblue', bg: str = 'white'):
     """
     Conduct POS tagging
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -291,21 +316,29 @@ def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_
     
     **bg**: Colour of the background
     """
-    
+
+    NLP = None
+
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not toolkit['DATA'].empty:
-            # init the required columns
-            toolkit['DATA'] = toolkit['DATA'][[data_column]]
-            toolkit['DATA']['POS'] = ''
-            toolkit['DATA'] = toolkit['DATA'].astype(str)
+        if not raw_data.empty:
+            raw_data = raw_data[[data_column]]
+            raw_data['POS'] = ''
+            raw_data = raw_data.astype(str)
 
             if model == 'en_core_web_sm':
                 try:
-                    toolkit['NLP'] = spacy.load('en_core_web_sm')
+                    NLP = spacy.load('en_core_web_sm')
                 except OSError:
                     logging.warning('Model not found, downloading...')
                     try:
@@ -317,7 +350,7 @@ def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_
                     raise HTTPException(status_code=415, detail=ex)
             elif model == 'en_core_web_lg':
                 try:
-                    toolkit['NLP'] = spacy.load('en_core_web_lg')
+                    NLP = spacy.load('en_core_web_lg')
                 except OSError:
                     logging.warning('Model not found, downloading...')
                     try:
@@ -328,16 +361,16 @@ def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_
                 except Exception as ex:
                     raise HTTPException(status_code=415, detail=ex)
 
-            for index in range(len(toolkit['DATA'])):
-                temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                toolkit['DATA'].at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
-                                                                [word.pos_ for word in temp_nlp])))
-                toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.pos_ for word in temp_nlp])))
+            for index in range(len(raw_data)):
+                temp_nlp = NLP(raw_data[data_column][index])
+                raw_data.at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
+                                                         [word.pos_ for word in temp_nlp])))
+                raw_data.at[index, 'COMPILED_LABELS'] = str(list(set([word.pos_ for word in temp_nlp])))
 
             if one_datapoint_analyser is not None:
-                cpy = toolkit['DATA'].copy()
+                cpy = raw_data.copy()
                 temp = cpy[data_column][one_datapoint_analyser]
-                render = displacy.render(list(toolkit['NLP'](str(temp)).sents),
+                render = displacy.render(list(NLP(str(temp)).sents),
                                          style='dep',
                                          options={
                                              'compact': compact,
@@ -345,13 +378,13 @@ def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_
                                              'bg': bg,
                                          })
                 data = {
-                    'data': toolkit['DATA'].to_json(),
+                    'data': raw_data.to_json(),
                     'render': render
                 }
                 return jsonable_encoder(data)
             else:
                 data = {
-                    'data': toolkit['DATA'].to_json()
+                    'data': raw_data.to_json()
                 }
                 return jsonable_encoder(data)
         else:
@@ -359,13 +392,16 @@ def pos(json_file, data_column: str = '', model='en_core_web_sm', one_datapoint_
 
 
 @router.post('/summarise')
-def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: str = 'en_core_web_sm',
-              sentence_len: int = 3, min_words: int = 80, max_words: str = 150, max_tensor: int = 512):
+def summarise(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', mode: str = 'basic',
+              model: str = 'en_core_web_sm', sentence_len: int = 3, min_words: int = 80, max_words: str = 150,
+              max_tensor: int = 512):
     """
     Summarise texts
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -381,22 +417,31 @@ def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: 
     
     **max_tensor**: The maximum number of input tensors for advanced summarisation process
     """
-    
+
+    NLP = None
+
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
         # load up the data first
-        toolkit['DATA'] = toolkit['DATA'][[data_column]]
-        toolkit['DATA']['SUMMARY'] = np.nan
-        toolkit['DATA'] = toolkit['DATA'].astype(str)
+        raw_data = raw_data[[data_column]]
+        raw_data['SUMMARY'] = np.nan
+        raw_data = raw_data.astype(str)
 
-        if not toolkit['DATA'].empty:
+        if not raw_data.empty:
             if mode == 'basic':
                 if model == 'en_core_web_sm':
                     try:
-                        toolkit['NLP'] = spacy.load('en_core_web_sm')
+                        NLP = spacy.load('en_core_web_sm')
                     except OSError:
                         logging.warning('Model not found, downloading...')
                         try:
@@ -408,7 +453,7 @@ def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: 
                         raise HTTPException(status_code=415, detail=ex)
                 elif model == 'en_core_web_lg':
                     try:
-                        toolkit['NLP'] = spacy.load('en_core_web_lg')
+                        NLP = spacy.load('en_core_web_lg')
                     except OSError:
                         logging.warning('Model not found, downloading...')
                         try:
@@ -421,10 +466,10 @@ def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: 
 
                 stopwords = list(STOP_WORDS)
                 pos_tag = ['PROPN', 'ADJ', 'NOUN', 'VERB']
-                toolkit['DATA']['SUMMARY'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                    apply(lambda x: summarise(x, stopwords, pos_tag, toolkit['NLP'], sentence_len))
+                raw_data['SUMMARY'] = raw_data[data_column]. \
+                    apply(lambda x: summarise(x, stopwords, pos_tag, NLP, sentence_len))
                 data = {
-                    'data': toolkit['DATA'].to_json()
+                    'data': raw_data.to_json()
                 }
                 return jsonable_encoder(data)
 
@@ -439,26 +484,26 @@ def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: 
                     else:
                         tokenizer = AutoTokenizer.from_pretrained('t5-base')
                         model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
-                        toolkit['DATA'] = toolkit['DATA'].astype(object)
-                        toolkit['DATA']['ENCODED'] = toolkit['DATA'][data_column]. \
+                        raw_data = raw_data.astype(object)
+                        raw_data['ENCODED'] = raw_data[data_column]. \
                             apply(lambda x: tokenizer.encode('summarize: ' + x,
                                                              return_tensors='pt',
                                                              max_length=max_tensor,
                                                              truncation=True))
-                        toolkit['DATA']['OUTPUTS'] = toolkit['DATA']['ENCODED']. \
+                        raw_data['OUTPUTS'] = raw_data['ENCODED']. \
                             apply(lambda x: model.generate(x,
                                                            max_length=max_words,
                                                            min_length=min_words,
                                                            length_penalty=5.0,
                                                            num_beams=2))
-                        toolkit['DATA']['SUMMARISED'] = toolkit['DATA']['OUTPUTS'].apply(
+                        raw_data['SUMMARISED'] = raw_data['OUTPUTS'].apply(
                             lambda x: tokenizer.decode(x[0]))
-                        toolkit['DATA'].drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
-                        toolkit['DATA']['SUMMARISED'] = toolkit['DATA']['SUMMARISED']. \
+                        raw_data.drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
+                        raw_data['SUMMARISED'] = raw_data['SUMMARISED']. \
                             str.replace('<pad> ', '').str.replace('</s>', '')
-                        toolkit['DATA'] = toolkit['DATA'].astype(str)
+                        raw_data = raw_data.astype(str)
                         data = {
-                            'data': toolkit['DATA'].to_json()
+                            'data': raw_data.to_json()
                         }
                         return jsonable_encoder(data)
 
@@ -467,12 +512,15 @@ def summarise(json_file, data_column: str = 'data', mode: str = 'basic', model: 
 
 
 @router.post('/sentiment')
-def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACAEA'):
+def sentiment(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', model: str = 'vader',
+              colour: str = '#2ACAEA'):
     """
     Conduct Sentiment Analysis
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -480,13 +528,20 @@ def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACA
     
     **colour**: Colour of plots generated
     """
-    
+
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not toolkit['DATA'].empty:
+        if not raw_data.empty:
             if model == 'vader':
                 replacer = {
                     r"'": '',
@@ -495,7 +550,7 @@ def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACA
                     r' +': ' '
                 }
 
-                toolkit['DATA']['VADER SENTIMENT TEXT'] = toolkit['DATA'][data_column]. \
+                raw_data['VADER SENTIMENT TEXT'] = raw_data[data_column]. \
                     replace(to_replace=replacer, regex=True)
 
                 vader_analyser = SentimentIntensityAnalyzer()
@@ -503,7 +558,7 @@ def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACA
                 sent_label_list = []
 
                 # scoring
-                for i in toolkit['DATA']['VADER SENTIMENT TEXT'].tolist():
+                for i in raw_data['VADER SENTIMENT TEXT'].tolist():
                     sent_score = vader_analyser.polarity_scores(i)
 
                     if sent_score['compound'] > 0:
@@ -516,32 +571,30 @@ def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACA
                         sent_score_list.append(sent_score['compound'])
                         sent_label_list.append('Negative')
 
-                toolkit['DATA']['VADER OVERALL SENTIMENT'] = sent_label_list
-                toolkit['DATA']['VADER OVERALL SCORE'] = sent_score_list
-                toolkit['DATA']['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
-                                                             toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
-                toolkit['DATA']['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
-                                                            toolkit['DATA']['VADER SENTIMENT TEXT'].values.tolist()]
-                toolkit['DATA']['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
-                                                             toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
+                raw_data['VADER OVERALL SENTIMENT'] = sent_label_list
+                raw_data['VADER OVERALL SCORE'] = sent_score_list
+                raw_data['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
+                                                      raw_data['VADER SENTIMENT TEXT'].values.tolist()]
+                raw_data['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
+                                                     raw_data['VADER SENTIMENT TEXT'].values.tolist()]
+                raw_data['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
+                                                      raw_data['VADER SENTIMENT TEXT'].values.tolist()]
 
                 # create plots
-                toolkit['HAC_PLOT'] = ff.create_distplot([toolkit['DATA']['VADER OVERALL SCORE'].tolist()],
-                                                         ['VADER'],
-                                                         colors=[colour],
-                                                         bin_size=0.25,
-                                                         curve_type='normal',
-                                                         show_rug=False,
-                                                         show_hist=False)
-                toolkit['HAC_PLOT'].update_layout(title_text='Distribution Plot',
-                                                  xaxis_title='VADER Score',
-                                                  yaxis_title='Frequency Density',
-                                                  legend_title='Frequency Density')
+                hac_plot = ff.create_distplot([raw_data['VADER OVERALL SCORE'].tolist()],
+                                              ['VADER'],
+                                              colors=[colour],
+                                              bin_size=0.25,
+                                              curve_type='normal',
+                                              show_rug=False,
+                                              show_hist=False)
+                hac_plot.update_layout(title_text='Distribution Plot',
+                                       xaxis_title='VADER Score',
+                                       yaxis_title='Frequency Density',
+                                       legend_title='Frequency Density')
                 data = {
-                    'data': toolkit['DATA'].to_json(),
-                    'image': toolkit['HAC_PLOT'].to_image(format="png")
+                    'data': raw_data.to_json(),
+                    'dot_image': hac_plot.to_image(format="png")
 
                 }
                 return jsonable_encoder(data)
@@ -551,62 +604,64 @@ def sentiment(json_file, data_column: str = 'data', model='vader', colour='#2ACA
                 sub_list = []
 
                 # scoring: polarity
-                toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][data_column]. \
+                raw_data['POLARITY SCORE'] = raw_data[data_column]. \
                     apply(lambda x: TextBlob(x).sentiment.polarity)
-                for i in toolkit['DATA']['POLARITY SCORE'].tolist():
+                for i in raw_data['POLARITY SCORE'].tolist():
                     if float(i) > 0:
                         pol_list.append('Positive')
                     elif float(i) < 0:
                         pol_list.append('Negative')
                     elif float(i) == 0:
                         pol_list.append('Neutral')
-                toolkit['DATA']['POLARITY SENTIMENT'] = pol_list
+                raw_data['POLARITY SENTIMENT'] = pol_list
 
                 # scoring: subjectivity
-                toolkit['DATA']['SUBJECTIVITY SCORE'] = toolkit['DATA'][data_column].apply(
+                raw_data['SUBJECTIVITY SCORE'] = raw_data[data_column].apply(
                     lambda x: TextBlob(x).sentiment.subjectivity
                 )
-                for i in toolkit['DATA']['SUBJECTIVITY SCORE'].tolist():
+                for i in raw_data['SUBJECTIVITY SCORE'].tolist():
                     if float(i) < 0.5:
                         sub_list.append('Objective')
                     elif float(i) > 0.5:
                         sub_list.append('Subjective')
                     elif float(i) == 0.5:
                         sub_list.append('Neutral')
-                toolkit['DATA']['SUBJECTIVITY SENTIMENT'] = sub_list
-                toolkit['HAC_PLOT'] = px.scatter(toolkit['DATA'][['SUBJECTIVITY SCORE', 'POLARITY SCORE']],
-                                                 x='SUBJECTIVITY SCORE',
-                                                 y='POLARITY SCORE',
-                                                 labels={
-                                                     'SUBJECTIVITY SCORE': 'Subjectivity',
-                                                     'POLARITY SCORE': 'Polarity'
-                                                 })
-                toolkit['HAC_PLOT1'] = ff.create_distplot([toolkit['DATA']['SUBJECTIVITY SCORE'].tolist(),
-                                                           toolkit['DATA']['POLARITY SCORE'].tolist()],
-                                                          ['Subjectivity', 'Polarity'],
-                                                          curve_type='normal',
-                                                          show_rug=False,
-                                                          show_hist=False)
+                raw_data['SUBJECTIVITY SENTIMENT'] = sub_list
+                hac_plot = px.scatter(raw_data[['SUBJECTIVITY SCORE', 'POLARITY SCORE']],
+                                      x='SUBJECTIVITY SCORE',
+                                      y='POLARITY SCORE',
+                                      labels={
+                                          'SUBJECTIVITY SCORE': 'Subjectivity',
+                                          'POLARITY SCORE': 'Polarity'
+                                      })
+                hac_plot1 = ff.create_distplot([raw_data['SUBJECTIVITY SCORE'].tolist(),
+                                                raw_data['POLARITY SCORE'].tolist()],
+                                               ['Subjectivity', 'Polarity'],
+                                               curve_type='normal',
+                                               show_rug=False,
+                                               show_hist=False)
                 data = {
-                    'data': toolkit['DATA'].to_json(),
-                    'image': toolkit['HAC_PLOT'].to_image(format="png"),
-                    'image1': toolkit['HAC_PLOT1'].to_image(format="png")
+                    'data': raw_data.to_json(),
+                    'dot_image': hac_plot.to_image(format="png"),
+                    'word_image': hac_plot1.to_image(format="png")
                 }
                 return jsonable_encoder(data)
         else:
             raise HTTPException(status_code=415, detail='Error: Data not loaded properly. Try again.')
 
 
-@router.post
-def topic_modelling(json_file, data_column: str = 'data', model: str = 'lda', num_topics: int = 10,
-                    max_features: int = 5000, max_iter: int = 10, min_df: int = 5,
-                    max_df: float = 0.90, worker: int = 1, alpha: float = 0.10,
+@router.post('/modelling')
+def topic_modelling(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', model: str = 'lda',
+                    num_topics: int = 10, max_features: int = 5000, max_iter: int = 10, min_df: int = 5,
+                    max_df: float = 0.90, worker: int = 1, colour: str = 'steelblue', alpha: float = 0.10,
                     l1_ratio: float = 0.50):
     """
     Topic Modelling
     
     
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
     
@@ -624,156 +679,165 @@ def topic_modelling(json_file, data_column: str = 'data', model: str = 'lda', nu
 
     **worker**: Number of workers
 
+    **colour**: Colour of the plots
+
     **alpha**: Alpha value
 
     **l1_ratio**: L1 ratio value
     """
 
+    global fc
+    
     try:
-        toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        if not toolkit['DATA'].empty:
-            if model == 'lda':
-                try:
-                    toolkit['CV'] = CountVectorizer(min_df=min_df,
-                                                    max_df=max_df,
-                                                    stop_words='english',
-                                                    lowercase=True,
-                                                    token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}',
-                                                    max_features=max_features)
-                    toolkit['VECTORISED'] = toolkit['CV'].fit_transform(toolkit['DATA'][data_column])
-                except ValueError:
-                    raise HTTPException(status_code=415, detail='Error: The column loaded is empty or has invalid data'
-                                                                ' points. Try again.')
-                except Exception as ex:
-                    raise HTTPException(status_code=415, detail=ex)
-                else:
-                    toolkit['LDA_MODEL'] = LatentDirichletAllocation(n_components=num_topics,
-                                                                     max_iter=max_iter,
-                                                                     learning_method='online',
-                                                                     n_jobs=worker)
-                    toolkit['LDA_DATA'] = toolkit['LDA_MODEL'].fit_transform(toolkit['VECTORISED'])
-                    toolkit['TOPIC_TEXT'] = modelIterator(toolkit['LDA_MODEL'], toolkit['CV'], top_n=num_topics,
-                                                          vb=False)
-                    toolkit['KW'] = pd.DataFrame(dominantTopic(vect=toolkit['CV'], model=toolkit['LDA_MODEL'],
-                                                               n_words=num_topics))
-                    toolkit['KW'].columns = [f'word_{i}' for i in range(toolkit["KW"].shape[1])]
-                    toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit["KW"].shape[0])]
-                    toolkit['LDA_VIS'] = pyLDAvis.sklearn.prepare(toolkit['LDA_MODEL'], toolkit['VECTORISED'],
-                                                                  toolkit['CV'], mds='tsne')
-                    pyLDAvis.save_html(toolkit['LDA_VIS'],
-                                       str(os.path.join(os.getcwd(), f'lda_id{toolkit["FC"]}.html')))
-                    toolkit['FC'] += 1
-                    with open(os.path.join(os.getcwd(), f'lda_id{toolkit["FC"]}.html')) as f:
+        if not raw_data.empty:
+            try:
+                cv = CountVectorizer(min_df=min_df,
+                                     max_df=max_df,
+                                     stop_words='english',
+                                     lowercase=True,
+                                     token_pattern=r'[a-zA-Z\-][a-zA-Z\-]{2,}',
+                                     max_features=max_features)
+                vectorised = cv.fit_transform(raw_data[data_column])
+            except ValueError:
+                raise HTTPException(status_code=415, detail='Error: The column loaded is empty or has invalid data'
+                                                            ' points. Try again.')
+            except Exception as ex:
+                raise HTTPException(status_code=415, detail=ex)
+            else:
+                if model == 'lda':
+                    LDA = LatentDirichletAllocation(n_components=num_topics,
+                                                    max_iter=max_iter,
+                                                    learning_method='online',
+                                                    n_jobs=worker)
+                    LDA_data = LDA.fit_transform(vectorised)
+                    topic_text = modelIterator(LDA, cv, top_n=num_topics,
+                                               vb=False)
+                    keywords = pd.DataFrame(dominantTopic(vect=cv, model=LDA,
+                                                          n_words=num_topics))
+                    keywords.columns = [f'word_{i}' for i in range(keywords.shape[1])]
+                    keywords.index = [f'topic_{i}' for i in range(keywords.shape[0])]
+                    LDA_vis = pyLDAvis.sklearn.prepare(LDA, vectorised, cv, mds='tsne')
+                    pyLDAvis.save_html(LDA_vis,
+                                       str(os.path.join(os.getcwd(), f'lda_id{fc}.html')))
+                    with open(os.path.join(os.getcwd(), f'lda_id{fc}.html')) as f:
                         render = f.read()
+                    fc += 1
 
                     data = {
-                        'topic_text': {i: (toolkit['TOPIC_TEXT'][i].to_json()) for i
-                                       in range(len(toolkit['TOPIC_TEXT']))},
-                        'data': toolkit['DATA'].to_json(),
-                        'keywords': toolkit['KW'].to_json(),
+                        'topic_text': {i: (topic_text[i].to_json()) for i
+                                       in range(len(topic_text))},
+                        'data': raw_data.to_json(),
+                        'keywords': keywords.to_json(),
                         'render': render
                     }
 
                     return jsonable_encoder(data)
 
-            elif model == 'nmf':
-                toolkit['TFIDF_MODEL'] = TfidfVectorizer(max_df=max_df,
-                                                         min_df=min_df,
-                                                         max_features=max_features,
-                                                         stop_words='english')
-                toolkit['TFIDF_VECTORISED'] = toolkit['TFIDF_MODEL'].fit_transform(toolkit['DATA']
-                                                                                   [data_column]
-                                                                                   .values.astype(str))
-                toolkit['NMF_MODEL'] = NMF(n_components=num_topics,
-                                           max_iter=max_iter,
-                                           random_state=1,
-                                           alpha=alpha,
-                                           l1_ratio=l1_ratio).fit(toolkit['TFIDF_VECTORISED'])
-                toolkit['TOPIC_TEXT'] = modelIterator(model=toolkit['NMF_MODEL'],
-                                                      vectoriser=toolkit['TFIDF_MODEL'],
-                                                      top_n=toolkit['NUM_TOPICS'],
-                                                      vb=False)
-                toolkit['KW'] = pd.DataFrame(dominantTopic(model=toolkit['NMF_MODEL'],
-                                                           vect=toolkit['TFIDF_MODEL'],
-                                                           n_words=num_topics))
-                toolkit['KW'].columns = [f'word_{i}' for i in range(toolkit['KW'].shape[1])]
-                toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit['KW'].shape[0])]
-                data = {
-                    'topic_text': {i: (toolkit['TOPIC_TEXT'][i].to_json()) for i
-                                   in range(len(toolkit['TOPIC_TEXT']))},
-                    'data': toolkit['DATA'].to_json(),
-                    'keywords': toolkit['KW'].to_json()
-                }
-                return jsonable_encoder(data)
+                elif model == 'nmf':
+                    TFIDF = TfidfVectorizer(max_df=max_df,
+                                            min_df=min_df,
+                                            max_features=max_features,
+                                            stop_words='english')
+                    TFIDF_vectorised = TFIDF.fit_transform(raw_data
+                                                           [data_column]
+                                                           .values.astype(str))
+                    NMF_model = NMF(n_components=num_topics,
+                                    max_iter=max_iter,
+                                    random_state=1,
+                                    alpha=alpha,
+                                    l1_ratio=l1_ratio).fit(TFIDF_vectorised)
+                    topic_text = modelIterator(model=NMF_model,
+                                               vectoriser=TFIDF,
+                                               top_n=num_topics,
+                                               vb=False)
+                    keywords = pd.DataFrame(dominantTopic(model=NMF_model,
+                                                          vect=TFIDF,
+                                                          n_words=num_topics))
+                    keywords.columns = [f'word_{i}' for i in range(keywords.shape[1])]
+                    keywords.index = [f'topic_{i}' for i in range(keywords.shape[0])]
+                    data = {
+                        'topic_text': {i: (topic_text[i].to_json()) for i
+                                       in range(len(topic_text))},
+                        'data': raw_data.to_json(),
+                        'keywords': keywords.to_json()
+                    }
+                    return jsonable_encoder(data)
 
-            elif model == 'lsi':
-                toolkit['LSI_MODEL'] = TruncatedSVD(n_components=num_topics,
-                                                    n_iter=max_iter)
-                toolkit['LSI_DATA'] = toolkit['LSI_MODEL'].fit_transform(toolkit['VECTORISED'])
-                toolkit['TOPIC_TEXT'] = modelIterator(toolkit['LSI_MODEL'], toolkit['CV'],
-                                                      top_n=num_topics, vb=False)
-                toolkit['KW'] = pd.DataFrame(dominantTopic(model=toolkit['LSI_MODEL'], vect=toolkit['CV'],
-                                                           n_words=num_topics))
-                toolkit['KW'].columns = [f'word_{i}' for i in range(toolkit['KW'].shape[1])]
-                toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit['KW'].shape[0])]
+                elif model == 'lsi':
+                    LSI = TruncatedSVD(n_components=num_topics, n_iter=max_iter)
+                    LSI_data = LSI.fit_transform(vectorised)
+                    topic_text = modelIterator(LSI, cv,
+                                               top_n=num_topics, vb=False)
+                    keywords = pd.DataFrame(dominantTopic(model=LSI, vect=cv,
+                                                          n_words=num_topics))
+                    keywords.columns = [f'word_{i}' for i in range(keywords.shape[1])]
+                    keywords.index = [f'topic_{i}' for i in range(keywords.shape[0])]
 
-                # SVD
-                svd_2d = TruncatedSVD(n_components=2)
-                data_2d = svd_2d.fit_transform(toolkit['VECTORISED'])
+                    # SVD
+                    svd_2d = TruncatedSVD(n_components=2)
+                    data_2d = svd_2d.fit_transform(vectorised)
 
-                toolkit['MAR_FIG'] = go.Scattergl(
-                    x=data_2d[:, 0],
-                    y=data_2d[:, 1],
-                    mode='markers',
-                    marker=dict(
-                        color=toolkit['COLOUR'],
-                        line=dict(width=1)
-                    ),
-                    text=toolkit['CV'].get_feature_names(),
-                    hovertext=toolkit['CV'].get_feature_names(),
-                    hoverinfo='text'
-                )
-                toolkit['MAR_FIG'] = [toolkit['MAR_FIG']]
-                toolkit['MAR_FIG'] = go.Figure(data=toolkit['MAR_FIG'],
-                                               layout=go.Layout(title='Scatter Plot'))
-                toolkit['WORD_FIG'] = go.Scattergl(
-                    x=data_2d[:, 0],
-                    y=data_2d[:, 1],
-                    mode='text',
-                    marker=dict(
-                        color=toolkit['COLOUR'],
-                        line=dict(width=1)
-                    ),
-                    text=toolkit['CV'].get_feature_names(),
-                )
-                toolkit['WORD_FIG'] = [toolkit['WORD_FIG']]
-                toolkit['WORD_FIG'] = go.Figure(data=toolkit['WORD_FIG'],
-                                                layout=go.Layout(title='Scatter Word Plot'))
+                    mar_fig = go.Scattergl(
+                        x=data_2d[:, 0],
+                        y=data_2d[:, 1],
+                        mode='markers',
+                        marker=dict(
+                            color=colour,
+                            line=dict(width=1)
+                        ),
+                        text=cv.get_feature_names(),
+                        hovertext=cv.get_feature_names(),
+                        hoverinfo='text'
+                    )
+                    mar_fig = [mar_fig]
+                    mar_fig = go.Figure(data=mar_fig, layout=go.Layout(title='Scatter Plot'))
+                    word_fig = go.Scattergl(
+                        x=data_2d[:, 0],
+                        y=data_2d[:, 1],
+                        mode='text',
+                        marker=dict(
+                            color=colour,
+                            line=dict(width=1)
+                        ),
+                        text=cv.get_feature_names(),
+                    )
+                    word_fig = [word_fig]
+                    word_fig = go.Figure(data=word_fig, layout=go.Layout(title='Scatter Word Plot'))
 
-                data = {
-                    'topic_text': {i: (toolkit['TOPIC_TEXT'][i].to_json()) for i
-                                   in range(len(toolkit['TOPIC_TEXT']))},
-                    'data': toolkit['DATA'].to_json(),
-                    'keywords': toolkit['KW'].to_json(),
-                    'point_figure': toolkit['MAR_FIG'].to_image(format='png'),
-                    'word_figure': toolkit['WORD_FIG'].to_image(format='png')
-                }
+                    data = {
+                        'topic_text': {i: (topic_text[i].to_json()) for i
+                                       in range(len(topic_text))},
+                        'data': raw_data.to_json(),
+                        'keywords': keywords.to_json(),
+                        'point_figure': mar_fig.to_image(format='png'),
+                        'word_figure': word_fig.to_image(format='png')
+                    }
 
-                return jsonable_encoder(data)
+                    return jsonable_encoder(data)
         else:
             raise HTTPException(status_code=415, detail='Error: Data not loaded properly. Try again.')
 
 
 @router.post('/classification')
-def classification(json_file, data_column: str = 'data', topics=''):
+def classification(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data', topics: str = ''):
     """
     Conduct Text Classification
 
 
-    **json_file**: JSON Data
+    **file**: Data
+
+    **ftype**: The file format to read the input data as
 
     **data_column**: Column in the pandas DataFrame to process
 
@@ -789,30 +853,33 @@ def classification(json_file, data_column: str = 'data', topics=''):
             raise HTTPException(status_code=415, detail=ex)
         else:
             try:
-                toolkit['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+                if ftype == 'csv':
+                    raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(object)
+                elif ftype == 'xlsx':
+                    raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(object)
+                elif ftype == 'json':
+                    raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(object)
+                else:
+                    raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
             except Exception as ex:
                 raise HTTPException(status_code=415, detail=ex)
             else:
                 if type(topics) == str:
-                    toolkit['CLASSIFY_TOPIC'] = [word.strip().lower() for word in toolkit['CLASSIFY_TOPIC']
-                        .split(sep=',')]
+                    topics = [word.strip().lower() for word in topics.split(sep=',')]
                 elif type(topics) == list:
-                    toolkit['CLASSIFY_TOPIC'] = topics
+                    topics = topics
                 else:
                     raise HTTPException(status_code=415, detail='Error: Invalid data type for topics.')
 
-                toolkit['DATA'] = toolkit['DATA'].astype(object)
                 classifier = pipeline('zero-shot-classification')
-                toolkit['DATA']['TEST'] = toolkit['DATA'][data_column]. \
-                    apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
-                toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
+                raw_data['TEST'] = raw_data[data_column].apply(lambda x: classifier(x, topics))
+                raw_data['CLASSIFIED'] = raw_data['TEST']. \
                     apply(lambda x: list(zip(x['labels'].tolist(), x['scores'].tolist())))
-                toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
-                    apply(lambda x: max(x, key=itemgetter[1])[0])
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
+                raw_data['MOST PROBABLE TOPIC'] = raw_data['CLASSIFIED'].apply(lambda x: max(x, key=itemgetter[1])[0])
+                raw_data = raw_data.astype(str)
 
                 data = {
-                    'data': toolkit['DATA'].to_json()
+                    'data': raw_data.to_json()
                 }
                 return jsonable_encoder(data)
     else:

@@ -5,7 +5,12 @@ python:
  
 install:
   - pip install -r requirements.txt
-  - sudo python -m nltk.downloader -d /usr/local/share/nltk_data all
+ 
+before_script:
+  - python
+  - import nltk
+  - nltk.download('popular')
+  - exit()
 
 script:
   - streamlit run app.py

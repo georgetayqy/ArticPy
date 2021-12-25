@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.encoders import jsonable_encoder
-from config import dtm
 import pandas as pd
+
+from typing import Union
+from io import StringIO
+from fastapi import APIRouter, HTTPException, File, UploadFile
+from fastapi.encoders import jsonable_encoder
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
-
 
 router = APIRouter(prefix='/endpoints',
                    tags=['dtm'],
@@ -14,47 +15,50 @@ router = APIRouter(prefix='/endpoints',
 
 
 @router.post('/dtm')
-def dtm(json_file, data_column: str = 'data') -> str:
+async def dtm(file: UploadFile = File(...), ftype: str = 'csv', data_column: str = 'data') -> dict:
     """
-    This function takes in JSON data that is compatible with a pandas DataFrame, creates a Document-Term Matrix and
+    This function takes in CSV data that is compatible with a pandas DataFrame, creates a Document-Term Matrix and
     returns it to the user in JSON format
 
 
-    **json_file**:                      JSON Data
+    **file**: Data
 
-    **data_column**:                    Column in the pandas DataFrame to process
+    **ftype**: The file format to read the input data as
+
+    **data_column**: Column in the pandas DataFrame to process
     """
 
     try:
-        dtm['DATA'] = pd.read_json(json_file, low_memory=False, encoding='latin1')
+        if ftype == 'csv':
+            raw_data = pd.read_csv(StringIO(str(file.file.read(), 'latin1')), encoding='latin1').astype(str)
+        elif ftype == 'xlsx':
+            raw_data = pd.read_excel(StringIO(str(file.file.read(), 'utf-8')), engine='openpyxl').astype(str)
+        elif ftype == 'json':
+            raw_data = pd.read_json(StringIO(str(file.file.read(), 'utf-8'))).astype(str)
+        else:
+            raise HTTPException(status_code=415, detail='Error: File format input is not supported. Try again.')
     except Exception as ex:
         raise HTTPException(status_code=415, detail=ex)
     else:
-        dtm['DATA'] = dtm['DATA'].astype(str)
         counter_object = CountVectorizer(stop_words=stopwords.words('english'))
+        word_string = ' '.join(raw_data[data_column])
 
-        # CONCATENATE ALL STR VALUES INTO LIST: OPTIMISED
-        word_string = ' '.join(dtm['DATA'][data_column])
-
-        # CREATE A NEW DF TO PARSE
         dict_data = {
             'text': word_string
         }
+
         series_data = pd.DataFrame(data=dict_data, index=[0])
-
-        # FIT-TRANSFORM THE DATA
         series_data = counter_object.fit_transform(series_data.text)
+        dtm_ = pd.DataFrame(series_data.toarray(),
+                            columns=counter_object.get_feature_names(),
+                            index=[0])
 
-        # CONVERT THE FITTED DATA INTO A PANDAS DATAFRAME TO USE FOR THE DTMs
-        dtm['DTM'] = pd.DataFrame(series_data.toarray(),
-                                  columns=counter_object.get_feature_names(),
-                                  index=[0])
-        if not dtm['DTM'].empty:
-            dtm['DTM_copy'] = dtm['DTM'].copy().transpose()
-            dtm['DTM_copy'].columns = ['Word Frequency']
-            dtm['DTM_copy'].sort_values(by=['Word Frequency'], ascending=False, inplace=True)
+        if not dtm_.empty:
+            dtm_copy = dtm_.copy().transpose()
+            dtm_copy.columns = ['Word Frequency']
+            dtm_copy.sort_values(by=['Word Frequency'], ascending=False, inplace=True)
             data = {
-                'dtm': dtm['DTM_copy'].to_json()
+                'dtm': dtm_copy.to_json()
             }
             return jsonable_encoder(data)
         else:

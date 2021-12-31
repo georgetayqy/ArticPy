@@ -1,5 +1,4 @@
 # CUSTOM PAGE IMPORTS
-import nltk
 from pyfiles.multipage import MultiPage
 from pyfiles.pages import load_clean_visualise, document_term_matrix, toolkit_nlp, model_trainer
 

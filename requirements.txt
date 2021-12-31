@@ -38,3 +38,5 @@ tensorflow-text~=2.7.3
 fastapi~=0.70.1
 uvicorn~=0.16.0
 aiofiles~=0.8.0
+python-multipart~=0.0.5
+streamlit-tags~=1.2.8

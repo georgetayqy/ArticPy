@@ -5,6 +5,8 @@
 
 An app built to simplify and condense NLP tasks into one simple yet powerful Interface. 
 
+<hr>
+
 ## Setup
 ### Clone the Repository
 To use this app, simple clone the repository onto your local system, navigate into the directory of the cloned 
@@ -55,14 +57,18 @@ the app on the website https://share.streamlit.io/asdfghjkxd/articpy/main/app.py
 are unable to upload files that are larger than 200 MB in size; for the other methods, you are able to override this 
 limitation and upload files of sizes far larger than 200 MB to parse.
 
+<hr>
+
 ## Usage
 There are 4 main modules in this app, each performing an important step of the way for NLP analysis.
 
 ### Load, Clean and Analyse
 This module is the first module you will be using to preprocess your data before conducting further analysis on it.
 
+
 ### Document-Term Matrix
 This module will allow you to create Document-Term Matrix and Word Use Frequency Data.
+
 
 ### NLP Toolkit
 This module will allow you to conduct advanced NLP analyses on your processed dataset. You are able to perform the 

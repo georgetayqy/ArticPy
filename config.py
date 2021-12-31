@@ -65,7 +65,6 @@ load_clean_visualise = {
     'QUERY_SUCCESS': False,
     'QUERY_MODE': None,
     'QUERY_DATA': pd.DataFrame(),
-    'FC': 0,
     'MOD_MODE': 'Country Extraction',
     'FIXED_KEY': True,
     'HEIGHT': 400
@@ -88,8 +87,7 @@ dtm = {
     'ADVANCED_ANALYSIS': False,
     'FINALISED_DATA_LIST': [],
     'DATA_COLUMN': None,
-    'TOP_N_WORD_FIG': None,
-    'FC': 0
+    'TOP_N_WORD_FIG': None
 }
 
 toolkit = {
@@ -148,7 +146,6 @@ toolkit = {
     'L1_RATIO': 0.5,
     'PLOT': False,
     'W_PLOT': False,
-    'FC': 0,
     'MIN_WORDS': 80,
     'SUM_MODE': 'Basic'
 }

@@ -2,22 +2,34 @@
 This file is used to store some of the basic helper functions that are used frequently in the app
 """
 
-import os
-from collections import Counter
-from heapq import nlargest
-from string import punctuation
-import nltk
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
+import os
+import typing
+from collections import Counter
+from heapq import nlargest
+from string import punctuation
+
+from PIL import Image
+import nltk
 import numpy as np
 import pandas
 import pandas as pd
+import plotly.utils
 import streamlit as st
 from nltk.stem import WordNetLemmatizer
 import pandas_profiling
+import base64
+import os
+import json
+import pickle
+import uuid
+import re
+
 from streamlit_pandas_profiling import st_profile_report
+from config import toolkit
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             DOWNLOAD DEPENDENCIES                                                | #
@@ -270,3 +282,73 @@ def dominantTopic(vect, model, n_words):
         topic_kw.append(kw.take(top_kw))
 
     return topic_kw
+
+
+def prettyDownload(object_to_download: typing.Any, download_filename: str, button_text: str,
+                   override_index: bool) -> str:
+    """
+    Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
+
+    Generates a link to download the given object_to_download.
+    :param object_to_download:  The object to be downloaded.
+    :param download_filename: filename and extension of file. e.g. mydata.csv, some_txt_output.txt
+    :param button_text: Text to display on download button (e.g. 'click here to download file')
+    :param override_index: Overrides
+    :return: the anchor tag to download object_to_download
+    """
+
+    try:
+        if isinstance(object_to_download, bytes):
+            pass
+        elif isinstance(object_to_download, str):
+            object_to_download = bytes(object_to_download, 'utf-8')
+        elif isinstance(object_to_download, pd.DataFrame):
+            object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+        elif isinstance(object_to_download, plotly.graph_objs.Figure):
+            object_to_download = plotly.io.to_image(object_to_download)
+        elif isinstance(object_to_download, Image):
+            buffer = io.BytesIO()
+            object_to_download.save(buffer, format='png')
+            object_to_download = buffer.getvalue()
+        else:
+            object_to_download = json.dumps(object_to_download)
+    except Exception as ex:
+        st.error(ex)
+    else:
+        try:
+            b64 = base64.b64encode(object_to_download.encode()).decode()
+        except AttributeError as e:
+            b64 = base64.b64encode(object_to_download).decode()
+
+        button_uuid = str(uuid.uuid4()).replace('-', '')
+        button_id = re.sub('\d+', '', button_uuid)
+
+        custom_css = f""" 
+            <style>
+                #{button_id} {{
+                    background-color: rgb(255, 255, 255);
+                    color: rgb(38, 39, 48);
+                    padding: 0.25em 0.38em;
+                    position: relative;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    border-width: 1px;
+                    border-style: solid;
+                    border-color: rgb(230, 234, 241);
+                    border-image: initial;
+                }} 
+                #{button_id}:hover {{
+                    border-color: rgb(246, 51, 102);
+                    color: rgb(246, 51, 102);
+                }}
+                #{button_id}:active {{
+                    box-shadow: none;
+                    background-color: rgb(246, 51, 102);
+                    color: white;
+                    }}
+            </style> """
+
+        dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">' \
+                               f'{button_text}</a><br></br>'
+
+        return dl_link

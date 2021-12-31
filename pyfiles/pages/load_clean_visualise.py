@@ -1,9 +1,7 @@
 """
 Load, Clean and Visualise is one of the core modules of this app.
-
 This module is responsible for the loading, cleaning and visualising of the data to be used for further NLP analysis in
 the other modules in this app.
-
 The loading of data part is handled by pandas, while the cleaning part is largely being handled by Texthero. The
 visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_profiling and pandas.
 """
@@ -20,14 +18,14 @@ import pycountry
 import streamlit as st
 import texthero as hero
 from config import load_clean_visualise as lcv
-from config import dtm, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
 
+from streamlit_tags import st_tags
 from texthero import stopwords
 from collections import Counter
 from texthero import preprocessing
 import plotly.express as px
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame
+from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload
 from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
 
 
@@ -42,10 +40,6 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    # CREATE THE DOWNLOAD PATH WHERE FILES CREATED WILL BE STORED AND AVAILABLE FOR DOWNLOADING
-    if not DOWNLOAD_PATH.is_dir():
-        DOWNLOAD_PATH.mkdir()
-
     st.title('Load, Clean and Visualise Data')
     st.markdown('## Init\n'
                 'This module is used for the visualisation and cleaning of data used for NLP Analysis on news articles.'
@@ -80,6 +74,7 @@ def app():
                 'that if you fail to define the correct file format you wish to upload, the app will not let you '
                 'upload your file (if you are using the Small File option, only the defined file format will be '
                 'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
+
     lcv['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
     lcv['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
@@ -147,7 +142,9 @@ def app():
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
                 st.success(f'Data Loaded from {lcv["DATA_COLUMN"]}!')
 
-    # FLAGS
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                                      FLAGS                                                       | #
+# -------------------------------------------------------------------------------------------------------------------- #
     if lcv['ANALYSIS_MODE'] == 'Data Cleaning':
         st.markdown('## Flags\n'
                     'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
@@ -197,15 +194,14 @@ def app():
                                                  help='Select this option to extend the list of stopwords that will '
                                                       'be used to clean your data.')
             if lcv['EXTEND_STOPWORD']:
-                lcv['STOPWORD_LIST'] = str()
-                lcv['STOPWORD_LIST'] = st.text_area('Extended List of Stopwords',
-                                                    value='Key in a list of stopwords that you wish to append to the '
-                                                          'existing list of stopwords. Delimit your words by commas, '
-                                                          'e.g. this, is, a, sample, list ...')
+                lcv['STOPWORD_LIST'] = st_tags(label='**Keyword List**',
+                                               text='Press Enter to extend list...',
+                                               maxtags=9999999,
+                                               key='extender')
                 if len(lcv['STOPWORD_LIST']) != 0:
-                    st.info('Alert: Words detected.')
+                    st.info('**Alert**: Words detected.')
                 else:
-                    st.info('Alert: No Words detected')
+                    st.info('**Alert**: No Words detected')
 
     elif lcv['ANALYSIS_MODE'] == 'Data Modification':
         st.markdown('This module will allow you to modify the data passed in by performing certain elementary '
@@ -280,32 +276,21 @@ def app():
                                                         'if you do not require it.')
         lcv['MATCH'] = st.checkbox('Query Must Match Exactly?', help='Select this option if you want your query string/'
                                                                      'condition to match exactly with your data.')
-        lcv['QUERY_MODE'] = st.radio('Choose Method of Query', ('Single Query', 'Multiple Queries'),
-                                     help='Note: For Single Query and Multiple Queries, the DataFrame values are '
-                                          'converted to strings, hence all queries will be based on substring '
-                                          'searching.')
 
-        if lcv['QUERY_MODE'] == 'Single Query':
-            lcv['QUERY'] = st.text_input('Key in words/numbers/characters/symbols to Query')
-            if len(lcv['QUERY']) != 0:
-                lcv['QUERY_SUCCESS'] = True
-                st.info('Alert: Words detected.')
-            else:
-                lcv['QUERY_SUCCESS'] = False
-                st.info('Alert: No Words detected')
-
-        elif lcv['QUERY_MODE'] == 'Multiple Queries':
-            lcv['QUERY'] = st.text_area('Key in words/numbers/characters/symbols to Query',
-                                        help='Note: Delimit your list by commas')
-            lcv['QUERY'] = [word.strip() for word in lcv['QUERY'].split(sep=',')]
+        lcv['QUERY'] = st_tags(label='**Query**',
+                               text='Press Enter to extend list...',
+                               maxtags=9999999,
+                               key='query_input')
+        if len(lcv['QUERY']) == 0:
+            lcv['QUERY_SUCCESS'] = False
+            st.info('Alert: No Words detected')
+        elif len(lcv['QUERY']) == 1:
+            lcv['QUERY_SUCCESS'] = True
+            st.info('Alert: Words detected.')
+        else:
             lcv['QUERY'] = '|'.join(map(re.escape, lcv['QUERY']))
-            if len(lcv['QUERY']) != 0:
-                lcv['QUERY_SUCCESS'] = True
-                st.info('Alert: Words detected.')
-            else:
-                lcv['QUERY_SUCCESS'] = False
-                st.info('Alert: No Words detected')
-
+            lcv['QUERY_SUCCESS'] = True
+            st.info('Alert: Words detected.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                DATA CLEANING                                                     | #
@@ -427,30 +412,30 @@ def app():
                     if lcv['CLEAN_MODE'] == 'None':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [(lcv['CLEANED_DATA_TOKENIZED'], 'Tokenized Data',
-                                                           'tokenized.csv')]
+                                                           'tokenized.csv', False)]
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv'),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv'),
-                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv')
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False),
+                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv', False)
                             ]
                         else:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv'),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv')
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False)
                             ]
                     elif lcv['CLEAN_MODE'] == 'Complex':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv'),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv'),
-                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv')
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False),
+                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv', False)
                             ]
                         else:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv'),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv')
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False)
                             ]
 
                     if lcv['VERBOSE']:
@@ -497,12 +482,9 @@ def app():
                                     st.markdown('---')
                                     st.markdown('## Download Data')
                                     for data in lcv['FINALISED_DATA_LIST']:
-                                        if not data[0].empty:
-                                            st.markdown(f'### {data[1]}\n'
-                                                        f'Download data from [downloads/{data[2]}]'
-                                                        f'(downloads/id{lcv["FC"]}_{data[2]})')
-                                            data[0].to_csv(str(DOWNLOAD_PATH / f'id{lcv["FC"]}_{data[2]}'), index=False)
-                                            lcv["FC"] += 1
+                                        st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]} Data',
+                                                                   override_index=data[3]),
+                                                    unsafe_allow_html=True)
                                 except KeyError:
                                     st.error('Warning: Your data was not processed properly. Try again.')
                                 except Exception as ex:
@@ -515,12 +497,9 @@ def app():
                                 st.markdown('---')
                                 st.markdown('## Download Data')
                                 for data in lcv['FINALISED_DATA_LIST']:
-                                    if not data[0].empty:
-                                        st.markdown(f'### {data[1]}\n'
-                                                    f'Download data from [downloads/{data[2]}]'
-                                                    f'(downloads/id{lcv["FC"]}_{data[2]})')
-                                        data[0].to_csv(str(DOWNLOAD_PATH / f'id{lcv["FC"]}_{data[2]}'), index=False)
-                                        lcv["FC"] += 1
+                                    st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
+                                                               override_index=data[3]),
+                                                unsafe_allow_html=True)
                             except KeyError:
                                 st.error('Warning: Your data was not processed properly. Try again.')
                             except Exception as ex:
@@ -533,13 +512,9 @@ def app():
                                         st.markdown('---')
                                         st.markdown('## Download Data')
                                         for data in lcv['FINALISED_DATA_LIST']:
-                                            if not data[0].empty:
-                                                st.markdown(f'### {data[1]}\n'
-                                                            f'Download data from [downloads/{data[2]}]'
-                                                            f'(downloads/id{lcv["FC"]}_{data[2]})')
-                                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{lcv["FC"]}_{data[2]}'),
-                                                               index=False)
-                                                lcv["FC"] += 1
+                                            st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
+                                                                       override_index=data[3]),
+                                                        unsafe_allow_html=True)
                                     except KeyError:
                                         st.error('Warning: Your data was not processed properly. Try again.')
                                     except Exception as ex:
@@ -550,11 +525,9 @@ def app():
                                     st.markdown('## Download Data')
                                     for data in lcv['FINALISED_DATA_LIST']:
                                         if not data[0].empty:
-                                            st.markdown(f'### {data[1]}\n'
-                                                        f'Download data from [downloads/{data[2]}]'
-                                                        f'(downloads/id{lcv["FC"]}_{data[2]})')
-                                            data[0].to_csv(str(DOWNLOAD_PATH / f'id{lcv["FC"]}_{data[2]}'), index=False)
-                                            lcv["FC"] += 1
+                                            st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
+                                                                       override_index=data[3]),
+                                                        unsafe_allow_html=True)
                                 except KeyError:
                                     st.error('Warning: Your Data as not processed properly. Try again.')
                                 except Exception as ex:
@@ -563,7 +536,6 @@ def app():
                     st.error('Error: No Files Uploaded.')
             else:
                 st.error('Error: No Files Uploaded.')
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               COUNTRY EXTRACTION                                                 | #
@@ -623,25 +595,13 @@ def app():
                         try:
                             st.markdown('---')
                             st.markdown('## Download Data')
-                            st.markdown('### Country Data')
-                            st.markdown(f'Download data from [downloads/globe_data.csv]'
-                                        f'(downloads/globe_data_id{lcv["FC"]}.csv)')
-                            lcv['DATA'].to_csv(str(DOWNLOAD_PATH / f'globe_data_id{lcv["FC"]}.csv'), index=False)
-                            lcv["FC"] += 1
-
-                            st.markdown('### Country Data (Concatenated)')
-                            st.markdown(f'Download data from [downloads/globe_data_concat.csv]'
-                                        f'(downloads/globe_data_concat_id{lcv["FC"]}.csv)')
-                            lcv['GLOBE_DATA'].to_csv(str(DOWNLOAD_PATH / f'globe_data_concat_id{lcv["FC"]}.csv'),
-                                                     index=False)
-                            lcv["FC"] += 1
+                            st.markdown(prettyDownload(lcv['DATA'], 'globe_data.csv', 'Download Globe Data', False))
+                            st.markdown(prettyDownload(lcv['GLOBE_DATA'], 'globe_data_concat.csv',
+                                                       'Download Concatenated Globe Data', False))
 
                             if lcv['WORLD_MAP']:
-                                st.markdown('### World Map Representation')
-                                st.markdown(f'Download data from [downloads/map.png]'
-                                            f'(downloads/map_id{lcv["FC"]}.png)')
-                                lcv['GLOBE_FIG'].write_image(str(DOWNLOAD_PATH / f'map_id{lcv["FC"]}.png'))
-                                lcv["FC"] += 1
+                                st.markdown(prettyDownload(lcv['GLOBE_FIG'], 'map.png', 'Download Map Representation',
+                                                           False))
                         except ValueError:
                             st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
                                        'Connect to the Internet and try again.')
@@ -681,11 +641,8 @@ def app():
                         )
 
                     if st.button('Generate Modified Data'):
-                        st.markdown('### Modified Data')
-                        st.markdown(f'Download data from [downloads/modified_data.csv]'
-                                    f'(downloads/modified_data_id{lcv["FC"]}.csv)')
-                        ag['data'].to_csv(str(DOWNLOAD_PATH / f'modified_data_id{lcv["FC"]}.csv'), index=False)
-                        lcv["FC"] += 1
+                        st.markdown('## Download Data')
+                        st.markdown(prettyDownload(ag['data'], 'modified_data.csv', 'Download Modified Data', False))
                 else:
                     st.warning('File has not been loaded.')
 
@@ -716,10 +673,9 @@ def app():
                     if st.button('Generate Modified Data'):
                         if lcv['SAVE']:
                             st.markdown('### Modified Data')
-                            st.markdown(f'Download data from [downloads/modified_data.csv]'
-                                        f'(downloads/modified_data_id{lcv["FC"]}.csv)')
-                            ag['data'].to_csv(str(DOWNLOAD_PATH / f'modified_data_id{lcv["FC"]}.csv'), index=False)
-                            lcv["FC"] += 1
+                            st.markdown(prettyDownload(ag['data'], 'modified_data.csv', 'Download Modified Data',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
                 else:
                     st.warning('File has not been loaded.')
 
@@ -770,9 +726,9 @@ def app():
                         if lcv['SAVE']:
                             st.markdown('---')
                             st.markdown('## Save Query')
-                            st.markdown(f'Download data from [downloads/query.csv](downloads/query_id{lcv["FC"]}.csv)')
-                            lcv['QUERY_DATA'].to_csv(str(DOWNLOAD_PATH / f'query_id{lcv["FC"]}.csv'), index=False)
-                            lcv["FC"] += 1
+                            st.markdown(prettyDownload(lcv['QUERY_DATA'], 'query.csv', 'Download Queried Data',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
                     else:
                         st.error('Query did not find matching keywords. Try again.')
                 else:

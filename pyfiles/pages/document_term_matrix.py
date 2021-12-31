@@ -1,8 +1,6 @@
 """
 Document Term Matrix is one of the core modules of this app.
-
 This module is responsible for the creation of a Document-Term Matrix and visualising the Document-Term Matrix.
-
 A large portion of this module uses the nltk and scikit-learn packages to create the Document-Term Matrix document.
 """
 
@@ -14,11 +12,11 @@ import pathlib
 import pandas as pd
 import streamlit as st
 
-from config import dtm, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
+from config import dtm
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from utils import csp_downloaders
-from utils.helper import readFile, printDataFrame
+from utils.helper import readFile, printDataFrame, prettyDownload
 pd.options.plotting.backend = 'plotly'
 
 
@@ -33,9 +31,6 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                     INIT                                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    if not DOWNLOAD_PATH.is_dir():
-        DOWNLOAD_PATH.mkdir()
-
     st.title('Document-Term Matrix and Word Frequency Analysis')
     st.markdown('## Init\n'
                 'Before proceeding, you will need to download the corpus needed to process your data. To do so, click '
@@ -259,18 +254,18 @@ def app():
                 # FINALISED DATA LIST
                 if not dtm['VERBOSE_DTM'] and not dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', 'csv')
+                        (dtm['DTM'], 'DTM', 'dtm.csv', False)
                     ]
                 elif dtm['VERBOSE_DTM'] and not dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', 'csv'),
-                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', 'csv_')
+                        (dtm['DTM'], 'DTM', 'dtm.csv', False),
+                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', True)
                     ]
                 if dtm['VERBOSE_DTM'] and dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', 'csv'),
-                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', 'csv_'),
-                        (dtm['TOP_N_WORD_FIG'], f'Top {dtm["N"]} Words Frequency', 'top_n.png', 'png')
+                        (dtm['DTM'], 'DTM', 'dtm.csv', False),
+                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', True),
+                        (dtm['TOP_N_WORD_FIG'], f'Top {dtm["N"]} Words Frequency', 'top_n.png', False)
                     ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -280,27 +275,9 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     for data in dtm['FINALISED_DATA_LIST']:
-                        if data[3] == 'csv':
-                            if not data[0].empty:
-                                st.markdown(f'### {data[1]}')
-                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/id{dtm["FC"]}_{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{dtm["FC"]}_{data[2]}'), index=False)
-                                dtm["FC"] += 1
-                        elif data[3] == 'csv_':
-                            if not data[0].empty:
-                                st.markdown(f'### {data[1]}')
-                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/id{dtm["FC"]}_{data[2]})')
-                                data[0].to_csv(str(DOWNLOAD_PATH / f'id{dtm["FC"]}_{data[2]}'), index=True)
-                                dtm["FC"] += 1
-                        elif data[3] == 'png':
-                            if data[0]:
-                                st.markdown(f'### {data[1]}')
-                                st.markdown(f'Download requested data from [downloads/{data[2]}]'
-                                            f'(downloads/id{dtm["FC"]}_{data[2]})')
-                                data[0].write_image(str(DOWNLOAD_PATH / f'id{dtm["FC"]}_{data[2]}'))
-                                dtm["FC"] += 1
+                        st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]} Data',
+                                                   override_index=data[3]),
+                                    unsafe_allow_html=True)
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

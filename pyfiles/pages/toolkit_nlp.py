@@ -1,6 +1,5 @@
 """
 This module allows the user to conduct basic NLP analysis functions on the preprocessed data using the spaCy module
-
 This module uses CPU-optimised pipelines and hence a GPU is optional in this module
 """
 
@@ -29,8 +28,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import transformers
 
+from streamlit_tags import st_tags
 from datetime import datetime
-from config import toolkit, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
+from config import toolkit
 from operator import itemgetter
 from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline, AutoModelForSequenceClassification
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
@@ -43,7 +43,7 @@ from spacy import displacy
 from wordcloud import WordCloud
 from textblob import TextBlob
 from utils import csp_downloaders
-from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic
+from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic, prettyDownload
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -57,10 +57,6 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    # CREATE THE DOWNLOAD PATH WHERE FILES CREATED WILL BE STORED AND AVAILABLE FOR DOWNLOADING
-    if not DOWNLOAD_PATH.is_dir():
-        DOWNLOAD_PATH.mkdir()
-
     st.title('NLP Toolkit')
     st.markdown('## Init\n'
                 'This module uses the *spaCy* package to conduct the necessary NLP preprocessing and '
@@ -214,10 +210,8 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Image')
-                    st.markdown(f'Download image from [downloads/wordcloud.png]'
-                                f'(downloads/wordcloud_id{toolkit["FC"]}.png)')
-                    wc.to_file(str(DOWNLOAD_PATH / f'wordcloud_id{toolkit["FC"]}.png'))
-                    toolkit['FC'] += 1
+                    st.markdown(prettyDownload(wc, 'wordcloud.png', 'Download Queried Data', override_index=False),
+                                unsafe_allow_html=True)
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -328,16 +322,12 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown(f'Download data from [downloads/ner.csv](downloads/ner_id{toolkit["FC"]}.csv)')
-                    toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'ner_id{toolkit["FC"]}.csv'), index=False)
-                    toolkit["FC"] += 1
-                    if toolkit['ONE_DATAPOINT']:
-                        st.markdown(f'Download data from [downloads/rendering.html]'
-                                    f'(downloads/rendering_id{toolkit["FC"]}.html)')
-                        with open(pathlib.Path(str(DOWNLOAD_PATH / f'rendering_id{toolkit["FC"]}.html')), 'w',
-                                  encoding='utf-8') as f:
-                            f.write(toolkit['SVG'])
-                        toolkit["FC"] += 1
+                    st.markdown(prettyDownload(toolkit['DATA'], 'ner.csv', f'Download NER Data',
+                                               override_index=False),
+                                unsafe_allow_html=True)
+                    st.markdown(prettyDownload(toolkit['SVG'], 'rendering.html', f'Download Rendering Data',
+                                               override_index=False),
+                                unsafe_allow_html=True)
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -449,20 +439,16 @@ def app():
                                                              'bg': toolkit['COLOUR_BCKGD'],
                                                          })
 
-                        st.markdown('### Render')
-                        st.markdown(f'Download data from [downloads/rendering.html](downloads/rendering_id'
-                                    f'{toolkit["FC"]}.html)')
-                        with open(pathlib.Path(str(DOWNLOAD_PATH / f'rendering_id{toolkit["FC"]}.html')), 'w',
-                                  encoding='utf-8') as f:
-                            f.write(toolkit['SVG'])
-                        toolkit['FC'] += 1
-
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown(f'Download data from [downloads/pos.csv](downloads/pos_id{toolkit["FC"]}.csv)')
-                    toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'pos_id{toolkit["FC"]}.csv'), index=False)
-                    toolkit["FC"] += 1
+                    st.markdown(prettyDownload(toolkit['DATA'], 'pos.csv', f'Download POS Data',
+                                               override_index=False),
+                                unsafe_allow_html=True)
+                    if toolkit['VERBOSE'] and toolkit['ONE_DATAPOINT']:
+                        st.markdown(prettyDownload(toolkit['SVG'], 'rendering.html', f'Download Rendering Data',
+                                                   override_index=False),
+                                    unsafe_allow_html=True)
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -575,11 +561,9 @@ def app():
                     # SAVE DATA
                     if toolkit['SAVE']:
                         st.markdown('---')
-                        st.markdown('## Download Summarised Data')
-                        st.markdown('Download summarised data from [downloads/summarised.csv]'
-                                    f'(downloads/summarised_id{toolkit["FC"]}.csv)')
-                        toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'summarised_id{toolkit["FC"]}.csv'), index=False)
-                        toolkit['FC'] += 1
+                        st.markdown('## Download Data')
+                        st.markdown(prettyDownload(toolkit['DATA'], 'summarised.csv', 'Download Summarised Data',
+                                                   False))
                 else:
                     st.error('Error: Data not loaded properly. Try again.')
 
@@ -680,10 +664,9 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Summarised Data')
-                    st.markdown('Download summarised data from [downloads/summarised.csv]'
-                                f'(downloads/summarised_id{toolkit["FC"]}.csv)')
-                    toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'summarised_id{toolkit["FC"]}.csv'), index=False)
-                    toolkit["FC"] += 1
+                    st.markdown(prettyDownload(toolkit['DATA'], 'summarised.csv', f'Download Summarised Data',
+                                               override_index=False),
+                                unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -853,23 +836,20 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown('Download sentiment data from [downloads/sentiment_scores.csv]'
-                                f'(downloads/sentiment_scores_id{toolkit["FC"]}.csv)')
-                    toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'sentiment_scores_id{toolkit["FC"]}.csv'), index=False)
-                    toolkit['FC'] += 1
+                    st.markdown(prettyDownload(toolkit['DATA'], 'sentiment_scores.csv', 'Download Sentiment Score Data',
+                                               override_index=False),
+                                unsafe_allow_html=True)
 
                     if toolkit['HAC_PLOT'] is not None:
-                        st.markdown('## Graph')
-                        st.markdown(f'Download sentiment data from [downloads/plot.png]'
-                                    f'(downloads/plot_id{toolkit["FC"]}.png)')
-                        toolkit['HAC_PLOT'].write_image(str(DOWNLOAD_PATH / f'plot_id{toolkit["FC"]}.png'))
-                        toolkit['FC'] += 1
+                        st.markdown('## Graphs')
+                        st.markdown(prettyDownload(toolkit['HAC_PLOT'], 'plot.png', f'Download Plot',
+                                                   override_index=False),
+                                    unsafe_allow_html=True)
                     if toolkit['HAC_PLOT1'] is not None:
-                        st.markdown('## Normal Distribution Graph')
-                        st.markdown('Download sentiment data from [downloads/normal_plot.png]'
-                                    f'(downloads/normal_plot_id{toolkit["FC"]}.png)')
-                        toolkit['HAC_PLOT1'].write_image(str(DOWNLOAD_PATH / f'normal_plot_id{toolkit["FC"]}.png'))
-                        toolkit['FC'] += 1
+                        st.markdown(prettyDownload(toolkit['HAC_PLOT1'], 'normal_plot.png', 'Download Normal '
+                                                                                            'Distribution Data',
+                                                   override_index=False),
+                                    unsafe_allow_html=True)
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -1055,23 +1035,22 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(f'Download all Topic List from [downloads/lda_topics_{i}.csv]'
-                                            f'(downloads/lda_topics_{i}_id{toolkit["FC"]}.csv)')
-                                toolkit['TOPIC_TEXT'][i].to_csv(str(DOWNLOAD_PATH /
-                                                                    f'lda_topics_{i}_id{toolkit["FC"]}.csv'),
-                                                                index=False)
-                                toolkit['FC'] += 1
+                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
+                                                           f'Download Topic List Data Entry {i}',
+                                                           override_index=False),
+                                            unsafe_allow_html=True)
+
                             st.markdown('### Topic/Word List')
-                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics_id{toolkit["FC"]}.csv)')
-                            toolkit['KW'].to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{toolkit["FC"]}.csv'))
-                            toolkit['FC'] += 1
+                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
+                                                       'Download Summarised Topic/Word List',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
 
                             st.markdown('### Other Requested Data')
-                            st.markdown(f'Download HTML File from [downloads/lda.html]'
-                                        f'(downloads/lda_id{toolkit["FC"]}.html)')
-                            pyLDAvis.save_html(toolkit['LDA_VIS'], str(DOWNLOAD_PATH / f'lda_id{toolkit["FC"]}.html'))
-                            toolkit['FC'] += 1
+                            st.markdown(prettyDownload(pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']), 'lda.html',
+                                                       'Download pyLDAvis Rendering',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
 
                     # NMF
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Non-Negative Matrix Factorization':
@@ -1115,18 +1094,16 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(f'Download Topic List from [downloads/nmf_topics_{i}.csv]'
-                                            f'(downloads/nmf_topics_{i}_id{toolkit["FC"]}.csv)')
-                                toolkit['TOPIC_TEXT'][i].to_csv(str(DOWNLOAD_PATH /
-                                                                    f'nmf_topics_{i}_id{toolkit["FC"]}.csv'),
-                                                                index=False)
-                                toolkit['FC'] += 1
+                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
+                                                           f'Download Topic List Data Entry {i}',
+                                                           override_index=False),
+                                            unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
-                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics_id{toolkit["FC"]}.csv)')
-                            toolkit['KW'].to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{toolkit["FC"]}.csv'))
-                            toolkit['FC'] += 1
+                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
+                                                       'Download Summarised Topic/Word List',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
 
                     # LSI
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Latent Semantic Indexing':
@@ -1207,32 +1184,29 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(f'Download Topic List from [downloads/lsi_topic_{i}.csv]'
-                                            f'(downloads/lsi_topic_{i}_id{toolkit["FC"]}.csv)')
-                                pd.DataFrame(toolkit['TOPIC_TEXT'][i]). \
-                                    to_csv(str(DOWNLOAD_PATH / f'lsi_topic_{i}_id{toolkit["FC"]}.csv'), index=False)
-                                toolkit['FC'] += 1
+                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
+                                                           f'Download Topic List Data Entry {i}',
+                                                           override_index=False),
+                                            unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
-                            st.markdown(f'Download Summarised Topic/Word List from [downloads/summary_topics.csv]'
-                                        f'(downloads/summary_topics_id{toolkit["FC"]}.csv)')
-                            toolkit['KW'].to_csv(str(DOWNLOAD_PATH / f'summary_topics_id{toolkit["FC"]}.csv'))
-                            toolkit['FC'] += 1
+                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
+                                                       'Download Summarised Topic/Word List',
+                                                       override_index=False),
+                                        unsafe_allow_html=True)
 
                             if toolkit['VERBOSE'] and toolkit['PLOT']:
                                 st.markdown('### Other Requested Data')
-                                st.markdown('Download PNG File from [downloads/marker_figure.png]'
-                                            f'(downloads/marker_figure_id{toolkit["FC"]}.png)')
-                                toolkit['MAR_FIG'].write_image(str(DOWNLOAD_PATH /
-                                                                   f'marker_figure_id{toolkit["FC"]}.png'))
-                                toolkit['FC'] += 1
+                                st.markdown(prettyDownload(toolkit['MAR_FIG'], f'marker_figure.png',
+                                                           'Download Marked Figure',
+                                                           override_index=False),
+                                            unsafe_allow_html=True)
 
                                 if toolkit['W_PLOT']:
-                                    st.markdown('Download PNG File from [downloads/word_figure.png]'
-                                                f'(downloads/word_figure_id{toolkit["FC"]}.png)')
-                                    toolkit['WORD_FIG'].write_image(str(DOWNLOAD_PATH /
-                                                                        f'word_figure_id{toolkit["FC"]}.png'))
-                                    toolkit['FC'] += 1
+                                    st.markdown(prettyDownload(toolkit['WORD_FIG'], f'word_figure.png',
+                                                               'Download Word Figure',
+                                                               override_index=False),
+                                                unsafe_allow_html=True)
             else:
                 st.error('Error: File not loaded properly. Try again.')
 
@@ -1289,16 +1263,15 @@ def app():
                                                             'advanced statistics on it. Note that this will require '
                                                             'some time and processing power to complete. Deselect this '
                                                             'option if this if you do not require it.')
-
-        toolkit['CLASSIFY_TOPIC'] = st.text_area(label='Key in the topics to classify your documents into',
-                                                 help='Delimit your topics by commas. Failure to do so will result in '
-                                                      'errors.')
-        toolkit['CLASSIFY_TOPIC'] = [word.strip().lower() for word in toolkit['CLASSIFY_TOPIC'].split(sep=',')]
+        toolkit['CLASSIFY_TOPIC'] = st_tags(label='**Topics**',
+                                            text='Press Enter to extend list...',
+                                            maxtags=9999999,
+                                            key='classify_topics')
 
         if len(toolkit['CLASSIFY_TOPIC']) != 0:
             st.info(f'**{toolkit["CLASSIFY_TOPIC"]}** Topics are Detected!')
         else:
-            st.info('No Topics Detected. Check your inputs to ensure that you have delimited your topics properly.')
+            st.info('No Topics Detected.')
 
         if st.button('Classify Text', key='classify'):
             toolkit['DATA'] = toolkit['DATA'].astype(object)
@@ -1319,7 +1292,6 @@ def app():
             if toolkit['SAVE']:
                 st.markdown('---')
                 st.markdown('## Download Data')
-                st.markdown(f'Download data from [downloads/classified.csv]'
-                            f'(downloads/classified_id{toolkit["FC"]}.csv)')
-                toolkit['DATA'].to_csv(str(DOWNLOAD_PATH / f'classified_id{toolkit["FC"]}.csv'), index=False)
-                toolkit['FC'] += 1
+                st.markdown(prettyDownload(toolkit['DATA'], 'classified.csv', f'Download Classified Data',
+                                           override_index=False),
+                            unsafe_allow_html=True)

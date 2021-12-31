@@ -16,7 +16,7 @@ import subprocess
 import transformers
 
 from datetime import datetime
-from config import trainer, STREAMLIT_STATIC_PATH, DOWNLOAD_PATH
+from config import trainer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from utils import csp_downloaders
 from utils.helper import readFile, summarise, modelIterator, printDataFrame, dominantTopic
@@ -29,10 +29,6 @@ def app():
     """
     Main function that will be called when the app is run
     """
-
-    # CREATE THE DOWNLOAD PATH WHERE FILES CREATED WILL BE STORED AND AVAILABLE FOR DOWNLOADING
-    if not DOWNLOAD_PATH.is_dir():
-        DOWNLOAD_PATH.mkdir()
 
     st.markdown('# NLP Model Trainer and Predictor')
     st.markdown('This function allows you to train and create a ML Model to classify the topic of the News Article '

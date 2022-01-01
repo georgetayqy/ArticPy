@@ -1,0 +1,9 @@
+[global]
+disableWatchdogWarning = true
+
+[server]
+maxUploadSize = 1024000
+
+[theme]
+base = "light"
+primaryColor = "#4FBBFF"

@@ -39,27 +39,20 @@ def app():
                 'connected to the Internet.')
     if st.button('Begin Download', key='download-model'):
         os.system('python -m nltk.downloader all')
-    st.markdown('## Upload Data\n'
-                'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. To circumvent this limitation, you may choose to '
-                'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
-                '`streamlit run app.py` command and define the maximum size of file you can upload '
-                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                'is only available for users who run the app using the app\'s source code or through Docker. '
-                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
-                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
-                'Ensure that your data is cleaned and lemmatized before passing it into this module. If '
-                'you have not cleaned your dataset, use the *Load, Clean and Visualise* module to clean up your '
-                'data before proceeding. Do not upload the a file containing tokenized data for DTM creation.')
-    dtm['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
-    dtm['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', ' XLSX'))
+
+    st.markdown('## Upload Data\n')
+    col1, col1_ = st.columns(2)
+    dtm['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                 help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                      '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                      'Service Providers.')
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', ' XLSX'),
+                                  help='')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    if dtm['FILE'] == 'Small File(s)':
-        st.markdown('### Upload File\n')
+    if dtm['FILE'] == 'Local':
         dtm['DATA_PATH'] = st.file_uploader(f'Load {dtm["MODE"]} File', type=[dtm['MODE']])
         if dtm['DATA_PATH'] is not None:
             dtm['DATA'] = readFile(dtm['DATA_PATH'], dtm['MODE'])
@@ -70,7 +63,7 @@ def app():
             # RESET
             dtm['DATA'] = pd.DataFrame()
 
-    elif dtm['FILE'] == 'Large File(s)':
+    elif dtm['FILE'] == 'Online':
         st.info(f'File Format Selected: **{dtm["MODE"]}**')
         dtm['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
@@ -168,20 +161,20 @@ def app():
                 'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
                 'before clicking on the "Proceed" button. The status of your file upload is displayed below for your '
                 'reference.')
-    if dtm['FILE'] == 'Small File(s)':
+    if dtm['FILE'] == 'Local':
         if dtm['DATA_PATH']:
             st.info('File loaded.')
         else:
             st.warning('File has not been loaded.')
-    elif dtm['FILE'] == 'Large File(s)':
+    elif dtm['FILE'] == 'Online':
         if not dtm['DATA'].empty:
             st.info('File loaded.')
         else:
             st.warning('File has not been loaded.')
 
     if st.button('Proceed', key='doc'):
-        if (dtm['FILE'] == 'Small File(s)' and dtm['DATA_PATH']) or \
-                (dtm['FILE'] == 'Large File(s)' and not dtm['DATA'].empty):
+        if (dtm['FILE'] == 'Local' and dtm['DATA_PATH']) or \
+                (dtm['FILE'] == 'Online' and not dtm['DATA'].empty):
             st.info('Data loaded properly!')
             dtm['DATA'] = dtm['DATA'].astype(str)
             with st.spinner('Working to create a Document-Term Matrix...'):

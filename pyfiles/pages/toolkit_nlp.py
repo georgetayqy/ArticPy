@@ -8,8 +8,6 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 # -------------------------------------------------------------------------------------------------------------------- #
 import multiprocessing
 import os
-import pathlib
-import matplotlib
 import numpy as np
 import pandas as pd
 import spacy
@@ -72,35 +70,22 @@ def app():
                 'Select the NLP functions which you wish to execute.')
     toolkit['APP_MODE'] = st.selectbox('Select the NLP Operation to execute',
                                        ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
-                                        'Named Entity Recognition', 'POS Tagging', 'Summarise',
-                                        'NLP Model Trainer and Predictor'))
+                                        'Named Entity Recognition', 'POS Tagging', 'Summarise'))
     st.info(f'**{toolkit["APP_MODE"]}** Selected')
 
     if toolkit['APP_MODE'] != 'News Classifier':
-        st.markdown('## Upload Data\n'
-                    'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be '
-                    'loaded with the widget. To circumvent this limitation, you may choose to '
-                    'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
-                    '`streamlit run app.py` command and define the maximum size of file you can upload '
-                    'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                    'is only available for users who run the app using the app\'s source code or through Docker. '
-                    'For Docker, you will need to append the tag above behind the Docker Image name when running the '
-                    '`run` command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do '
-                    'not use the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
-                    'Alternatively, you may use the Large File option to pull your dataset from any one of the four '
-                    'supported Cloud Service Providers into the app.\n\n'
-                    'After selecting the size of your file, select the file format you wish to upload. You are warned '
-                    'that if you fail to define the correct file format you wish to upload, the app will not let you '
-                    'upload your file (if you are using the Small File option, only the defined file format will be '
-                    'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
-        toolkit['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
-        toolkit['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+        st.markdown('## Upload Data\n')
+        col1, col1_ = st.columns(2)
+        toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                         help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                              '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                              'Service Providers.')
+        toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-        if toolkit['FILE'] == 'Small File(s)':
-            st.markdown('### Upload File\n')
+        if toolkit['FILE'] == 'Local':
             toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
             if toolkit['DATA_PATH'] is not None:
                 toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
@@ -112,7 +97,7 @@ def app():
             else:
                 toolkit['DATA'] = pd.DataFrame()
 
-        elif toolkit['FILE'] == 'Large File(s)':
+        elif toolkit['FILE'] == 'Online':
             st.info(f'File Format Selected: **{toolkit["MODE"]}**')
             toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
@@ -158,7 +143,6 @@ def app():
                                                           list(toolkit['DATA'].columns))
                     st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
 
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -175,22 +159,24 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
-        toolkit['MAX_WORDS'] = st.number_input('Key in the maximum number of words to display',
-                                               min_value=2,
-                                               max_value=1000,
-                                               value=200)
-        toolkit['CONTOUR_WIDTH'] = st.number_input('Key in the contour width of your WordCloud',
-                                                   min_value=1,
-                                                   max_value=10,
-                                                   value=3)
-        toolkit['WIDTH'] = st.number_input('Key in the Width of the WordCloud image generated',
-                                           min_value=1,
-                                           max_value=100000,
-                                           value=800)
-        toolkit['HEIGHT'] = st.number_input('Key in the Height of the WordCloud image generated',
-                                            min_value=1,
-                                            max_value=100000,
-                                            value=400)
+
+        col1, col1_ = st.columns(2)
+        toolkit['MAX_WORDS'] = col1.number_input('Key in the maximum number of words to display',
+                                                 min_value=2,
+                                                 max_value=1000,
+                                                 value=200)
+        toolkit['CONTOUR_WIDTH'] = col1_.number_input('Key in the contour width of your WordCloud',
+                                                      min_value=1,
+                                                      max_value=10,
+                                                      value=3)
+        toolkit['WIDTH'] = col1.number_input('Key in the Width of the WordCloud image generated',
+                                             min_value=1,
+                                             max_value=100000,
+                                             value=800)
+        toolkit['HEIGHT'] = col1_.number_input('Key in the Height of the WordCloud image generated',
+                                               min_value=1,
+                                               max_value=100000,
+                                               value=400)
 
         # MAIN DATA PROCESSING
         if st.button('Generate Word Cloud', key='wc'):
@@ -578,13 +564,13 @@ def app():
                         'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
                         'and to check if your GPU is enabled.')
             with st.expander('GPU-enabled Features'):
-                col1, col2 = st.columns(2)
-                with col1:
+                col, col_ = st.columns(2)
+                with col:
                     st.markdown('### PyTorch for CUDA 10.2')
                     if st.button('Install Relevant Packages', key='10.2'):
                         os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
                                   ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
-                with col2:
+                with col_:
                     st.markdown('### PyTorch for CUDA 11.3')
                     if st.button('Install Relevant Packages', key='11.3'):
                         os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
@@ -620,14 +606,16 @@ def app():
                                                                 'Deselect this option if this if you do not require '
                                                                 'it.')
 
-            toolkit['MIN_WORDS'] = st.number_input('Key in the minimum number of words to summarise to',
-                                                   min_value=1,
-                                                   max_value=1000,
-                                                   value=80)
-            toolkit['MAX_WORDS'] = st.number_input('Key in the maximum number of words to summarise to',
-                                                   min_value=80,
-                                                   max_value=1000,
-                                                   value=150)
+            col2, col2_ = st.columns(2)
+
+            toolkit['MIN_WORDS'] = col2.number_input('Key in the minimum number of words to summarise to',
+                                                     min_value=1,
+                                                     max_value=1000,
+                                                     value=80)
+            toolkit['MAX_WORDS'] = col2_.number_input('Key in the maximum number of words to summarise to',
+                                                      min_value=80,
+                                                      max_value=1000,
+                                                      value=150)
             toolkit['MAX_TENSOR'] = st.number_input('Key in the maximum number of vectors to consider',
                                                     min_value=1,
                                                     max_value=10000,
@@ -754,7 +742,7 @@ def app():
                         sub_list = []
 
                         # APPLY POLARITY FUNCTION
-                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']].\
+                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
                             apply(lambda x: TextBlob(x).sentiment.polarity)
                         for i in toolkit['DATA']['POLARITY SCORE'].tolist():
                             if float(i) > 0:
@@ -861,23 +849,24 @@ def app():
         st.markdown('# Topic Modelling')
         st.markdown('Ensure that your data is **lemmatized and properly cleaned**; data **should not be tokenized** '
                     'for this step. Use the Load, Clean and Visualise module to clean and lemmatize your data if you '
-                    'have not done so already.\n\n'
-                    '## Short Explanation on Models used\n'
-                    '### Latent Dirichlet Allocation (LDA)\n'
-                    'Extracted from '
-                    'https://towardsdatascience.com/topic-modeling-quora-questions-with-lda-nmf-aff8dce5e1dd, LDA is '
-                    'the Model used for finding all the hidden probability distributions of a certain set of data, '
-                    'which would allow us to discover hidden groupings of data points within a set of data.\n\n'
-                    '### Non-Negative Matrix Factorization (NMF)\n'
-                    'Extracted from '
-                    'https://medium.com/analytics-vidhya/topic-modeling-with-non-negative-matrix-factorization-nmf'
-                    '-3caf3a6bb6da, NMF is an unsupervised learning technique to decompose (factorise) high-'
-                    'dimensional vectors into non-negative lower-dimensional vectors.\n\n'
-                    '### Latent Semantic Indexing (LSI)\n'
-                    'Extracted from https://www.searchenginejournal.com/latent-semantic-indexing-wont-help-seo/240705/'
-                    '#:~:text=Latent%20semantic%20indexing%20(also%20referred,of%20those%20words%20and%20documents, '
-                    'LSI is a technique of analysing a document to discover statistical co-occurrences of words which '
-                    'appear to gather, which gives us insights into the topics of the words and of the document.')
+                    'have not done so already.\n\n')
+        with st.expander('Short Explanation on Models used'):
+            st.markdown(
+                '#### Latent Dirichlet Allocation (LDA)\n'
+                'Extracted from '
+                'https://towardsdatascience.com/topic-modeling-quora-questions-with-lda-nmf-aff8dce5e1dd, LDA is '
+                'the Model used for finding all the hidden probability distributions of a certain set of data, '
+                'which would allow us to discover hidden groupings of data points within a set of data.\n\n'
+                '#### Non-Negative Matrix Factorization (NMF)\n'
+                'Extracted from '
+                'https://medium.com/analytics-vidhya/topic-modeling-with-non-negative-matrix-factorization-nmf'
+                '-3caf3a6bb6da, NMF is an unsupervised learning technique to decompose (factorise) high-'
+                'dimensional vectors into non-negative lower-dimensional vectors.\n\n'
+                '#### Latent Semantic Indexing (LSI)\n'
+                'Extracted from https://www.searchenginejournal.com/latent-semantic-indexing-wont-help-seo/240705/'
+                '#:~:text=Latent%20semantic%20indexing%20(also%20referred,of%20those%20words%20and%20documents, '
+                'LSI is a technique of analysing a document to discover statistical co-occurrences of words which '
+                'appear to gather, which gives us insights into the topics of the words and of the document.')
 
         st.markdown('## Topic Modelling Model Selection')
         toolkit['NLP_TOPIC_MODEL'] = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
@@ -906,70 +895,77 @@ def app():
                                                             'advanced statistics on it. Note that this will require '
                                                             'some time and processing power to complete. Deselect this '
                                                             'option if this if you do not require it.')
-        toolkit['NUM_TOPICS'] = st.number_input('Choose Number of Topics to Generate Per Text',
+
+        col1, col2 = st.columns(2)
+
+        toolkit['NUM_TOPICS'] = col1.number_input('Number of Topics to Generate',
+                                                  min_value=1,
+                                                  max_value=100,
+                                                  step=1,
+                                                  value=10)
+        toolkit['MAX_FEATURES'] = col2.number_input('Maximum Number of Features to Extract',
+                                                    min_value=1,
+                                                    max_value=99999,
+                                                    step=1,
+                                                    value=5000)
+
+        toolkit['MAX_ITER'] = col1.number_input('Iterations of Model Training (Epochs)',
                                                 min_value=1,
-                                                max_value=100,
+                                                max_value=10000,
                                                 step=1,
                                                 value=10)
-        toolkit['MAX_FEATURES'] = st.number_input('Choose the Maximum Number of Features to Extract from Dataset',
-                                                  min_value=1,
-                                                  max_value=99999,
-                                                  step=1,
-                                                  value=5000)
-        toolkit['MAX_ITER'] = st.number_input('Choose Number of Iterations of Model Training',
-                                              min_value=1,
-                                              max_value=10000,
-                                              step=1,
-                                              value=10)
 
         if toolkit['NLP_TOPIC_MODEL'] == 'Latent Dirichlet Allocation':
-            toolkit['MIN_DF'] = st.number_input('Choose Minimum (Cardinal) Frequency of Words to Consider',
-                                                min_value=1,
-                                                max_value=100,
-                                                step=1,
-                                                value=5)
-            toolkit['MAX_DF'] = st.number_input('Choose Maximum (Percentage) Frequency of Words to Consider',
-                                                min_value=0.,
-                                                max_value=1.,
-                                                step=0.01,
-                                                format='%.2f',
-                                                value=0.90)
-            toolkit['WORKER'] = st.number_input('Chose Number of CPU Cores to Use',
-                                                min_value=1,
-                                                max_value=multiprocessing.cpu_count(),
-                                                step=1,
-                                                value=1,
-                                                help='The number of effective cores is calculated from multiplying '
-                                                     'the number of cores on your machine and the number of threads '
-                                                     'in your CPU.')
-        elif toolkit['NLP_TOPIC_MODEL'] == 'Non-Negative Matrix Factorization':
-            toolkit['MIN_DF'] = st.number_input('Choose Minimum (Cardinal) Frequency of Words to Consider',
-                                                min_value=1,
-                                                max_value=100,
-                                                step=1,
-                                                value=2)
-            toolkit['MAX_DF'] = st.number_input('Choose Maximum (Percentage) Frequency of Words to Consider',
-                                                min_value=0.,
-                                                max_value=1.,
-                                                step=0.01,
-                                                format='%.2f',
-                                                value=0.95)
-            toolkit['ALPHA'] = st.number_input('Choose Alpha Value for NMF Model',
-                                               min_value=0.,
-                                               max_value=1.,
-                                               step=0.01,
-                                               format='%.2f',
-                                               value=.1,
-                                               help='Constant that multiplies the regularization terms. Set it to zero '
-                                                    'to have no regularization. Regularization is not scaled by the '
-                                                    'number of features to consider in the model.')
-            toolkit['L1_RATIO'] = st.number_input('Choose L1 Ratio for NMF Model',
+            toolkit['MIN_DF'] = col2.number_input('Minimum (Cardinal) Frequency of Words to Consider',
+                                                  min_value=1,
+                                                  max_value=100,
+                                                  step=1,
+                                                  value=5)
+            toolkit['MAX_DF'] = col1.number_input('Maximum (Percentage) Frequency of Words to Consider',
                                                   min_value=0.,
                                                   max_value=1.,
                                                   step=0.01,
                                                   format='%.2f',
-                                                  value=.5,
-                                                  help='The regularization mixing parameter, with 0 <= l1_ratio <= 1.')
+                                                  value=0.90)
+            toolkit['WORKER'] = col2.number_input('Number of CPU Cores to Use',
+                                                  min_value=1,
+                                                  max_value=multiprocessing.cpu_count(),
+                                                  step=1,
+                                                  value=1,
+                                                  help='The number of effective cores is calculated from multiplying '
+                                                       'the number of cores on your machine and the number of threads '
+                                                       'in your CPU.')
+
+        elif toolkit['NLP_TOPIC_MODEL'] == 'Non-Negative Matrix Factorization':
+            toolkit['MIN_DF'] = col2.number_input('Minimum (Cardinal) Frequency of Words to Consider',
+                                                  min_value=1,
+                                                  max_value=100,
+                                                  step=1,
+                                                  value=2)
+            toolkit['MAX_DF'] = col1.number_input('Maximum (Percentage) Frequency of Words to Consider',
+                                                  min_value=0.,
+                                                  max_value=1.,
+                                                  step=0.01,
+                                                  format='%.2f',
+                                                  value=0.95)
+            toolkit['ALPHA'] = col2.number_input('Alpha Value for NMF Model',
+                                                 min_value=0.,
+                                                 max_value=1.,
+                                                 step=0.01,
+                                                 format='%.2f',
+                                                 value=.1,
+                                                 help='Constant that multiplies the regularization terms. Set it to '
+                                                      'zero to have no regularization. Regularization is not scaled by '
+                                                      'the number of features to consider in the model.')
+            toolkit['L1_RATIO'] = col1.number_input('L1 Ratio for NMF Model',
+                                                    min_value=0.,
+                                                    max_value=1.,
+                                                    step=0.01,
+                                                    format='%.2f',
+                                                    value=.5,
+                                                    help='The regularization mixing parameter, with 0 <= l1_ratio <= 1'
+                                                         '.')
+
         elif toolkit['NLP_TOPIC_MODEL'] == 'Latent Semantic Indexing':
             if toolkit['VERBOSE']:
                 toolkit['PLOT'] = st.checkbox('Generate LSI Plot?')
@@ -1009,7 +1005,7 @@ def app():
                                                                   top_n=toolkit['NUM_TOPICS'], vb=False)
 
                         toolkit['KW'] = pd.DataFrame(dominantTopic(vect=toolkit['CV'], model=toolkit['LDA_MODEL'],
-                                                     n_words=toolkit['NUM_TOPICS']))
+                                                                   n_words=toolkit['NUM_TOPICS']))
                         toolkit['KW'].columns = [f'word_{i}' for i in range(toolkit["KW"].shape[1])]
                         toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit["KW"].shape[0])]
 
@@ -1276,11 +1272,11 @@ def app():
         if st.button('Classify Text', key='classify'):
             toolkit['DATA'] = toolkit['DATA'].astype(object)
             classifier = pipeline('zero-shot-classification')
-            toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']].\
+            toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
                 apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
-            toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST'].\
+            toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
                 apply(lambda x: list(zip(x['labels'].tolist(), x['scores'].tolist())))
-            toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED'].\
+            toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
                 apply(lambda x: max(x, key=itemgetter[1])[0])
             toolkit['DATA'] = toolkit['DATA'].astype(str)
 

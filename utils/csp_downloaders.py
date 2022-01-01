@@ -167,7 +167,7 @@ class AzureDownloader:
                         'this error.')
             self.AZURE_CONNECTION_STRING = st.text_input("Azure Connection String")
             self.AZURE_BLOB_NAME = st.text_input("Azure Blob Name")
-            self.LOCAL_DOWNLOAD_PATH = st.text_input("Local Download Path (do not modify if running on web app)",
+            self.LOCAL_DOWNLOAD_PATH = st.text_input("Local Download Path (do not modify.py if running on web app)",
                                                      value=os.path.join(os.getcwd()))
             self.SUBMIT = st.form_submit_button('Submit Parameters')
 

@@ -348,7 +348,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     }}
             </style> """
 
-        dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">' \
-                               f'{button_text}</a><br></br>'
+        dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" ' \
+                               f'href="data:file/txt;base64,{b64}"> {button_text}</a><br></br>'
 
         return dl_link

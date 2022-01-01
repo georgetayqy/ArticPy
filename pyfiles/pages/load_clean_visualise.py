@@ -58,32 +58,19 @@ def app():
                                                                         'Data Query'))
     st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected!')
 
-    st.markdown('## Upload Data\n'
-                'Due to limitations imposed by the file uploader widget, only files smaller than 200 MB can be loaded '
-                'with the widget. To circumvent this limitation, you may choose to '
-                'rerun the app with the tag `--server.maxUploadSize=[SIZE_IN_MB_HERE]` appended behind the '
-                '`streamlit run app.py` command and define the maximum size of file you can upload '
-                'onto Streamlit (replace `SIZE_IN_MB_HERE` with an integer value above). Do note that this option '
-                'is only available for users who run the app using the app\'s source code or through Docker. '
-                'For Docker, you will need to append the tag above behind the Docker Image name when running the `run` '
-                'command, e.g. `docker run asdfghjklxl/news:latest --server.maxUploadSize=1028`; if you do not use '
-                'the tag, the app will run with a default maximum upload size of 200 MB.\n\n'
-                'Alternatively, you may use the Large File option to pull your dataset from any one of the three '
-                'supported Cloud Service Providers into the app.\n\n'
-                'After selecting the size of your file, select the file format you wish to upload. You are warned '
-                'that if you fail to define the correct file format you wish to upload, the app will not let you '
-                'upload your file (if you are using the Small File option, only the defined file format will be '
-                'accepted by the File Uploader widget) and may result in errors (for Large File option).\n\n')
-
-    lcv['FILE'] = st.selectbox('Select the Size of File to Load', ('Small File(s)', 'Large File(s)'))
-    lcv['MODE'] = st.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+    st.markdown('## Upload Data\n')
+    col1, col1_ = st.columns(2)
+    lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                 help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                      '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                      'Service Providers.')
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    if lcv['FILE'] == 'Small File(s)':
-        st.markdown('### Upload File\n')
+    if lcv['FILE'] == 'Local':
         lcv['DATA_PATH'] = st.file_uploader(f'Load {lcv["MODE"]} File', type=[lcv["MODE"]])
         if lcv['DATA_PATH'] is not None:
             lcv['DATA'] = readFile(lcv['DATA_PATH'], lcv["MODE"])
@@ -96,7 +83,7 @@ def app():
             # RESET
             lcv['DATA'] = pd.DataFrame()
 
-    elif lcv['FILE'] == 'Large File(s)':
+    elif lcv['FILE'] == 'Online':
         st.info(f'File Format Selected: **{lcv["MODE"]}**')
         lcv['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
 
@@ -301,12 +288,12 @@ def app():
                     'Ensure that you have successfully uploaded the required data and selected the correct column '
                     'containing your data before clicking on the "Begin Analysis" button. The status of your file '
                     'upload is displayed below for your reference.')
-        if lcv['FILE'] == 'Small File(s)':
+        if lcv['FILE'] == 'Local':
             if lcv['DATA_PATH']:
                 st.info('File loaded.')
             else:
                 st.warning('File has not been loaded.')
-        elif lcv['FILE'] == 'Large File(s)':
+        elif lcv['FILE'] == 'Online':
             if not lcv['DATA'].empty:
                 st.info('File loaded.')
             else:
@@ -317,8 +304,8 @@ def app():
             lcv['CLEANED_DATA'] = pd.DataFrame()
             lcv['CLEANED_DATA_TOKENIZED'] = pd.DataFrame()
 
-            if (lcv['FILE'] == 'Small File(s)' and lcv['DATA_PATH']) or \
-                    (lcv['FILE'] == 'Large File(s)' and not lcv['DATA'].empty):
+            if (lcv['FILE'] == 'Local' and lcv['DATA_PATH']) or \
+                    (lcv['FILE'] == 'Online' and not lcv['DATA'].empty):
                 if not lcv['DATA'].empty:
                     try:
                         lcv['DATA'] = lcv['DATA'].astype(str)
@@ -550,12 +537,12 @@ def app():
                         'graphical representation of the frequency of country name occurrence within the set of '
                         'documents passed to it.')
 
-            if lcv['FILE'] == 'Small File(s)':
+            if lcv['FILE'] == 'Local':
                 if lcv['DATA_PATH']:
                     st.info('File loaded.')
                 else:
                     st.warning('File has not been loaded.')
-            elif lcv['FILE'] == 'Large File(s)':
+            elif lcv['FILE'] == 'Online':
                 if not lcv['DATA'].empty:
                     st.info('File loaded.')
                 else:
@@ -616,7 +603,7 @@ def app():
                         'This function uses the AgGrid module to create editable tables for your to edit your '
                         'DataFrame as you would with an Excel sheet.')
 
-            if lcv['FILE'] == 'Small File(s)':
+            if lcv['FILE'] == 'Local':
                 if lcv['DATA_PATH']:
                     st.info('File loaded.')
                     gb = GridOptionsBuilder.from_dataframe(lcv['DATA'])
@@ -646,7 +633,7 @@ def app():
                 else:
                     st.warning('File has not been loaded.')
 
-            elif lcv['FILE'] == 'Large File(s)':
+            elif lcv['FILE'] == 'Online':
                 if not lcv['DATA'].empty:
                     st.info('File loaded.')
                     gb = GridOptionsBuilder.from_dataframe(lcv['DATA'])
@@ -690,12 +677,12 @@ def app():
                     'fulfills your criteria. You may choose between querying just one column at a time (one '
                     'condition per query) or mulitple columns at a time (multiple conditions per query).')
 
-        if lcv['FILE'] == 'Small File(s)':
+        if lcv['FILE'] == 'Local':
             if lcv['DATA_PATH']:
                 st.info('File loaded.')
             else:
                 st.warning('File has not been loaded.')
-        elif lcv['FILE'] == 'Large File(s)':
+        elif lcv['FILE'] == 'Online':
             if not lcv['DATA'].empty:
                 st.info('File loaded.')
             else:

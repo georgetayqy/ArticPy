@@ -159,14 +159,6 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
-        if toolkit['SAVE']:
-            if st.checkbox('Override Output Format?'):
-                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
-                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
-                    st.warning('Warning: Overridden Format is the same as Input Format')
-            else:
-                toolkit['OVERRIDE_FORMAT'] = None
 
         col1, col1_ = st.columns(2)
         toolkit['MAX_WORDS'] = col1.number_input('Key in the maximum number of words to display',
@@ -367,7 +359,7 @@ def app():
                     'workflow.')
 
         # FLAGS
-        st.markdown('## Flags')
+        st.markdown('## Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
                     'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
                     'one point. However, you will still be able to download a text/html file containing '
@@ -507,20 +499,18 @@ def app():
         st.markdown('# Summarization of Text')
         st.markdown('For this function, you are able to upload a piece of document or multiple pieces of documents '
                     'in a CSV file to create a summary for the documents of interest.\n\n'
-                    'However, do note that this module takes a long time to process a long piece of text. '
-                    'If you intend to process large chunks of text, prepare to wait for hours for the summarization '
-                    'process to finish. We are looking to implement multiprocessing into the app to optimise it.\n\n'
-                    'In the meantime, it may be better to process your data in smaller batches to speed up your '
+                    'However, do note that this module takes a long time to process a long piece of text, '
+                    'hence, it may be better to process your data in smaller batches to speed up your '
                     'workflow.\n\n'
                     'In an effort to enhance this module to provide users with meaningful summaries of their document, '
                     ' we have implemented two modes of summarization in this function, namely Basic and Advanced '
-                    'Mode.\n '
-                    '**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
-                    'sentences. No machine learning model was used to produce a unique summary of the text.\n'
-                    '**Advanced Mode** uses the Pytorch and Huggingface Transformers library to produce summaries '
-                    'using Google\'s T5 Model.')
+                    'Mode.\n')
 
         st.markdown('## Summary Complexity')
+        st.markdown('**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
+                    'sentences. No machine learning model was used to produce a unique summary of the text.\n\n'
+                    '**Advanced Mode** uses the Pytorch and Huggingface Transformers library to produce summaries '
+                    'using Google\'s T5 Model.')
         toolkit['SUM_MODE'] = st.selectbox('Choose Mode', ('Basic', 'Advanced'))
 
         if toolkit['SUM_MODE'] == 'Basic':
@@ -767,7 +757,7 @@ def app():
                     'For VADER, your sentiment score will be ')
 
         # FLAGS
-        st.markdown('## Flags')
+        st.markdown('## Options')
         toolkit['BACKEND_ANALYSER'] = st.selectbox('Choose the Backend Engine Used to Conduct Sentiment Analysis',
                                                    ('VADER', 'TextBlob'),
                                                    help='VADER is more optimised for texts extracted from Social Media '
@@ -1001,7 +991,7 @@ def app():
         st.info(f'**{toolkit["NLP_TOPIC_MODEL"]}** Selected')
 
         # FLAGS
-        st.markdown('## Flags')
+        st.markdown('## Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?')
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
@@ -1453,7 +1443,7 @@ def app():
                 except Exception as ex:
                     st.error(ex)
 
-        st.markdown('## Flags')
+        st.markdown('## Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')

@@ -39,12 +39,12 @@ def app():
     with col1:
         st.markdown('### PyTorch for CUDA 10.2')
         if st.button('Install Relevant Packages', key='10.2'):
-            os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
+            os.system('pip install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
                       ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
     with col2:
         st.markdown('### PyTorch for CUDA 11.3')
         if st.button('Install Relevant Packages', key='11.3'):
-            os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
+            os.system('pip install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
                       ' -f https://download.pytorch.org/whl/cu113/torch_stable.html')
     st.markdown('\n\n')
 
@@ -65,7 +65,7 @@ def app():
 
     if trainer['MODEL_MODE'] == 'Training':
         # FLAGS
-        st.markdown('## Flags\n\n'
+        st.markdown('## Options\n\n'
                     '### Transformers Selection')
         trainer['TRANSFORMERS_SELECTION'] = st.selectbox('Choose Transformers Auto Model Class to Use',
                                                          options=trainer['TRANSFORMERS_CHOICES'],
@@ -759,7 +759,7 @@ def app():
                         st.success(f'Successfully trained model! Model saved in {os.getcwd()}{trainer["output_dir"]}.')
 
     elif trainer['MODEL_MODE'] == 'Evaluation':
-        st.markdown('## Flags')
+        st.markdown('## Options')
         trainer['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')
@@ -779,7 +779,6 @@ def app():
                                                             'option if this if you do not require it.')
 
         st.markdown('## Upload Prediction Data and Model\n')
-
         st.markdown('### Prediction Data')
         col3, col3_ = st.columns(2)
 

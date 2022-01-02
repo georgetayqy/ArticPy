@@ -43,11 +43,11 @@ def app():
     st.title('Load, Clean and Visualise Data')
     st.markdown('## Init\n'
                 'This module is used for the visualisation and cleaning of data used for NLP Analysis on news articles.'
-                ' Since this process uses the `nltk` stopword corpus, you need to download the corpus onto your '
-                'system. The corpus will automatically download onto your device when you run the app. Please ensure '
-                'that sufficient storage (~1 GB) of storage space is free and that you are connected to the Internet '
-                'to ensure that the corpus can be successfully downloaded. If the download fails, rerun the app again '
-                'and ensure that your device has sufficient space and is connected to the Internet.\n\n '
+                ' Since this process uses the `nltk` stopword corpus, the corpus will automatically download onto your '
+                'device when you run the app. Please ensure that sufficient storage (~1 GB) of storage space is free '
+                'and that you are connected to the Internet to ensure that the corpus can be successfully downloaded. '
+                'If the download fails, rerun the app again and ensure that your device has sufficient space and is '
+                'connected to the Internet.\n\n '
                 'For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
                 'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n')
 
@@ -55,7 +55,12 @@ def app():
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '
                 'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
     lcv['ANALYSIS_MODE'] = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification',
-                                                                        'Data Query'))
+                                                                        'Data Query'),
+                                        help='**Data Cleaning**: \tThis mode cleans the data for further processing\n\n'
+                                             '**Data Modification**: \tThis mode allows users to modify their data by '
+                                             'adding in new information or to change existing information.\n\n'
+                                             '**Data Query**: \tThis mode allows users to query their data for '
+                                             'specific keywords of interest.')
     st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected!')
 
     st.markdown('## Upload Data\n')
@@ -64,7 +69,7 @@ def app():
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
                                       'Service Providers.')
-    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -133,21 +138,26 @@ def app():
 # |                                                      FLAGS                                                       | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if lcv['ANALYSIS_MODE'] == 'Data Cleaning':
-        st.markdown('## Flags\n'
-                    'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
-                    'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the '
-                    'number of data points you wish to visualise or download the file and visualise it through Excel '
-                    'or any other DataFrame visualising Python packages. There is no definitive way to increase the '
-                    'size of the DataFrame that can be printed out due to the inherent limitation on the size of the '
-                    'packets sent over to and from the Streamlit server.')
+        st.markdown('## Options\n')
         lcv['SAVE'] = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any '
                                                         'saved outputs. If None mode is chosen, you will not be able '
                                                         'to download the outputs as it is assumed that you already '
-                                                        'possess that.\n\n'
-                                                        'Additionally, due to the possibility of files with the same '
-                                                        'file name and content being downloaded again, a unique file '
-                                                        'identifier is tacked onto the filename.')
-        lcv['VERBOSE'] = st.checkbox('Display Outputs?')
+                                                        'possess that.\n\n')
+        if lcv['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                lcv['OVERRIDE_FORMAT'] = None
+
+        lcv['VERBOSE'] = st.checkbox('Display Outputs?',
+                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
+                                          'are printed to screen. If you get an error telling you that the '
+                                          'DataFrame size is too large to proceed, kindly lower the number of '
+                                          'data points you wish to visualise or download the file and visualise '
+                                          'it through Excel or any other DataFrame visualising Python packages')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -191,29 +201,35 @@ def app():
                     st.info('**Alert**: No Words detected')
 
     elif lcv['ANALYSIS_MODE'] == 'Data Modification':
-        st.markdown('This module will allow you to modify the data passed in by performing certain elementary '
-                    'analysis on the data. So far, we have implemented the ability to extract the countries '
-                    'mentioned in your data and to plot out the Data Points on a World Map and the ability to '
-                    'modify a single value of the inputted DataFrame in place.')
         st.markdown('## Data Modification Mode')
-        lcv['MOD_MODE'] = st.selectbox('Choose Mode', ('Country Extraction', 'Inplace Data Modification'))
+        lcv['MOD_MODE'] = st.selectbox('Choose Mode', ('Country Extraction', 'Inplace Data Modification'),
+                                       help='This module will allow you to modify the data passed in by performing '
+                                            'certain elementary analysis on the data. So far, we have implemented the '
+                                            'ability to extract the countries mentioned in your data and to plot out '
+                                            'the Data Points on a World Map and the ability to modify a single value '
+                                            'of the inputted DataFrame in place.')
         if lcv['MOD_MODE'] == 'Country Extraction':
-            st.markdown('## Flags\n'
-                        'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. '
-                        'If you get an error telling you that the DataFrame size is too large to proceed, kindly lower '
-                        'the number of data points you wish to visualise or download the file and visualise it through '
-                        'Excel or any other DataFrame visualising Python packages. There is no definitive way to '
-                        'increase the size of the DataFrame that can be printed out due to the inherent limitation on '
-                        'the size of the packets sent over to and from the Streamlit server.')
+            st.markdown('## Options\n')
             lcv['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Note: Only Simple and Complex Cleaning modes will produce any '
                                            'saved outputs. If None mode is chosen, you will not be able '
                                            'to download the outputs as it is assumed that you already '
-                                           'possess that.\n\n'
-                                           'Additionally, due to the possibility of files with the same '
-                                           'file name and content being downloaded again, a unique file '
-                                           'identifier is tacked onto the filename.')
-            lcv['VERBOSE'] = st.checkbox('Display Outputs?')
+                                           'possess that.\n\n')
+            if lcv['SAVE']:
+                if st.checkbox('Override Output Format?'):
+                    lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                    if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
+                        st.warning('Warning: Overridden Format is the same as Input Format')
+                else:
+                    lcv['OVERRIDE_FORMAT'] = None
+
+            lcv['VERBOSE'] = st.checkbox('Display Outputs?',
+                                         help='Note that there is an size limit (50 MB) for the DataFrames that '
+                                              'are printed to screen. If you get an error telling you that the '
+                                              'DataFrame size is too large to proceed, kindly lower the number of '
+                                              'data points you wish to visualise or download the file and visualise '
+                                              'it through Excel or any other DataFrame visualising Python packages')
             if lcv['VERBOSE']:
                 lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                              key='Data points to display?',
@@ -234,21 +250,26 @@ def app():
             lcv['HEIGHT'] = st.number_input('Height of Table', min_value=100, max_value=800, value=400)
 
     elif lcv['ANALYSIS_MODE'] == 'Data Query':
-        st.markdown('## Flags\n'
-                    'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
-                    'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the '
-                    'number of data points you wish to visualise or download the file and visualise it through Excel '
-                    'or any other DataFrame visualising Python packages. There is no definitive way to increase the '
-                    'size of the DataFrame that can be printed out due to the inherent limitation on the size of the '
-                    'packets sent over to and from the Streamlit server.')
+        st.markdown('## Options\n')
         lcv['SAVE'] = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any '
                                                         'saved outputs. If None mode is chosen, you will not be able '
                                                         'to download the outputs as it is assumed that you already '
-                                                        'possess that.\n\n'
-                                                        'Additionally, due to the possibility of files with the same '
-                                                        'file name and content being downloaded again, a unique file '
-                                                        'identifier is tacked onto the filename.')
-        lcv['VERBOSE'] = st.checkbox('Display Outputs?')
+                                                        'possess that.\n\n')
+        if lcv['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                lcv['OVERRIDE_FORMAT'] = None
+
+        lcv['VERBOSE'] = st.checkbox('Display Outputs?',
+                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
+                                          'are printed to screen. If you get an error telling you that the '
+                                          'DataFrame size is too large to proceed, kindly lower the number of '
+                                          'data points you wish to visualise or download the file and visualise '
+                                          'it through Excel or any other DataFrame visualising Python packages')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -399,30 +420,30 @@ def app():
                     if lcv['CLEAN_MODE'] == 'None':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [(lcv['CLEANED_DATA_TOKENIZED'], 'Tokenized Data',
-                                                           'tokenized.csv', False)]
+                                                           'tokenized', '.csv', False)]
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False),
-                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv', False)
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data', '.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data', '.csv', False),
+                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized', '.csv', False)
                             ]
                         else:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False)
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data', '.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data', '.csv', False)
                             ]
                     elif lcv['CLEAN_MODE'] == 'Complex':
                         if lcv['TOKENIZE']:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False),
-                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized.csv', False)
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data', '.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data', '.csv', False),
+                                (lcv['CLEANED_DATA_TOKENIZED'], 'Cleaned Tokenized Data', 'tokenized', '.csv', False)
                             ]
                         else:
                             lcv['FINALISED_DATA_LIST'] = [
-                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data.csv', False),
-                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data.csv', False)
+                                (lcv['DATA'], 'Raw Data', 'raw_ascii_data', '.csv', False),
+                                (lcv['CLEANED_DATA'], 'Cleaned Data', 'cleaned_data', '.csv', False)
                             ]
 
                     if lcv['VERBOSE']:
@@ -469,9 +490,23 @@ def app():
                                     st.markdown('---')
                                     st.markdown('## Download Data')
                                     for data in lcv['FINALISED_DATA_LIST']:
-                                        st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]} Data',
-                                                                   override_index=data[3]),
-                                                    unsafe_allow_html=True)
+                                        if lcv['OVERRIDE_FORMAT'] is not None:
+                                            st.markdown(prettyDownload(
+                                                object_to_download=data[0],
+                                                download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                button_text=f'Download {data[1]}',
+                                                override_index=data[4],
+                                                format=lcv['OVERRIDE_FORMAT']),
+                                                unsafe_allow_html=True)
+                                        else:
+                                            st.markdown(prettyDownload(
+                                                object_to_download=data[0],
+                                                download_filename=f'{data[2]}.{data[3]}',
+                                                button_text=f'Download {data[1]}',
+                                                override_index=data[4],
+                                                format=lcv["MODE"]),
+                                                unsafe_allow_html=True
+                                            )
                                 except KeyError:
                                     st.error('Warning: Your data was not processed properly. Try again.')
                                 except Exception as ex:
@@ -484,9 +519,24 @@ def app():
                                 st.markdown('---')
                                 st.markdown('## Download Data')
                                 for data in lcv['FINALISED_DATA_LIST']:
-                                    st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
-                                                               override_index=data[3]),
-                                                unsafe_allow_html=True)
+                                    if lcv['OVERRIDE_FORMAT'] is not None:
+                                        st.markdown(prettyDownload(
+                                            object_to_download=data[0],
+                                            download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download {data[1]}',
+                                            override_index=data[4],
+                                            format=lcv['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True
+                                        )
+                                    else:
+                                        st.markdown(prettyDownload(
+                                            object_to_download=data[0],
+                                            download_filename=f'{data[2]}.{data[3]}',
+                                            button_text=f'Download {data[1]}',
+                                            override_index=data[4],
+                                            format=lcv["MODE"]),
+                                            unsafe_allow_html=True
+                                        )
                             except KeyError:
                                 st.error('Warning: Your data was not processed properly. Try again.')
                             except Exception as ex:
@@ -499,9 +549,24 @@ def app():
                                         st.markdown('---')
                                         st.markdown('## Download Data')
                                         for data in lcv['FINALISED_DATA_LIST']:
-                                            st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
-                                                                       override_index=data[3]),
-                                                        unsafe_allow_html=True)
+                                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                                st.markdown(prettyDownload(
+                                                    object_to_download=data[0],
+                                                    download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                    button_text=f'Download {data[1]}',
+                                                    override_index=data[4],
+                                                    format=lcv['OVERRIDE_FORMAT']),
+                                                    unsafe_allow_html=True
+                                                )
+                                            else:
+                                                st.markdown(prettyDownload(
+                                                    object_to_download=data[0],
+                                                    download_filename=f'{data[2]}.{data[3]}',
+                                                    button_text=f'Download {data[1]}',
+                                                    override_index=data[4],
+                                                    format=lcv["MODE"]),
+                                                    unsafe_allow_html=True
+                                                )
                                     except KeyError:
                                         st.error('Warning: Your data was not processed properly. Try again.')
                                     except Exception as ex:
@@ -511,10 +576,24 @@ def app():
                                     st.markdown('---')
                                     st.markdown('## Download Data')
                                     for data in lcv['FINALISED_DATA_LIST']:
-                                        if not data[0].empty:
-                                            st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]}',
-                                                                       override_index=data[3]),
-                                                        unsafe_allow_html=True)
+                                        if lcv['OVERRIDE_FORMAT'] is not None:
+                                            st.markdown(prettyDownload(
+                                                object_to_download=data[0],
+                                                download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                button_text=f'Download {data[1]}',
+                                                override_index=data[4],
+                                                format=lcv['OVERRIDE_FORMAT']),
+                                                unsafe_allow_html=True
+                                            )
+                                        else:
+                                            st.markdown(prettyDownload(
+                                                object_to_download=data[0],
+                                                download_filename=f'{data[2]}.{data[3]}',
+                                                button_text=f'Download {data[1]}',
+                                                override_index=data[4],
+                                                format=lcv["MODE"]),
+                                                unsafe_allow_html=True
+                                            )
                                 except KeyError:
                                     st.error('Warning: Your Data as not processed properly. Try again.')
                                 except Exception as ex:
@@ -582,13 +661,48 @@ def app():
                         try:
                             st.markdown('---')
                             st.markdown('## Download Data')
-                            st.markdown(prettyDownload(lcv['DATA'], 'globe_data.csv', 'Download Globe Data', False))
-                            st.markdown(prettyDownload(lcv['GLOBE_DATA'], 'globe_data_concat.csv',
-                                                       'Download Concatenated Globe Data', False))
-
+                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(
+                                    object_to_download=lcv['DATA'],
+                                    download_filename=f'globe_data.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Globe Data',
+                                    override_index=False,
+                                    format=lcv['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True
+                                )
+                                st.markdown(prettyDownload(
+                                    object_to_download=lcv['GLOBE_DATA'],
+                                    download_filename=f'globe_data_concat.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Concatenated Globe Data',
+                                    override_index=False,
+                                    format=lcv['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.markdown(prettyDownload(
+                                    object_to_download=lcv['DATA'],
+                                    download_filename=f'globe_data.{lcv["MODE"]}',
+                                    button_text=f'Download Globe Data',
+                                    override_index=False,
+                                    format=lcv["MODE"]),
+                                    unsafe_allow_html=True
+                                )
+                                st.markdown(prettyDownload(
+                                    object_to_download=lcv['GLOBE_DATA'],
+                                    download_filename=f'globe_data_concat.csv',
+                                    button_text=f'Download Concatenated Globe Data',
+                                    override_index=False,
+                                    format=lcv["MODE"]),
+                                    unsafe_allow_html=True
+                                )
                             if lcv['WORLD_MAP']:
-                                st.markdown(prettyDownload(lcv['GLOBE_FIG'], 'map.png', 'Download Map Representation',
-                                                           False))
+                                st.markdown(prettyDownload(
+                                    object_to_download=lcv['GLOBE_FIG'],
+                                    download_filename='map.png',
+                                    button_text=f'Download Map Representation',
+                                    override_index=False),
+                                    unsafe_allow_html=True
+                                )
                         except ValueError:
                             st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
                                        'Connect to the Internet and try again.')
@@ -660,9 +774,24 @@ def app():
                     if st.button('Generate Modified Data'):
                         if lcv['SAVE']:
                             st.markdown('### Modified Data')
-                            st.markdown(prettyDownload(ag['data'], 'modified_data.csv', 'Download Modified Data',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(
+                                    object_to_download=ag['data'],
+                                    download_filename=f'modified_data.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Modified Data',
+                                    override_index=False,
+                                    format=lcv['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.markdown(prettyDownload(
+                                    object_to_download=ag['data'],
+                                    download_filename=f'modified_data.{lcv["MODE"].lower()}',
+                                    button_text=f'Download Modified Data',
+                                    override_index=False,
+                                    format=lcv["MODE"]),
+                                    unsafe_allow_html=True
+                                )
                 else:
                     st.warning('File has not been loaded.')
 
@@ -713,9 +842,20 @@ def app():
                         if lcv['SAVE']:
                             st.markdown('---')
                             st.markdown('## Save Query')
-                            st.markdown(prettyDownload(lcv['QUERY_DATA'], 'query.csv', 'Download Queried Data',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
+                                                           download_filename=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                           button_text=f'Download Download Queried Data',
+                                                           override_index=False,
+                                                           format=lcv['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
+                                                           download_filename=f'query.{lcv["MODE"].lower()}',
+                                                           button_text=f'Download Queried Data',
+                                                           override_index=False,
+                                                           format=lcv["MODE"]),
+                                            unsafe_allow_html=True)
                     else:
                         st.error('Query did not find matching keywords. Try again.')
                 else:

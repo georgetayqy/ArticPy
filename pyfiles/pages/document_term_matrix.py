@@ -7,8 +7,11 @@ A large portion of this module uses the nltk and scikit-learn packages to create
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             IMPORT RELEVANT LIBRARIES                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import os
 import pathlib
+import platform
+
 import pandas as pd
 import streamlit as st
 
@@ -37,6 +40,33 @@ def app():
                 'on the "Begin Download" button below. Please ensure that you have at least 3 GB of free disk space '
                 'available so that you are able to download the corpus onto your system and that your device is '
                 'connected to the Internet.')
+
+    # CHECK IF THE DATA HAS BEEN DOWNLOADED
+    if platform.system() == 'Windows':
+        if pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').is_dir():
+            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').iterdir()):
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+        else:
+            st.warning('NLTK Data Not Detected')
+    elif platform.system() == 'Linux':
+        if pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').is_dir():
+            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').iterdir()):
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+        else:
+            st.warning('NLTK Data Not Detected')
+    elif platform.system() == 'Darwin':
+        if pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').is_dir():
+            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').iterdir()):
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+        else:
+            st.warning('NLTK Data Not Detected')
+
     if st.button('Begin Download', key='download-model'):
         os.system('python -m nltk.downloader all')
 
@@ -46,8 +76,7 @@ def app():
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
                                       'Service Providers.')
-    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', ' XLSX'),
-                                  help='')
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -112,19 +141,25 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                      FLAGS                                                       | #
 # -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## Flags\n'
-                'The following section contains flags you can use to better define the outputs of this module and to '
-                'modify what the app prints out to screen.\n\n'
-                'Note that there is an size limit **(50 MB)** for the DataFrames that are printed to screen. If '
-                'you get an error telling you that the DataFrame size is too large to proceed, kindly lower the number '
-                'of data points you wish to visualise or download the file and visualise it through Excel or any other '
-                'DataFrame visualising Python packages. There is no definitive way to increase the size of the '
-                'DataFrame that can be printed out due to the inherent limitation on the size of the packets sent '
-                'over to and from the Streamlit server.')
-    dtm['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name and '
-                                                    'content being downloaded again, a unique file identifier is '
-                                                    'tacked onto the filename.')
-    dtm['VERBOSE_DTM'] = st.checkbox('Display DataFrame of Document-Term Matrix?')
+    st.markdown('## Options\n'
+                'The following section contains options you can use to better define the outputs of this module and to '
+                'modify what the app prints out to screen.\n\n')
+    dtm['SAVE'] = st.checkbox('Save Outputs?', help='The files outputted will be in the same format as the input '
+                                                    'file format by default but this behaviour can be overridden.')
+    if dtm['SAVE']:
+        if st.checkbox('Override Output Format?'):
+            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+            if dtm['OVERRIDE_FORMAT'] == dtm['MODE']:
+                st.warning('Warning: Overridden Format is the same as Input Format')
+        else:
+            dtm['OVERRIDE_FORMAT'] = None
+
+    dtm['VERBOSE_DTM'] = st.checkbox('Display DataFrame of Document-Term Matrix?',
+                                     help='Note that there is an size limit (50 MB) for the DataFrames that are '
+                                          'printed to screen. If you get an error telling you that the DataFrame size '
+                                          'is too large to proceed, kindly lower the number of data points you wish '
+                                          'to visualise or download the file and visualise it through Excel or any '
+                                          'other DataFrame visualising Python packages')
     if dtm['VERBOSE_DTM']:
         dtm['VERBOSITY_DTM'] = st.slider('Data Points to Display for Document-Term Matrix?',
                                          min_value=1,
@@ -159,8 +194,8 @@ def app():
     st.markdown('---')
     st.markdown('## Document-Term Matrix Creation\n'
                 'Ensure that you have successfully uploaded the data and selected the correct field for analysis '
-                'before clicking on the "Proceed" button. The status of your file upload is displayed below for your '
-                'reference.')
+                'before clicking on the "Proceed" button.')
+
     if dtm['FILE'] == 'Local':
         if dtm['DATA_PATH']:
             st.info('File loaded.')
@@ -247,18 +282,18 @@ def app():
                 # FINALISED DATA LIST
                 if not dtm['VERBOSE_DTM'] and not dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', False)
+                        (dtm['DTM'], 'DTM', 'dtm', '.csv', False)
                     ]
                 elif dtm['VERBOSE_DTM'] and not dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', False),
-                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', True)
+                        (dtm['DTM'], 'DTM', 'dtm', '.csv', False),
+                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm', '.csv', True)
                     ]
                 if dtm['VERBOSE_DTM'] and dtm['VERBOSE_ANALYSIS']:
                     dtm['FINALISED_DATA_LIST'] = [
-                        (dtm['DTM'], 'DTM', 'dtm.csv', False),
-                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm.csv', True),
-                        (dtm['TOP_N_WORD_FIG'], f'Top {dtm["N"]} Words Frequency', 'top_n.png', False)
+                        (dtm['DTM'], 'DTM', 'dtm', '.csv', False),
+                        (dtm['DTM_copy'], 'Sorted DTM', 'sorted_dtm', '.csv', True),
+                        (dtm['TOP_N_WORD_FIG'], f'Top {dtm["N"]} Words Frequency', 'top_n', '.png', False)
                     ]
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -268,9 +303,20 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     for data in dtm['FINALISED_DATA_LIST']:
-                        st.markdown(prettyDownload(data[0], data[2], f'Download {data[1]} Data',
-                                                   override_index=data[3]),
-                                    unsafe_allow_html=True)
+                        if dtm['OVERRIDE_FORMAT'] is not None:
+                            st.markdown(prettyDownload(object_to_download=data[0],
+                                                       download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       button_text=f'Download {data[1]} Data',
+                                                       override_index=data[4],
+                                                       format=dtm['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(prettyDownload(object_to_download=data[0],
+                                                       download_filename=f'{data[2]}.{data[3]}',
+                                                       button_text=f'Download {data[1]} Data',
+                                                       override_index=data[4],
+                                                       format=dtm["MODE"]),
+                                        unsafe_allow_html=True)
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

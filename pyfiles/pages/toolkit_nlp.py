@@ -80,7 +80,7 @@ def app():
                                          help='Choose "Local" if you wish to upload a file from your machine or choose '
                                               '"Online" if you wish to pull a file from any one of the supported Cloud '
                                               'Service Providers.')
-        toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+        toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -155,10 +155,18 @@ def app():
                     'avoid double-counting words.')
 
         # FLAGS
-        st.markdown('## Flags')
+        st.markdown('## Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
 
         col1, col1_ = st.columns(2)
         toolkit['MAX_WORDS'] = col1.number_input('Key in the maximum number of words to display',
@@ -196,8 +204,13 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Image')
-                    st.markdown(prettyDownload(wc, 'wordcloud.png', 'Download Queried Data', override_index=False),
-                                unsafe_allow_html=True)
+                    st.markdown(prettyDownload(
+                        object_to_download=wc,
+                        download_filename='wordcloud.png',
+                        button_text='Download Queried Data',
+                        override_index=False),
+                        unsafe_allow_html=True
+                    )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -216,7 +229,7 @@ def app():
                     'workflow.')
 
         # FLAGS
-        st.markdown('## Flags')
+        st.markdown('## Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
                     'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
                     'one point. However, you will still be able to download a text/html file containing '
@@ -272,6 +285,14 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
@@ -308,12 +329,27 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown(prettyDownload(toolkit['DATA'], 'ner.csv', f'Download NER Data',
-                                               override_index=False),
-                                unsafe_allow_html=True)
-                    st.markdown(prettyDownload(toolkit['SVG'], 'rendering.html', f'Download Rendering Data',
-                                               override_index=False),
-                                unsafe_allow_html=True)
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   button_text=f'Download NER Data',
+                                                   override_index=False,
+                                                   format=toolkit['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'ner.{toolkit["MODE"].lower()}',
+                                                   button_text=f'Download NER Data',
+                                                   override_index=False,
+                                                   format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
+                    st.markdown(prettyDownload(
+                        object_to_download=toolkit['SVG'],
+                        download_filename='rendering.html',
+                        button_text=f'Download Rendering Data',
+                        override_index=False),
+                        unsafe_allow_html=True
+                    )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -389,6 +425,14 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
         if st.button('Start POS Tagging', key='pos'):
@@ -428,13 +472,29 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown(prettyDownload(toolkit['DATA'], 'pos.csv', f'Download POS Data',
-                                               override_index=False),
-                                unsafe_allow_html=True)
-                    if toolkit['VERBOSE'] and toolkit['ONE_DATAPOINT']:
-                        st.markdown(prettyDownload(toolkit['SVG'], 'rendering.html', f'Download Rendering Data',
-                                                   override_index=False),
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'pos.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   button_text=f'Download POS Data',
+                                                   override_index=False,
+                                                   format=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'pos.{toolkit["MODE"].lower()}',
+                                                   button_text=f'Download POS Data',
+                                                   override_index=False,
+                                                   format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
+
+                    if toolkit['VERBOSE'] and toolkit['ONE_DATAPOINT']:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['SVG'],
+                            download_filename='rendering.html',
+                            button_text=f'Download Rendering Data',
+                            override_index=False),
+                            unsafe_allow_html=True
+                        )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -465,7 +525,7 @@ def app():
 
         if toolkit['SUM_MODE'] == 'Basic':
             # FLAGS
-            st.markdown('## Flags')
+            st.markdown('## Options')
             st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
                         'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
             toolkit['NLP_MODEL'] = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'),
@@ -505,6 +565,15 @@ def app():
             toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file '
                                                                 'name and content being downloaded again, a unique '
                                                                 'file identifier is tacked onto the filename.')
+            if toolkit['SAVE']:
+                if st.checkbox('Override Output Format?'):
+                    toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                    if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                        st.warning('Warning: Overridden Format is the same as Input Format')
+                else:
+                    toolkit['OVERRIDE_FORMAT'] = None
+
             toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
             if toolkit['VERBOSE']:
                 toolkit['VERBOSITY'] = st.slider('Data points',
@@ -548,14 +617,27 @@ def app():
                     if toolkit['SAVE']:
                         st.markdown('---')
                         st.markdown('## Download Data')
-                        st.markdown(prettyDownload(toolkit['DATA'], 'summarised.csv', 'Download Summarised Data',
-                                                   False))
+                        if toolkit['OVERRIDE_FORMAT'] is not None:
+                            st.markdown(prettyDownload(
+                                object_to_download=toolkit['DATA'],
+                                download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                button_text=f'Download Summarised Data',
+                                override_index=False,
+                                format=toolkit['OVERRIDE_FORMAT']),
+                                unsafe_allow_html=True)
+                        else:
+                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                       download_filename=f'summarised.{toolkit["MODE"].lower()}',
+                                                       button_text=f'Download Summarised Data',
+                                                       override_index=False,
+                                                       format=toolkit['MODE']),
+                                        unsafe_allow_html=True)
                 else:
                     st.error('Error: Data not loaded properly. Try again.')
 
         elif toolkit['SUM_MODE'] == 'Advanced':
             # FLAGS
-            st.markdown('## Flags')
+            st.markdown('## Options')
             st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
                         'advanced user, you may choose to modify the number of input tensors for the model. If '
                         'you do not wish to modify the setting, a default value of 512 will be used for your '
@@ -587,9 +669,16 @@ def app():
                     except Exception as ex:
                         st.error(ex)
 
-            toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file '
-                                                                'name and content being downloaded again, a unique '
-                                                                'file identifier is tacked onto the filename.')
+            toolkit['SAVE'] = st.checkbox('Save Outputs?')
+            if toolkit['SAVE']:
+                if st.checkbox('Override Output Format?'):
+                    toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                    if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                        st.warning('Warning: Overridden Format is the same as Input Format')
+                else:
+                    toolkit['OVERRIDE_FORMAT'] = None
+
             toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
 
             if toolkit['VERBOSE']:
@@ -652,9 +741,20 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Summarised Data')
-                    st.markdown(prettyDownload(toolkit['DATA'], 'summarised.csv', f'Download Summarised Data',
-                                               override_index=False),
-                                unsafe_allow_html=True)
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   button_text=f'Download Summarised Data',
+                                                   override_index=False,
+                                                   format=toolkit['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'summarised.{toolkit["MODE"].lower()}',
+                                                   button_text=f'Download Summarised Data',
+                                                   override_index=False,
+                                                   format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -675,9 +775,16 @@ def app():
                                                         'TextBlob performs better for more formal pieces of text. If '
                                                         'you are not sure which to choose, VADER is recommended due to '
                                                         'its higher accuracy of analysis compared to Textblob.')
-        toolkit['SAVE'] = st.checkbox('Save Outputs?',
-                                      help='Due to the possibility of files with the same file name and content being '
-                                           'downloaded again, a unique file identifier is tacked onto the filename.')
+        toolkit['SAVE'] = st.checkbox('Save Outputs?')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Data points',
@@ -824,20 +931,39 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    st.markdown(prettyDownload(toolkit['DATA'], 'sentiment_scores.csv', 'Download Sentiment Score Data',
-                                               override_index=False),
-                                unsafe_allow_html=True)
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'sentiment_scores.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                            button_text=f'Download Sentiment Score Data',
+                            override_index=False,
+                            format=toolkit['OVERRIDE_FORMAT']),
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                   download_filename=f'sentiment_scores.{toolkit["MODE"].lower()}',
+                                                   button_text=f'Download Sentiment Score Data',
+                                                   override_index=False,
+                                                   format=toolkit["MODE"]),
+                                    unsafe_allow_html=True)
 
                     if toolkit['HAC_PLOT'] is not None:
                         st.markdown('## Graphs')
-                        st.markdown(prettyDownload(toolkit['HAC_PLOT'], 'plot.png', f'Download Plot',
-                                                   override_index=False),
-                                    unsafe_allow_html=True)
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['HAC_PLOT'],
+                            download_filename='plot.png',
+                            button_text=f'Download Plot',
+                            override_index=False),
+                            unsafe_allow_html=True
+                        )
                     if toolkit['HAC_PLOT1'] is not None:
-                        st.markdown(prettyDownload(toolkit['HAC_PLOT1'], 'normal_plot.png', 'Download Normal '
-                                                                                            'Distribution Data',
-                                                   override_index=False),
-                                    unsafe_allow_html=True)
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['HAC_PLOT1'],
+                            download_filename='normal_plot.png',
+                            button_text=f'Download Normal Distribution Data',
+                            override_index=False),
+                            unsafe_allow_html=True
+                        )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -876,9 +1002,16 @@ def app():
 
         # FLAGS
         st.markdown('## Flags')
-        toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
-                                                            'and content being downloaded again, a unique file '
-                                                            'identifier is tacked onto the filename.')
+        toolkit['SAVE'] = st.checkbox('Save Outputs?')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?', help='Note: For LSI, if verbose is enabled, the model '
                                                                   'will be refitted such that only 2 components are '
                                                                   'considered. If you wish to turn off this feature, '
@@ -1031,22 +1164,49 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
-                                                           f'Download Topic List Data Entry {i}',
-                                                           override_index=False),
-                                            unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] is not None:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'lda_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                                else:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'lda_topics_{i}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['MODE']),
+                                        unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
-                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
-                                                       'Download Summarised Topic/Word List',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            if toolkit['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
 
                             st.markdown('### Other Requested Data')
-                            st.markdown(prettyDownload(pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']), 'lda.html',
-                                                       'Download pyLDAvis Rendering',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            st.markdown(prettyDownload(
+                                object_to_download=pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']),
+                                download_filename='lda.html',
+                                button_text='Download pyLDAvis Rendering',
+                                override_index=False),
+                                unsafe_allow_html=True
+                            )
 
                     # NMF
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Non-Negative Matrix Factorization':
@@ -1090,16 +1250,40 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
-                                                           f'Download Topic List Data Entry {i}',
-                                                           override_index=False),
-                                            unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] is not None:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'nmf_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                                else:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'nmf_topics_{i}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['MODE']),
+                                        unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
-                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
-                                                       'Download Summarised Topic/Word List',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            if toolkit['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
 
                     # LSI
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Latent Semantic Indexing':
@@ -1180,29 +1364,57 @@ def app():
                             st.markdown('## Save Data\n'
                                         '### Topics')
                             for i in range(len(toolkit['TOPIC_TEXT'])):
-                                st.markdown(prettyDownload(toolkit['TOPIC_TEXT'][i], f'lda_topics_{i}.csv',
-                                                           f'Download Topic List Data Entry {i}',
-                                                           override_index=False),
-                                            unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] is not None:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'lsi_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                                else:
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['TOPIC_TEXT'][i],
+                                        download_filename=f'lsi_topics_{i}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {i}',
+                                        override_index=False,
+                                        format=toolkit['MODE']),
+                                        unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
-                            st.markdown(prettyDownload(toolkit['KW'], f'summary_topics.csv',
-                                                       'Download Summarised Topic/Word List',
-                                                       override_index=False),
-                                        unsafe_allow_html=True)
+                            if toolkit['OVERRIDE_FORMAT'] is not None:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['KW'],
+                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
+                                    button_text=f'Download Summarised Topic/Word Data',
+                                    override_index=False,
+                                    format=toolkit['MODE']),
+                                    unsafe_allow_html=True)
 
                             if toolkit['VERBOSE'] and toolkit['PLOT']:
                                 st.markdown('### Other Requested Data')
-                                st.markdown(prettyDownload(toolkit['MAR_FIG'], f'marker_figure.png',
-                                                           'Download Marked Figure',
-                                                           override_index=False),
-                                            unsafe_allow_html=True)
+                                st.markdown(prettyDownload(
+                                    object_to_download=toolkit['MAR_FIG'],
+                                    download_filename=f'marker_figure.png',
+                                    button_text='Download Marked Figure',
+                                    override_index=False),
+                                    unsafe_allow_html=True)
 
                                 if toolkit['W_PLOT']:
-                                    st.markdown(prettyDownload(toolkit['WORD_FIG'], f'word_figure.png',
-                                                               'Download Word Figure',
-                                                               override_index=False),
-                                                unsafe_allow_html=True)
+                                    st.markdown(prettyDownload(
+                                        object_to_download=toolkit['WORD_FIG'],
+                                        download_filename=f'word_figure.png',
+                                        button_text='Download Word Figure',
+                                        override_index=False),
+                                        unsafe_allow_html=True)
             else:
                 st.error('Error: File not loaded properly. Try again.')
 
@@ -1288,6 +1500,19 @@ def app():
             if toolkit['SAVE']:
                 st.markdown('---')
                 st.markdown('## Download Data')
-                st.markdown(prettyDownload(toolkit['DATA'], 'classified.csv', f'Download Classified Data',
-                                           override_index=False),
-                            unsafe_allow_html=True)
+                if toolkit['OVERRIDE_FORMAT'] is not None:
+                    st.markdown(prettyDownload(
+                        object_to_download=toolkit['DATA'],
+                        download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                        button_text=f'Download Classified Data',
+                        override_index=False,
+                        format=toolkit['OVERRIDE_FORMAT']),
+                        unsafe_allow_html=True)
+                else:
+                    st.markdown(prettyDownload(
+                        object_to_download=toolkit['DATA'],
+                        download_filename=f'classified.{toolkit["MODE"].lower()}',
+                        button_text=f'Download Classified Data',
+                        override_index=False,
+                        format=toolkit['MODE']),
+                        unsafe_allow_html=True)

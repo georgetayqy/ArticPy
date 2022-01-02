@@ -72,6 +72,16 @@ def readFile(filepath, fformat):
             return pd.read_pickle(filepath)
         except Exception as e:
             st.error(f'Error: {e}')
+    elif fformat == 'JSON':
+        try:
+            return pd.read_json(filepath)
+        except Exception as e:
+            st.error(f'Error: {e}')
+    elif fformat == 'HDF5':
+        try:
+            return pd.read_hdf(filepath)
+        except Exception as e:
+            st.error(f'Error: {e}')
 
 
 def lemmatizeText(text):
@@ -285,25 +295,55 @@ def dominantTopic(vect, model, n_words):
 
 
 def prettyDownload(object_to_download: typing.Any, download_filename: str, button_text: str,
-                   override_index: bool) -> str:
+                   override_index: bool, format: typing.Optional[str] = None) -> str:
     """
     Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
 
     Generates a link to download the given object_to_download.
-    :param object_to_download:  The object to be downloaded.
+    :rtype: object
+    :param object_to_download:  The object to be downloaded, enter in a list to convert all dataframes into a final
+                                Excel sheet to output
     :param download_filename: filename and extension of file. e.g. mydata.csv, some_txt_output.txt
     :param button_text: Text to display on download button (e.g. 'click here to download file')
     :param override_index: Overrides
+    :param override_format: Processes data into the requested format
     :return: the anchor tag to download object_to_download
     """
 
     try:
         if isinstance(object_to_download, bytes):
             pass
+        elif isinstance(object_to_download, list):
+            out = io.BytesIO()
+            writer = pd.ExcelWriter(out, engine='openpyxl')
+
+            for dataframe in enumerate(object_to_download):
+                dataframe[1].to_excel(writer, sheet_name=f'Sheet{dataframe[0]}', index=override_index)
+
+            writer.save()
+            object_to_download = out.getvalue()
         elif isinstance(object_to_download, str):
             object_to_download = bytes(object_to_download, 'utf-8')
         elif isinstance(object_to_download, pd.DataFrame):
-            object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+            if format.lower() == 'xlsx':
+                out = io.BytesIO()
+                writer = pd.ExcelWriter(out, engine='openpyxl')
+                object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
+                writer.save()
+                object_to_download = out.getvalue()
+            elif format.lower() == 'csv':
+                object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+            elif format.lower() == 'json':
+                object_to_download = object_to_download.to_json(index=override_index)
+            elif format.lower() == 'hdf5':
+                st.warning('Output to HDF5 format is not currently supported. Defaulting to CSV instead...')
+                object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+            elif format.lower() == 'pkl':
+                out = io.BytesIO()
+                object_to_download.to_pickle(path=out)
+                object_to_download = out.getvalue()
+            else:
+                raise ValueError('Error: Unrecognised File Format')
         elif isinstance(object_to_download, plotly.graph_objs.Figure):
             object_to_download = plotly.io.to_image(object_to_download)
         elif isinstance(object_to_download, Image):

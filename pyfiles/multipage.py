@@ -1,12 +1,22 @@
 """
-Generates a helper class to assist with the generation of multiple Streamlit apps through object-oriented programming
+Generates a helper class to assist with the generation of multiple Streamlit apps
+
+This file also allows users to set the app config for the app
 """
 
 # IMPORT STREAMLIT
-import numpy as np
 import streamlit as st
-import pathlib
-import pandas as pd
+
+st.set_page_config(page_title='ArticPy',
+                   page_icon='❄',
+                   menu_items={
+                       'Report a bug': 'https://github.com/asdfghjkxd/ArticPy/issues',
+                       'About': '## ArticPy ❄ \n'
+                                'An app built to simplify and condense NLP tasks into one simple yet powerful '
+                                'Interface.\n\n'
+                                '### Project Contributors: \n\n'
+                                'Ong Jung Yi, PNSD & George Tay, PNSD'
+                   })
 
 
 # DEFINE THE MULTIPAGE CLASS TO MANAGE THE APPS
@@ -52,4 +62,7 @@ class MultiPage:
                                     self.pages,
                                     format_func=lambda page: page['title'])
         # RUN THE APP
-        page['function']()
+        try:
+            page['function']()
+        except ValueError:
+            page['function']()

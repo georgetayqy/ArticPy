@@ -787,7 +787,7 @@ def app():
                                          help='Choose "Local" if you wish to upload a file from your machine or choose '
                                               '"Online" if you wish to pull a file from any one of the supported Cloud '
                                               'Service Providers.')
-        trainer['MODE'] = col3_.selectbox('Define the Data Input Format', ('CSV', 'XLSX'))
+        trainer['MODE'] = col3_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
 
         if trainer['FILE'] == 'Local':
             trainer['PRED_FILEPATH'] = st.file_uploader(f'Load {trainer["MODE"]} File', type=[trainer['MODE']])

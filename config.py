@@ -69,19 +69,6 @@ load_clean_visualise = {
     'MOD_MODE': 'Country Extraction',
     'FIXED_KEY': True,
     'HEIGHT': 400,
-    'MONGODB_WORKER': False,
-    'MONGODB': {
-        'host': str,
-        'port': int,
-        'sshUser': str,
-        'sshPassword': str,
-        'mongoUsername': str,
-        'mongoPassword': str,
-        'authenticationDB': str,
-        'database': str,
-        'collection': str,
-        'ssh': str
-    }
 }
 
 dtm = {

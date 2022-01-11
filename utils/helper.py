@@ -26,14 +26,10 @@ import urllib.parse
 from collections import Counter
 from heapq import nlargest
 from string import punctuation
-import pymongo
-from pymongo import MongoClient
 from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
 from config import toolkit
-from sshtunnel import SSHTunnelForwarder
-from ssh_pymongo import MongoSession
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             DOWNLOAD DEPENDENCIES                                                | #

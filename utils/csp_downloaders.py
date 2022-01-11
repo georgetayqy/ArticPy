@@ -1,5 +1,8 @@
 """
-This module is used for the downloading of the files from the major CSPs.
+This module is used for the downloading of the files from the major CSPs
+
+Currently, the app's configs have been updated and large files are allowed to be uploaded locally, so long as the user
+specifies the maximum size of files to upload to the app
 """
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
@@ -7,11 +10,11 @@ This module is used for the downloading of the files from the major CSPs.
 import os
 import io
 import shutil
-
 import boto3
 import botocore
 import pandas as pd
 import streamlit as st
+
 from azure.storage.blob import BlobServiceClient
 from google.cloud import storage
 

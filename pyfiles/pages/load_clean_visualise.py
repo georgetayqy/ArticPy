@@ -25,7 +25,7 @@ from collections import Counter
 from texthero import preprocessing
 import plotly.express as px
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload
+from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload, MongoDB
 from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
 
 
@@ -60,7 +60,8 @@ def app():
                                              '**Data Modification**: \tThis mode allows users to modify their data by '
                                              'adding in new information or to change existing information.\n\n'
                                              '**Data Query**: \tThis mode allows users to query their data for '
-                                             'specific keywords of interest.')
+                                             'specific keywords of interest.',
+                                        key='analysis_mode_data')
     st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected!')
 
     st.markdown('## Upload Data\n')
@@ -186,6 +187,37 @@ def app():
         lcv['TOKENIZE'] = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect '
                                                                          'this option if you do not want to tokenize '
                                                                          'your data.')
+        lcv['MONGODB_WORKER'] = st.checkbox('Send to MongoDB?')
+        if lcv['MONGODB_WORKER']:
+            with st.form('MongoDB Connection Details'):
+                host = st.text_input('Key in the host to the MongoDB Server', value='localhost')
+                port = st.number_input('Key in the port to connect to the MongoDB Server',
+                                       value=27017,
+                                       step=1,
+                                       min_value=0,
+                                       max_value=65536)
+                sshUser = st.text_input('Key in the username of the VM', key='ssh_user')
+                sshPassword = st.text_input('Key in the password to the VM', key='ssh_pw')
+                mongoUsername = st.text_input('Key in the username of the MongoDB Database', key='mongo_user')
+                mongoPassword = st.text_input('Key in the password to the MongoDB Database', key='mongo_pw')
+                authentication = st.text_input('Key in the authentication source DB', value='admin', key='auth')
+                database = st.text_input('Key in the database to use', key='db')
+                collection = st.text_input('Key in the collection within database to use', key='col')
+                ssh_key = st.file_uploader('Upload PK', type=['PEM'])
+
+                if st.form_submit_button('Submit Configuration'):
+                    lcv['MONGODB']['host'] = host
+                    lcv['MONGODB']['port'] = port
+                    lcv['MONGODB']['sshUser'] = sshUser
+                    lcv['MONGODB']['sshPassword'] = sshPassword
+                    lcv['MONGODB']['mongoUsername'] = mongoUsername
+                    lcv['MONGODB']['mongoPassword'] = mongoPassword
+                    lcv['MONGODB']['authenticationDB'] = authentication
+                    lcv['MONGODB']['database'] = database
+                    lcv['MONGODB']['collection'] = collection
+                    lcv['MONGODB']['ssh'] = ssh_key
+                    st.success('Configuration Accepted!')
+
         if lcv['CLEAN_MODE'] == 'Complex':
             lcv['EXTEND_STOPWORD'] = st.checkbox('Extend List of Stopwords?',
                                                  help='Select this option to extend the list of stopwords that will '
@@ -340,8 +372,30 @@ def app():
                     if lcv['CLEAN_MODE'] == 'None':
                         # DO NOTHING
                         lcv['DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
-                        lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
-                        lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+
+                        if lcv['TOKENIZE']:
+                            lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
+                            lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+
+                        if lcv['MONGODB_WORKER']:
+                            mongo = MongoDB(
+                                host=lcv['MONGODB']['host'],
+                                port=lcv['MONGODB']['port'],
+                                sshUser=lcv['MONGODB']['sshUser'],
+                                sshPassword=lcv['MONGODB']['sshPassword'],
+                                mongoUsername=lcv['MONGODB']['mongoUsername'],
+                                mongoPassword=lcv['MONGODB']['mongoPassword'],
+                                authDB=lcv['MONGODB']['authenticationDB'],
+                                db=lcv['MONGODB']['database'],
+                                collection=lcv['MONGODB']['database']
+                            )
+                            mongo.authenticate()
+                            mongo.point()
+                            mongo.push(data=lcv['DATA'])
+                            if lcv['TOKENIZE']:
+                                mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
+                                mongo.resetPointer(db=lcv['MONGODB']['database'], collections='processedTokenizedData')
+                            mongo.close()
 
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
@@ -358,6 +412,27 @@ def app():
                             if lcv['TOKENIZE']:
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
                                 lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+
+                            if lcv['MONGODB_WORKER']:
+                                mongo = MongoDB(
+                                    host=lcv['MONGODB']['host'],
+                                    port=lcv['MONGODB']['port'],
+                                    sshUser=lcv['MONGODB']['sshUser'],
+                                    sshPassword=lcv['MONGODB']['sshPassword'],
+                                    mongoUsername=lcv['MONGODB']['mongoUsername'],
+                                    mongoPassword=lcv['MONGODB']['mongoPassword'],
+                                    authDB=lcv['MONGODB']['authenticationDB'],
+                                    db=lcv['MONGODB']['database'],
+                                    collection=lcv['MONGODB']['database']
+                                )
+                                mongo.authenticate()
+                                mongo.point()
+                                mongo.push(data=lcv['CLEANED_DATA'])
+                                if lcv['TOKENIZE']:
+                                    mongo.resetPointer(db=lcv['MONGODB']['database'],
+                                                       collections='processedTokenizedData')
+                                    mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
+                                mongo.close()
                         except Exception as ex:
                             st.error(ex)
 
@@ -414,6 +489,27 @@ def app():
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
                                 lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+
+                                if lcv['MONGODB_WORKER']:
+                                    mongo = MongoDB(
+                                        host=lcv['MONGODB']['host'],
+                                        port=lcv['MONGODB']['port'],
+                                        sshUser=lcv['MONGODB']['sshUser'],
+                                        sshPassword=lcv['MONGODB']['sshPassword'],
+                                        mongoUsername=lcv['MONGODB']['mongoUsername'],
+                                        mongoPassword=lcv['MONGODB']['mongoPassword'],
+                                        authDB=lcv['MONGODB']['authenticationDB'],
+                                        db=lcv['MONGODB']['database'],
+                                        collection=lcv['MONGODB']['database']
+                                    )
+                                    mongo.authenticate()
+                                    mongo.point()
+                                    mongo.push(data=lcv['CLEANED_DATA'])
+                                    if lcv['TOKENIZE']:
+                                        mongo.resetPointer(db=lcv['MONGODB']['database'],
+                                                           collections='processedTokenizedData')
+                                        mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
+                                    mongo.close()
                             except Exception as ex:
                                 st.error(ex)
 
@@ -496,7 +592,7 @@ def app():
                                                 download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
                                                 button_text=f'Download {data[1]}',
                                                 override_index=data[4],
-                                                format=lcv['OVERRIDE_FORMAT']),
+                                                format_=lcv['OVERRIDE_FORMAT']),
                                                 unsafe_allow_html=True)
                                         else:
                                             st.markdown(prettyDownload(
@@ -504,7 +600,7 @@ def app():
                                                 download_filename=f'{data[2]}.{data[3]}',
                                                 button_text=f'Download {data[1]}',
                                                 override_index=data[4],
-                                                format=lcv["MODE"]),
+                                                format_=lcv["MODE"]),
                                                 unsafe_allow_html=True
                                             )
                                 except KeyError:
@@ -525,7 +621,7 @@ def app():
                                             download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
                                             button_text=f'Download {data[1]}',
                                             override_index=data[4],
-                                            format=lcv['OVERRIDE_FORMAT']),
+                                            format_=lcv['OVERRIDE_FORMAT']),
                                             unsafe_allow_html=True
                                         )
                                     else:
@@ -534,7 +630,7 @@ def app():
                                             download_filename=f'{data[2]}.{data[3]}',
                                             button_text=f'Download {data[1]}',
                                             override_index=data[4],
-                                            format=lcv["MODE"]),
+                                            format_=lcv["MODE"]),
                                             unsafe_allow_html=True
                                         )
                             except KeyError:
@@ -555,7 +651,7 @@ def app():
                                                     download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
                                                     button_text=f'Download {data[1]}',
                                                     override_index=data[4],
-                                                    format=lcv['OVERRIDE_FORMAT']),
+                                                    format_=lcv['OVERRIDE_FORMAT']),
                                                     unsafe_allow_html=True
                                                 )
                                             else:
@@ -564,7 +660,7 @@ def app():
                                                     download_filename=f'{data[2]}.{data[3]}',
                                                     button_text=f'Download {data[1]}',
                                                     override_index=data[4],
-                                                    format=lcv["MODE"]),
+                                                    format_=lcv["MODE"]),
                                                     unsafe_allow_html=True
                                                 )
                                     except KeyError:
@@ -582,7 +678,7 @@ def app():
                                                 download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
                                                 button_text=f'Download {data[1]}',
                                                 override_index=data[4],
-                                                format=lcv['OVERRIDE_FORMAT']),
+                                                format_=lcv['OVERRIDE_FORMAT']),
                                                 unsafe_allow_html=True
                                             )
                                         else:
@@ -591,7 +687,7 @@ def app():
                                                 download_filename=f'{data[2]}.{data[3]}',
                                                 button_text=f'Download {data[1]}',
                                                 override_index=data[4],
-                                                format=lcv["MODE"]),
+                                                format_=lcv["MODE"]),
                                                 unsafe_allow_html=True
                                             )
                                 except KeyError:
@@ -667,7 +763,7 @@ def app():
                                     download_filename=f'globe_data.{lcv["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Globe Data',
                                     override_index=False,
-                                    format=lcv['OVERRIDE_FORMAT']),
+                                    format_=lcv['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True
                                 )
                                 st.markdown(prettyDownload(
@@ -675,7 +771,7 @@ def app():
                                     download_filename=f'globe_data_concat.{lcv["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Concatenated Globe Data',
                                     override_index=False,
-                                    format=lcv['OVERRIDE_FORMAT']),
+                                    format_=lcv['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True
                                 )
                             else:
@@ -684,7 +780,7 @@ def app():
                                     download_filename=f'globe_data.{lcv["MODE"]}',
                                     button_text=f'Download Globe Data',
                                     override_index=False,
-                                    format=lcv["MODE"]),
+                                    format_=lcv["MODE"]),
                                     unsafe_allow_html=True
                                 )
                                 st.markdown(prettyDownload(
@@ -692,7 +788,7 @@ def app():
                                     download_filename=f'globe_data_concat.csv',
                                     button_text=f'Download Concatenated Globe Data',
                                     override_index=False,
-                                    format=lcv["MODE"]),
+                                    format_=lcv["MODE"]),
                                     unsafe_allow_html=True
                                 )
                             if lcv['WORLD_MAP']:
@@ -780,7 +876,7 @@ def app():
                                     download_filename=f'modified_data.{lcv["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Modified Data',
                                     override_index=False,
-                                    format=lcv['OVERRIDE_FORMAT']),
+                                    format_=lcv['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True
                                 )
                             else:
@@ -789,7 +885,7 @@ def app():
                                     download_filename=f'modified_data.{lcv["MODE"].lower()}',
                                     button_text=f'Download Modified Data',
                                     override_index=False,
-                                    format=lcv["MODE"]),
+                                    format_=lcv["MODE"]),
                                     unsafe_allow_html=True
                                 )
                 else:
@@ -847,14 +943,14 @@ def app():
                                                            download_filename=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
                                                            button_text=f'Download Download Queried Data',
                                                            override_index=False,
-                                                           format=lcv['OVERRIDE_FORMAT']),
+                                                           format_=lcv['OVERRIDE_FORMAT']),
                                             unsafe_allow_html=True)
                             else:
                                 st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
                                                            download_filename=f'query.{lcv["MODE"].lower()}',
                                                            button_text=f'Download Queried Data',
                                                            override_index=False,
-                                                           format=lcv["MODE"]),
+                                                           format_=lcv["MODE"]),
                                             unsafe_allow_html=True)
                     else:
                         st.error('Query did not find matching keywords. Try again.')

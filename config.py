@@ -11,8 +11,8 @@ import streamlit as st
 from texthero import preprocessing
 from datetime import datetime
 
-STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
-DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
+# STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
+# DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
 
 # download the corpus
 nltk.download('words')
@@ -68,7 +68,20 @@ load_clean_visualise = {
     'QUERY_DATA': pd.DataFrame(),
     'MOD_MODE': 'Country Extraction',
     'FIXED_KEY': True,
-    'HEIGHT': 400
+    'HEIGHT': 400,
+    'MONGODB_WORKER': False,
+    'MONGODB': {
+        'host': str,
+        'port': int,
+        'sshUser': str,
+        'sshPassword': str,
+        'mongoUsername': str,
+        'mongoPassword': str,
+        'authenticationDB': str,
+        'database': str,
+        'collection': str,
+        'ssh': str
+    }
 }
 
 dtm = {

@@ -6,30 +6,34 @@ This file is used to store some of the basic helper functions that are used freq
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
 import io
+import logging
 import os
 import typing
-from collections import Counter
-from heapq import nlargest
-from string import punctuation
-
-from PIL import Image
 import nltk
 import numpy as np
 import pandas
 import pandas as pd
 import plotly.utils
 import streamlit as st
-from nltk.stem import WordNetLemmatizer
 import pandas_profiling
 import base64
-import os
 import json
 import pickle
 import uuid
 import re
+import urllib.parse
 
+from collections import Counter
+from heapq import nlargest
+from string import punctuation
+import pymongo
+from pymongo import MongoClient
+from PIL import Image
+from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
 from config import toolkit
+from sshtunnel import SSHTunnelForwarder
+from ssh_pymongo import MongoSession
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             DOWNLOAD DEPENDENCIES                                                | #
@@ -295,18 +299,19 @@ def dominantTopic(vect, model, n_words):
 
 
 def prettyDownload(object_to_download: typing.Any, download_filename: str, button_text: str,
-                   override_index: bool, format: typing.Optional[str] = None) -> str:
+                   override_index: bool, format_: typing.Optional[str] = None) -> str:
     """
     Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
 
     Generates a link to download the given object_to_download.
+
     :rtype: object
     :param object_to_download:  The object to be downloaded, enter in a list to convert all dataframes into a final
                                 Excel sheet to output
     :param download_filename: filename and extension of file. e.g. mydata.csv, some_txt_output.txt
     :param button_text: Text to display on download button (e.g. 'click here to download file')
     :param override_index: Overrides
-    :param override_format: Processes data into the requested format
+    :param format_: Format of the output file
     :return: the anchor tag to download object_to_download
     """
 
@@ -325,20 +330,20 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
         elif isinstance(object_to_download, str):
             object_to_download = bytes(object_to_download, 'utf-8')
         elif isinstance(object_to_download, pd.DataFrame):
-            if format.lower() == 'xlsx':
+            if format_.lower() == 'xlsx':
                 out = io.BytesIO()
                 writer = pd.ExcelWriter(out, engine='openpyxl')
                 object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
                 writer.save()
                 object_to_download = out.getvalue()
-            elif format.lower() == 'csv':
+            elif format_.lower() == 'csv':
                 object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
-            elif format.lower() == 'json':
+            elif format_.lower() == 'json':
                 object_to_download = object_to_download.to_json(index=override_index)
-            elif format.lower() == 'hdf5':
+            elif format_.lower() == 'hdf5':
                 st.warning('Output to HDF5 format is not currently supported. Defaulting to CSV instead...')
                 object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
-            elif format.lower() == 'pkl':
+            elif format_.lower() == 'pkl':
                 out = io.BytesIO()
                 object_to_download.to_pickle(path=out)
                 object_to_download = out.getvalue()
@@ -392,3 +397,182 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                                f'href="data:file/txt;base64,{b64}"> {button_text}</a><br></br>'
 
         return dl_link
+
+
+class MongoDB:
+    """
+    This class manages the pulling and pushing of data to and from a configured MongoDB server/MongoDB Atlas
+    """
+
+    def __init__(self, host: str = 'localhost', port: int = 27017, sshUser: str = 'user', sshPassword: str = 'password',
+                 mongoUsername: str = 'user', mongoPassword: str = 'password', authDB: str = 'admin', db: str = None,
+                 collection: str = None, ssh_path: os.PathLike = None):
+        """
+        This instantiates the MongoDB class and prepares the MongoDB connection
+
+        :param host:                        An IP address or website where MongoDB is hosted on
+        :param port:                        The port to connect to the IP address to
+        :param sshUser:                     SSH Username
+        :param sshPassword:                 SSH Password
+        :param mongoUsername:               Username of DB User
+        :param mongoPassword:               Password of DB User
+        :param authDB:                      DB used for authentication
+        :param db:                          Database to access
+        :param collection:                  Collection to access within Database
+        """
+
+        if isinstance(host, str):
+            self.host = host
+        else:
+            raise ValueError('Error: Invalid Host String. Only string values are accepted')
+
+        if isinstance(port, int) and port in range(0, 65536):
+            self.port = port
+        else:
+            raise ValueError('Error: Invalid Port')
+
+        if isinstance(sshUser, str):
+            self.sshUser = sshUser
+        else:
+            raise ValueError('Error: SSH Username Invalid')
+
+        if isinstance(sshPassword, str):
+            self.sshPassword = sshPassword
+        else:
+            raise ValueError('Error: SSH Password Invalid')
+
+        if isinstance(mongoUsername, str):
+            self.mongoUsername = mongoUsername
+        else:
+            raise ValueError('Error: MongoDB Username Invalid')
+
+        if isinstance(mongoPassword, str):
+            self.mongoPassword = mongoPassword
+        else:
+            raise ValueError('Error: MongoDB Password Invalid')
+
+        if isinstance(authDB, str):
+            self.authDB = authDB
+        else:
+            raise ValueError('Error: Invalid Authentication Database')
+
+        if isinstance(db, str):
+            self.db = db
+        else:
+            raise ValueError('Error: Invalid Database Name')
+
+        if isinstance(collection, str):
+            self.collection = collection
+        else:
+            raise ValueError('Error: Invalid Collection Name')
+
+        self.ssh_path = ssh_path
+
+        # define other constants
+        self.authenticatedUser = None
+        self.pointerDB = None
+        self.pointerCollection = None
+        self.query = None
+        self.tunnel = None
+
+    def __repr__(self):
+        return repr(f'User {self.username} is connected to {self.host} through {self.port}, with the pointer at '
+                    f'{self.db}.{self.collection}!')
+
+    def __str__(self):
+        return repr(f'User {self.username} is connected to {self.host} through {self.port}, with the pointer at '
+                    f'{self.db}.{self.collection}!')
+
+    def authenticate(self):
+        """
+        Authenticates the user to the MongoDB server
+        """
+
+        # self.uri = f'mongodb://{self.username}:{self.password}@{self.host}:{self.port}'
+
+        try:
+            self.authenticatedUser = MongoSession(
+                self.host,
+                port=22,
+                user=self.sshUser,
+                password=self.sshPassword,
+                key=self.ssh_path,
+                uri=f'mongodb://{self.mongoUsername}@{self.mongoPassword}@10.0.0.4:{self.port}'
+            )
+        except pymongo.errors.ConnectionFailure:
+            st.error('Error: Connection failed to establish. Try again.')
+        except pymongo.errors.ConfigurationError:
+            st.error('Error: The Connection is not configured properly. Try again.')
+        except pymongo.errors.PyMongoError:
+            st.error('Error: Unknown fatal error. Execution failure point: Connecting to the MongoDB server.')
+        except Exception as ex:
+            st.error(f'Unknown Fatal Error: {ex}')
+        else:
+            st.success('Authenticated!')
+
+    def point(self):
+        """
+        Instantiates the pointer to the database and collection of interest
+        """
+
+        try:
+            self.pointerDB = self.authenticatedUser.connection[self.db]
+            self.pointerCollection = self.pointerDB[self.collection]
+        except pymongo.errors.CollectionInvalid:
+            st.error('Error: The Collection referenced is invalid. Try again.')
+        except pymongo.errors.PyMongoError:
+            st.error('Error: Unknown fatal error. Execution failure point: Retrieving the database and collections'
+                     'found in the database.')
+        else:
+            st.success('Successfully connected to the server!')
+
+    def pull(self, query: dict):
+        if query:
+            self.query = {iter_: doc for (iter_, doc) in enumerate(self.collection.find(dict))}
+            st.dataframe(pd.DataFrame.from_dict(self.query).astype(str))
+        else:
+            st.error('Error: Query cannot be empty.')
+
+    def push(self, data: pandas.DataFrame):
+        """
+        Pushes data from local machine to the MongoDB server
+
+        :param data:                A pandas DataFrame containing data of interest
+        """
+
+        if isinstance(data, pandas.DataFrame):
+            data.reset_index(inplace=True)
+
+            # dataframe is converted to records form as mongodb is a non-relational database
+            data_ = data.to_dict('records')
+
+            try:
+                self.pointerCollection.insert_many(data_)
+            except pymongo.errors.BulkWriteError:
+                st.error('Error: Error in writing entire dataframe. Try again.')
+            except pymongo.errors.DocumentTooLarge:
+                st.error('Error: Document is too large. Try reducing the size of your document before uploading it.')
+            except pymongo.errors.DuplicateKeyError:
+                st.error('Error: Duplicate keys exist within dataset. Remove them before uploading to MongoDB.')
+            except pymongo.errors.OperationFailure:
+                st.error('Operation failed to execute. Try again.')
+            else:
+                st.success('Insertion to DB succeeded!')
+        else:
+            st.error(f'Error: Invalid datatype. Expected <pandas.DataFrame> but received {type(data)} instead.')
+
+    def resetPointer(self, db: str, collections: str):
+        """
+        Resets the pointers to the database and collection of interest
+
+        :param db:                      Database to change to
+        :param collections:             Collection to change to
+        """
+
+        self.db = db
+        self.collection = collections
+        self.point()
+
+    def close(self):
+        self.authenticatedUser.stop()
+        st.success('Database Connection Terminated!')

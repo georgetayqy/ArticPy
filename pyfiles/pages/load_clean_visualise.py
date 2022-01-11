@@ -25,7 +25,7 @@ from collections import Counter
 from texthero import preprocessing
 import plotly.express as px
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload, MongoDB
+from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload
 from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
 
 
@@ -187,36 +187,6 @@ def app():
         lcv['TOKENIZE'] = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect '
                                                                          'this option if you do not want to tokenize '
                                                                          'your data.')
-        lcv['MONGODB_WORKER'] = st.checkbox('Send to MongoDB?')
-        if lcv['MONGODB_WORKER']:
-            with st.form('MongoDB Connection Details'):
-                host = st.text_input('Key in the host to the MongoDB Server', value='localhost')
-                port = st.number_input('Key in the port to connect to the MongoDB Server',
-                                       value=27017,
-                                       step=1,
-                                       min_value=0,
-                                       max_value=65536)
-                sshUser = st.text_input('Key in the username of the VM', key='ssh_user')
-                sshPassword = st.text_input('Key in the password to the VM', key='ssh_pw')
-                mongoUsername = st.text_input('Key in the username of the MongoDB Database', key='mongo_user')
-                mongoPassword = st.text_input('Key in the password to the MongoDB Database', key='mongo_pw')
-                authentication = st.text_input('Key in the authentication source DB', value='admin', key='auth')
-                database = st.text_input('Key in the database to use', key='db')
-                collection = st.text_input('Key in the collection within database to use', key='col')
-                ssh_key = st.file_uploader('Upload PK', type=['PEM'])
-
-                if st.form_submit_button('Submit Configuration'):
-                    lcv['MONGODB']['host'] = host
-                    lcv['MONGODB']['port'] = port
-                    lcv['MONGODB']['sshUser'] = sshUser
-                    lcv['MONGODB']['sshPassword'] = sshPassword
-                    lcv['MONGODB']['mongoUsername'] = mongoUsername
-                    lcv['MONGODB']['mongoPassword'] = mongoPassword
-                    lcv['MONGODB']['authenticationDB'] = authentication
-                    lcv['MONGODB']['database'] = database
-                    lcv['MONGODB']['collection'] = collection
-                    lcv['MONGODB']['ssh'] = ssh_key
-                    st.success('Configuration Accepted!')
 
         if lcv['CLEAN_MODE'] == 'Complex':
             lcv['EXTEND_STOPWORD'] = st.checkbox('Extend List of Stopwords?',
@@ -377,26 +347,6 @@ def app():
                             lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
                             lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
 
-                        if lcv['MONGODB_WORKER']:
-                            mongo = MongoDB(
-                                host=lcv['MONGODB']['host'],
-                                port=lcv['MONGODB']['port'],
-                                sshUser=lcv['MONGODB']['sshUser'],
-                                sshPassword=lcv['MONGODB']['sshPassword'],
-                                mongoUsername=lcv['MONGODB']['mongoUsername'],
-                                mongoPassword=lcv['MONGODB']['mongoPassword'],
-                                authDB=lcv['MONGODB']['authenticationDB'],
-                                db=lcv['MONGODB']['database'],
-                                collection=lcv['MONGODB']['database']
-                            )
-                            mongo.authenticate()
-                            mongo.point()
-                            mongo.push(data=lcv['DATA'])
-                            if lcv['TOKENIZE']:
-                                mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
-                                mongo.resetPointer(db=lcv['MONGODB']['database'], collections='processedTokenizedData')
-                            mongo.close()
-
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
                             lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
@@ -412,27 +362,6 @@ def app():
                             if lcv['TOKENIZE']:
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
                                 lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
-
-                            if lcv['MONGODB_WORKER']:
-                                mongo = MongoDB(
-                                    host=lcv['MONGODB']['host'],
-                                    port=lcv['MONGODB']['port'],
-                                    sshUser=lcv['MONGODB']['sshUser'],
-                                    sshPassword=lcv['MONGODB']['sshPassword'],
-                                    mongoUsername=lcv['MONGODB']['mongoUsername'],
-                                    mongoPassword=lcv['MONGODB']['mongoPassword'],
-                                    authDB=lcv['MONGODB']['authenticationDB'],
-                                    db=lcv['MONGODB']['database'],
-                                    collection=lcv['MONGODB']['database']
-                                )
-                                mongo.authenticate()
-                                mongo.point()
-                                mongo.push(data=lcv['CLEANED_DATA'])
-                                if lcv['TOKENIZE']:
-                                    mongo.resetPointer(db=lcv['MONGODB']['database'],
-                                                       collections='processedTokenizedData')
-                                    mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
-                                mongo.close()
                         except Exception as ex:
                             st.error(ex)
 
@@ -489,27 +418,6 @@ def app():
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
                                 lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
-
-                                if lcv['MONGODB_WORKER']:
-                                    mongo = MongoDB(
-                                        host=lcv['MONGODB']['host'],
-                                        port=lcv['MONGODB']['port'],
-                                        sshUser=lcv['MONGODB']['sshUser'],
-                                        sshPassword=lcv['MONGODB']['sshPassword'],
-                                        mongoUsername=lcv['MONGODB']['mongoUsername'],
-                                        mongoPassword=lcv['MONGODB']['mongoPassword'],
-                                        authDB=lcv['MONGODB']['authenticationDB'],
-                                        db=lcv['MONGODB']['database'],
-                                        collection=lcv['MONGODB']['database']
-                                    )
-                                    mongo.authenticate()
-                                    mongo.point()
-                                    mongo.push(data=lcv['CLEANED_DATA'])
-                                    if lcv['TOKENIZE']:
-                                        mongo.resetPointer(db=lcv['MONGODB']['database'],
-                                                           collections='processedTokenizedData')
-                                        mongo.push(data=lcv['CLEANED_DATA_TOKENIZED'])
-                                    mongo.close()
                             except Exception as ex:
                                 st.error(ex)
 

@@ -326,14 +326,14 @@ def app():
                                                    download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                                    button_text=f'Download NER Data',
                                                    override_index=False,
-                                                   format=toolkit['OVERRIDE_FORMAT']),
+                                                   format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                     else:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'ner.{toolkit["MODE"].lower()}',
                                                    button_text=f'Download NER Data',
                                                    override_index=False,
-                                                   format=toolkit['MODE']),
+                                                   format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
                     st.markdown(prettyDownload(
                         object_to_download=toolkit['SVG'],
@@ -469,14 +469,14 @@ def app():
                                                    download_filename=f'pos.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                                    button_text=f'Download POS Data',
                                                    override_index=False,
-                                                   format=toolkit['OVERRIDE_FORMAT']),
+                                                   format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                     else:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'pos.{toolkit["MODE"].lower()}',
                                                    button_text=f'Download POS Data',
                                                    override_index=False,
-                                                   format=toolkit['MODE']),
+                                                   format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
                     if toolkit['VERBOSE'] and toolkit['ONE_DATAPOINT']:
@@ -613,14 +613,14 @@ def app():
                                 download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                 button_text=f'Download Summarised Data',
                                 override_index=False,
-                                format=toolkit['OVERRIDE_FORMAT']),
+                                format_=toolkit['OVERRIDE_FORMAT']),
                                 unsafe_allow_html=True)
                         else:
                             st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                        download_filename=f'summarised.{toolkit["MODE"].lower()}',
                                                        button_text=f'Download Summarised Data',
                                                        override_index=False,
-                                                       format=toolkit['MODE']),
+                                                       format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
                 else:
                     st.error('Error: Data not loaded properly. Try again.')
@@ -736,14 +736,14 @@ def app():
                                                    download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                                    button_text=f'Download Summarised Data',
                                                    override_index=False,
-                                                   format=toolkit['OVERRIDE_FORMAT']),
+                                                   format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                     else:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'summarised.{toolkit["MODE"].lower()}',
                                                    button_text=f'Download Summarised Data',
                                                    override_index=False,
-                                                   format=toolkit['MODE']),
+                                                   format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -927,14 +927,14 @@ def app():
                             download_filename=f'sentiment_scores.{toolkit["OVERRIDE_FORMAT"].lower()}',
                             button_text=f'Download Sentiment Score Data',
                             override_index=False,
-                            format=toolkit['OVERRIDE_FORMAT']),
+                            format_=toolkit['OVERRIDE_FORMAT']),
                             unsafe_allow_html=True)
                     else:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'sentiment_scores.{toolkit["MODE"].lower()}',
                                                    button_text=f'Download Sentiment Score Data',
                                                    override_index=False,
-                                                   format=toolkit["MODE"]),
+                                                   format_=toolkit["MODE"]),
                                     unsafe_allow_html=True)
 
                     if toolkit['HAC_PLOT'] is not None:
@@ -1160,7 +1160,7 @@ def app():
                                         download_filename=f'lda_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
@@ -1168,7 +1168,7 @@ def app():
                                         download_filename=f'lda_topics_{i}.{toolkit["MODE"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['MODE']),
+                                        format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
@@ -1178,7 +1178,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                             else:
                                 st.markdown(prettyDownload(
@@ -1186,7 +1186,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['MODE']),
+                                    format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
                             st.markdown('### Other Requested Data')
@@ -1246,7 +1246,7 @@ def app():
                                         download_filename=f'nmf_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
@@ -1254,7 +1254,7 @@ def app():
                                         download_filename=f'nmf_topics_{i}.{toolkit["MODE"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['MODE']),
+                                        format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
@@ -1264,7 +1264,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                             else:
                                 st.markdown(prettyDownload(
@@ -1272,7 +1272,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['MODE']),
+                                    format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
                     # LSI
@@ -1360,7 +1360,7 @@ def app():
                                         download_filename=f'lsi_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['OVERRIDE_FORMAT']),
+                                        format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
@@ -1368,7 +1368,7 @@ def app():
                                         download_filename=f'lsi_topics_{i}.{toolkit["MODE"].lower()}',
                                         button_text=f'Download Topic List Data Entry {i}',
                                         override_index=False,
-                                        format=toolkit['MODE']),
+                                        format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
                             st.markdown('### Topic/Word List')
@@ -1378,7 +1378,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['OVERRIDE_FORMAT']),
+                                    format_=toolkit['OVERRIDE_FORMAT']),
                                     unsafe_allow_html=True)
                             else:
                                 st.markdown(prettyDownload(
@@ -1386,7 +1386,7 @@ def app():
                                     download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
                                     button_text=f'Download Summarised Topic/Word Data',
                                     override_index=False,
-                                    format=toolkit['MODE']),
+                                    format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
                             if toolkit['VERBOSE'] and toolkit['PLOT']:
@@ -1496,7 +1496,7 @@ def app():
                         download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
                         button_text=f'Download Classified Data',
                         override_index=False,
-                        format=toolkit['OVERRIDE_FORMAT']),
+                        format_=toolkit['OVERRIDE_FORMAT']),
                         unsafe_allow_html=True)
                 else:
                     st.markdown(prettyDownload(
@@ -1504,5 +1504,5 @@ def app():
                         download_filename=f'classified.{toolkit["MODE"].lower()}',
                         button_text=f'Download Classified Data',
                         override_index=False,
-                        format=toolkit['MODE']),
+                        format_=toolkit['MODE']),
                         unsafe_allow_html=True)

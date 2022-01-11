@@ -752,11 +752,22 @@ def app():
                     # run the command
                     st.markdown('### Outputs')
                     try:
-                        subprocess.run(var_list)
+                        results = subprocess.run(var_list, capture_output=True)
                     except Exception as ex:
                         st.error(ex)
                     else:
-                        st.success(f'Successfully trained model! Model saved in {os.getcwd()}{trainer["output_dir"]}.')
+                        st.markdown('#### Outputs')
+                        try:
+                            results.check_returncode()
+                            st.write(results.stdout)
+                        except subprocess.CalledProcessError:
+                            st.error('Error: Command cannot be executed. Try again.')
+                    finally:
+                        if os.path.exist(os.path.join(os.getcwd(), trainer['output_dir'])):
+                            st.success(f'Successfully trained model! Model saved in {os.getcwd()}'
+                                       f'{trainer["output_dir"]}.')
+                        else:
+                            st.error('Error: Model is not saved.')
 
     elif trainer['MODEL_MODE'] == 'Evaluation':
         st.markdown('## Options')

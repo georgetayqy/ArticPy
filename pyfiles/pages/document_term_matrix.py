@@ -7,11 +7,9 @@ A large portion of this module uses the nltk and scikit-learn packages to create
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             IMPORT RELEVANT LIBRARIES                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import io
 import os
 import pathlib
 import platform
-
 import pandas as pd
 import streamlit as st
 

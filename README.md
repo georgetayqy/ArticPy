@@ -25,9 +25,9 @@ created pre-made Docker images hosted on Github Packages for you to use. To do s
 system and run the following commands on Terminal or Powershell:
 
 ```shell
-docker pull docker pull ghcr.io/asdfghjkxd/app:2.2
+docker pull docker pull ghcr.io/asdfghjkxd/app:main
 
-docker run -it -p 5000:8501 --name news ghcr.io/asdfghjkxd/app:2.2
+docker run -it -p 5000:8501 --name news ghcr.io/asdfghjkxd/app:main
 ```
 
 The created Docker Container can then be accessed through `localhost` on Port `5000`!
@@ -35,7 +35,7 @@ The created Docker Container can then be accessed through `localhost` on Port `5
 If Command Lines are not your thing, you can do the same using the Docker Desktop GUI! Just follow the steps below to 
 set up the Container:
 
-- Open up Terminal or Powershell and key in the command `docker pull ghcr.io/asdfghjkxd/app:2.2` word for word (we 
+- Open up Terminal or Powershell and key in the command `docker pull ghcr.io/asdfghjkxd/app:main` word for word (we 
   promise this is the only Command Line step in the entire process!)
 - Click on the _Images_ tab on the sidebar and find the image you have pulled in the above step
 - Click on the _Run_ button
@@ -81,8 +81,3 @@ following tasks on your dataset:
 - Named Entity Recognition
 - Position of Speech Tagging
 - Summary
-
-
-### NLP Model Trainer
-This module will allow you to train NLP models you can use for your NLP tasks. This module requires you to have a 
-compatible GPU (NVIDIA GPUs) to run inference/classification tasks.

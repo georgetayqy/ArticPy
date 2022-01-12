@@ -6,7 +6,6 @@ This file is used to store some of the basic helper functions that are used freq
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
 import io
-import logging
 import os
 import typing
 import nltk
@@ -21,7 +20,6 @@ import json
 import pickle
 import uuid
 import re
-import urllib.parse
 
 from collections import Counter
 from heapq import nlargest
@@ -29,7 +27,6 @@ from string import punctuation
 from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
-from config import toolkit
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             DOWNLOAD DEPENDENCIES                                                | #

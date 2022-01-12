@@ -9,9 +9,7 @@ visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_pr
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
-import pathlib
 import re
-import nltk
 import numpy as np
 import pandas as pd
 import pycountry
@@ -22,10 +20,9 @@ from config import load_clean_visualise as lcv
 from streamlit_tags import st_tags
 from texthero import stopwords
 from collections import Counter
-from texthero import preprocessing
 import plotly.express as px
 from utils import csp_downloaders
-from utils.helper import readFile, lemmatizeText, downloadCorpora, printDataFrame, prettyDownload
+from utils.helper import readFile, lemmatizeText, printDataFrame, prettyDownload
 from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
 
 

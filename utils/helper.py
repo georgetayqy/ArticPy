@@ -28,23 +28,11 @@ from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
 
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                             DOWNLOAD DEPENDENCIES                                                | #
-# -------------------------------------------------------------------------------------------------------------------- #
-with st.spinner('Downloading WordNet Corpora...'):
-    nltk.download('wordnet')
-    nltk.download('vader_lexicon')
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                         GLOBAL VARIABLES DECLARATION                                             | #
-# -------------------------------------------------------------------------------------------------------------------- #
-lemmatizer = WordNetLemmatizer()
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               HELPER FUNCTIONS                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-def readFile(filepath, fformat):
+def readFile(filepath: str or os.path, fformat: str):
     """
     This is a helper function to read the data
 
@@ -90,10 +78,11 @@ def lemmatizeText(text):
     :param text:                        Text to lemmatize (string)
     ----------
     """
+    lemmatizer = WordNetLemmatizer()
     return [lemmatizer.lemmatize(word) for word in text]
 
 
-def summarise(text, stopwords, pos_tag, nlp, sent_count):
+def summarise(text: pd.DataFrame, stopwords: list or set, pos_tag, nlp, sent_count: int):
     """
     This function summarise the text dataframe
 
@@ -344,7 +333,8 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                 raise ValueError('Error: Unrecognised File Format')
         elif isinstance(object_to_download, plotly.graph_objs.Figure):
             object_to_download = plotly.io.to_image(object_to_download)
-        elif isinstance(object_to_download, Image):
+        # type of Image is <module>, possible clashes?
+        elif isinstance(object_to_download, type(Image)):
             buffer = io.BytesIO()
             object_to_download.save(buffer, format='png')
             object_to_download = buffer.getvalue()
@@ -376,12 +366,12 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     border-image: initial;
                 }} 
                 #{button_id}:hover {{
-                    border-color: rgb(246, 51, 102);
+                    border-color: rgb(79, 187, 255);
                     color: rgb(246, 51, 102);
                 }}
                 #{button_id}:active {{
                     box-shadow: none;
-                    background-color: rgb(246, 51, 102);
+                    background-color: rgb(79, 187, 255);
                     color: white;
                     }}
             </style> """

@@ -194,9 +194,7 @@ def app():
                                                text='Press Enter to extend list...',
                                                maxtags=9999999,
                                                key='extender')
-                if len(lcv['STOPWORD_LIST']) != 0:
-                    st.info('**Alert**: Words detected.')
-                else:
+                if len(lcv['STOPWORD_LIST']) == 0:
                     st.info('**Alert**: No Words detected')
 
     elif lcv['ANALYSIS_MODE'] == 'Data Modification':

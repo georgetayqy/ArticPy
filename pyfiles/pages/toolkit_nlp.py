@@ -286,18 +286,21 @@ def app():
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
             if not toolkit['DATA'].empty:
-                # CLEAN UP AND STANDARDISE DATAFRAMES
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                toolkit['DATA']['NER'] = ''
-                toolkit['DATA']['COMPILED_LABELS'] = ''
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
-
-                for index in range(len(toolkit['DATA'])):
-                    temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                    toolkit['DATA'].at[index, 'NER'] = str(list(zip([word.text for word in temp_nlp.ents],
-                                                                    [word.label_ for word in temp_nlp.ents])))
-                    toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.label_ for word
-                                                                                 in temp_nlp.ents])))
+                # EFFICIENT NLP PIPING
+                ner = []
+                lab = []
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
+                                               disable=['tagger', 'parser', 'entity_linker', 'entity_ruler',
+                                                        'textcat', 'textcat_multilabel', 'lemmatizer',
+                                                        'morphologizer', 'attribute_ruler', 'senter',
+                                                        'sentencizer', 'tok2vec', 'transformer'],
+                                               batch_size=2000,
+                                               n_process=1):
+                    ner.append(str(list(zip([word.text for word in doc.ents], [word.label_ for word in doc.ents]))))
+                    lab.append(str(list(set([word.label_ for word in doc.ents]))))
+                toolkit['DATA']['NER'] = ner
+                toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
                     st.markdown('## NER DataFrame')
@@ -319,26 +322,34 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                                   button_text=f'Download NER Data',
-                                                   override_index=False,
-                                                   format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
+                        st.markdown(
+                            prettyDownload(
+                                object_to_download=toolkit['DATA'],
+                                download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                button_text=f'Download NER Data',
+                                override_index=False,
+                                format_=toolkit['OVERRIDE_FORMAT']),
+                            unsafe_allow_html=True
+                        )
                     else:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'ner.{toolkit["MODE"].lower()}',
-                                                   button_text=f'Download NER Data',
-                                                   override_index=False,
-                                                   format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['SVG'],
-                        download_filename='rendering.html',
-                        button_text=f'Download Rendering Data',
-                        override_index=False),
-                        unsafe_allow_html=True
-                    )
+                        st.markdown(
+                            prettyDownload(
+                                object_to_download=toolkit['DATA'],
+                                download_filename=f'ner.{toolkit["MODE"].lower()}',
+                                button_text=f'Download NER Data',
+                                override_index=False,
+                                format_=toolkit['MODE']),
+                            unsafe_allow_html=True
+                        )
+                    if toolkit['ONE_DATAPOINT']:
+                        st.markdown(
+                            prettyDownload(
+                                object_to_download=toolkit['SVG'],
+                                download_filename='rendering.html',
+                                button_text=f'Download Rendering Data',
+                                override_index=False),
+                            unsafe_allow_html=True
+                        )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -429,15 +440,21 @@ def app():
             toolkit['SVG'] = None
 
             if not toolkit['DATA'].empty:
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                toolkit['DATA']['POS'] = ''
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
-
-                for index in range(len(toolkit['DATA'])):
-                    temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                    toolkit['DATA'].at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
-                                                                    [word.pos_ for word in temp_nlp])))
-                    toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.pos_ for word in temp_nlp])))
+                # EFFICIENT NLP PIPING
+                pos = []
+                lab = []
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
+                                               disable=['ner', 'parser', 'entity_linker', 'entity_ruler',
+                                                        'textcat', 'textcat_multilabel', 'lemmatizer',
+                                                        'morphologizer', 'attribute_ruler', 'senter',
+                                                        'sentencizer', 'tok2vec', 'transformer'],
+                                               batch_size=2000,
+                                               n_process=1):
+                    pos.append(str(list(zip([str(word) for word in doc], [word.pos_ for word in doc]))))
+                    lab.append(str(list(set([word.pos_ for word in doc]))))
+                toolkit['DATA']['POS'] = pos
+                toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
                     st.markdown('## POS DataFrame')
@@ -447,7 +464,6 @@ def app():
                     if toolkit['ONE_DATAPOINT']:
                         verbose_data_copy = toolkit['DATA'].copy()
                         temp_df = verbose_data_copy[toolkit['DATA_COLUMN']][toolkit['DATAPOINT_SELECTOR']]
-                        st.markdown('## DisplaCy Rendering')
                         st.info('Renders are not shown due to the sheer size of the image. Kindly save the render in '
                                 'HTML format below to view it.')
                         toolkit['SVG'] = displacy.render(list(toolkit['NLP'](str(temp_df)).sents),
@@ -581,9 +597,7 @@ def app():
                 if not toolkit['DATA'].empty:
                     try:
                         # CLEAN UP AND STANDARDISE DATAFRAMES
-                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                        toolkit['DATA']['SUMMARY'] = np.nan
-                        toolkit['DATA'] = toolkit['DATA'].astype(str)
+                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
                     except KeyError:
                         st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
                     except Exception as ex:
@@ -629,7 +643,7 @@ def app():
                         'advanced user, you may choose to modify the number of input tensors for the model. If '
                         'you do not wish to modify the setting, a default value of 512 will be used for your '
                         'summmary.\n\n'
-                        'If your system has a GPU enabled, you may wish to install the GPU (CUDA) enabled version '
+                        'If your system has a GPU , you may wish to install the GPU (CUDA) enabled version '
                         'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
                         'and to check if your GPU is enabled.')
             with st.expander('GPU-enabled Features'):

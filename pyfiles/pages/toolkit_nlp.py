@@ -60,6 +60,75 @@ def app():
                 'and save the cleaned  data onto your workstation. Those files may come in useful in '
                 'the functionality of this app.\n\n')
 
+    st.markdown('## Upload Data\n')
+    col1, col1_ = st.columns(2)
+    toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                     help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                          '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                          'Service Providers.')
+    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                                 FILE UPLOADING                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+    if toolkit['FILE'] == 'Local':
+        toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
+        if toolkit['DATA_PATH'] is not None:
+            toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
+            if not toolkit['DATA'].empty:
+                toolkit['DATA'] = toolkit['DATA'].astype(str)
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+        else:
+            toolkit['DATA'] = pd.DataFrame()
+
+    elif toolkit['FILE'] == 'Online':
+        st.info(f'File Format Selected: **{toolkit["MODE"]}**')
+        toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+
+        if toolkit['CSP'] == 'Azure':
+            azure = csp_downloaders.AzureDownloader()
+            if azure.SUCCESSFUL:
+                try:
+                    azure.downloadBlob()
+                    toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
+        elif toolkit['CSP'] == 'Amazon':
+            aws = csp_downloaders.AWSDownloader()
+            if aws.SUCCESSFUL:
+                try:
+                    aws.downloadFile()
+                    toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
+        elif toolkit['CSP'] == 'Google':
+            gcs = csp_downloaders.GoogleDownloader()
+            if gcs.SUCCESSFUL:
+                try:
+                    gcs.downloadBlob()
+                    toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              FUNCTION SELECTOR                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -69,77 +138,6 @@ def app():
                                        ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
                                         'Named Entity Recognition', 'POS Tagging', 'Summarise'))
     st.info(f'**{toolkit["APP_MODE"]}** Selected')
-
-    if toolkit['APP_MODE'] != 'News Classifier':
-        st.markdown('## Upload Data\n')
-        col1, col1_ = st.columns(2)
-        toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
-                                         help='Choose "Local" if you wish to upload a file from your machine or choose '
-                                              '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                              'Service Providers.')
-        toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                 FILE UPLOADING                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
-        if toolkit['FILE'] == 'Local':
-            toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
-            if toolkit['DATA_PATH'] is not None:
-                toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA'] = toolkit['DATA'].astype(str)
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-            else:
-                toolkit['DATA'] = pd.DataFrame()
-
-        elif toolkit['FILE'] == 'Online':
-            st.info(f'File Format Selected: **{toolkit["MODE"]}**')
-            toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
-
-            if toolkit['CSP'] == 'Azure':
-                azure = csp_downloaders.AzureDownloader()
-                if azure.SUCCESSFUL:
-                    try:
-                        azure.downloadBlob()
-                        toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-
-            elif toolkit['CSP'] == 'Amazon':
-                aws = csp_downloaders.AWSDownloader()
-                if aws.SUCCESSFUL:
-                    try:
-                        aws.downloadFile()
-                        toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-
-            elif toolkit['CSP'] == 'Google':
-                gcs = csp_downloaders.GoogleDownloader()
-                if gcs.SUCCESSFUL:
-                    try:
-                        gcs.downloadBlob()
-                        toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -764,8 +762,7 @@ def app():
         st.markdown('---')
         st.markdown('# Sentiment Analysis\n'
                     'For this module, both the VADER and TextBlob models will be used to analyse the sentiment of the '
-                    'text you upload.\n'
-                    'For VADER, your sentiment score will be ')
+                    'text you upload.\n')
 
         # FLAGS
         st.markdown('## Options')
@@ -817,62 +814,64 @@ def app():
                         replace(to_replace=replacer, regex=True)
 
                     vader_analyser = SentimentIntensityAnalyzer()
-                    sent_score_list = []
-                    sent_label_list = []
 
-                    for i in toolkit['DATA']['VADER SENTIMENT TEXT'].tolist():
-                        sent_score = vader_analyser.polarity_scores(i)
+                    def score2label(score: int or float):
+                        if score < 0:
+                            return 'Negative'
+                        elif score == 0:
+                            return 'Neutral'
+                        else:
+                            return 'Positive'
 
-                        if sent_score['compound'] > 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Positive')
-                        elif sent_score['compound'] == 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Neutral')
-                        elif sent_score['compound'] < 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Negative')
-
-                    toolkit['DATA']['VADER OVERALL SENTIMENT'] = sent_label_list
-                    toolkit['DATA']['VADER OVERALL SCORE'] = sent_score_list
-                    toolkit['DATA']['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
-                                                                 toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
-                    toolkit['DATA']['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
-                                                                toolkit['DATA']['VADER SENTIMENT TEXT'].values.tolist()]
-                    toolkit['DATA']['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
-                                                                 toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
+                    toolkit['DATA']['VADER OVERALL SCORE'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['compound']
+                    )
+                    toolkit['DATA']['VADER OVERALL SENTIMENT'] = toolkit['DATA']['VADER OVERALL SCORE'].apply(
+                        lambda x: score2label(x)
+                    )
+                    toolkit['DATA']['VADER POSITIVE SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['pos']
+                    )
+                    toolkit['DATA']['VADER NEUTRAL SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['neu']
+                    )
+                    toolkit['DATA']['VADER NEGATIVE SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['neg']
+                    )
 
                 elif toolkit['BACKEND_ANALYSER'] == 'TextBlob':
                     try:
-                        pol_list = []
-                        sub_list = []
+                        def score2label(score: int or float):
+                            if score < 0:
+                                return 'Negative'
+                            elif score == 0:
+                                return 'Neutral'
+                            else:
+                                return 'Positive'
+
+                        def score2subject(score: int or float):
+                            if score < 0.5:
+                                return 'Objective'
+                            elif score > 0.5:
+                                return 'Subjective'
+                            elif score == 0.5:
+                                return 'Neutral'
 
                         # APPLY POLARITY FUNCTION
-                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                            apply(lambda x: TextBlob(x).sentiment.polarity)
-                        for i in toolkit['DATA']['POLARITY SCORE'].tolist():
-                            if float(i) > 0:
-                                pol_list.append('Positive')
-                            elif float(i) < 0:
-                                pol_list.append('Negative')
-                            elif float(i) == 0:
-                                pol_list.append('Neutral')
-                        toolkit['DATA']['POLARITY SENTIMENT'] = pol_list
+                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']].apply(
+                            lambda x: TextBlob(x).sentiment.polarity
+                        )
+                        toolkit['DATA']['POLARITY SENTIMENT'] = toolkit['DATA']['POLARITY SCORE'].apply(
+                            lambda x: score2label(float(x))
+                        )
 
                         # APPLY SUBJECTIVITY FUNCTION
                         toolkit['DATA']['SUBJECTIVITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']].apply(
                             lambda x: TextBlob(x).sentiment.subjectivity
                         )
-                        for i in toolkit['DATA']['SUBJECTIVITY SCORE'].tolist():
-                            if float(i) < 0.5:
-                                sub_list.append('Objective')
-                            elif float(i) > 0.5:
-                                sub_list.append('Subjective')
-                            elif float(i) == 0.5:
-                                sub_list.append('Neutral')
-                        toolkit['DATA']['SUBJECTIVITY SENTIMENT'] = sub_list
+                        toolkit['DATA']['SUBJECTIVITY SENTIMENT'] = toolkit['DATA']['SUBJECTIVITY SCORE'].apply(
+                            lambda x: score2subject(float(x))
+                        )
                     except Exception as ex:
                         st.error(f'Error: {ex}')
 
@@ -968,6 +967,7 @@ def app():
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
+# TODO
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                TOPIC MODELLING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #

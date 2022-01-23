@@ -1,20 +1,12 @@
 """
 This file contains all the default parameters used in the app
 """
-import os
-import typing
 
 import pandas as pd
 import nltk
-import pathlib
-import streamlit as st
 from texthero import preprocessing
-from datetime import datetime
 
-# STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
-# DOWNLOAD_PATH = (STREAMLIT_STATIC_PATH / "downloads")
-
-# download the corpus
+# DOWNLOAD CORPUS
 nltk.download('words')
 
 load_clean_visualise = {

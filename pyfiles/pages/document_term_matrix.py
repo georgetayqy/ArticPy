@@ -88,6 +88,7 @@ def app():
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
         else:
             # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
             dtm['DATA'] = pd.DataFrame()
 
     elif dtm['FILE'] == 'Online':

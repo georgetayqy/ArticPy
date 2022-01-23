@@ -1,5 +1,6 @@
 [global]
 disableWatchdogWarning = true
+dataFrameSerialization = "legacy"
 
 [server]
 maxUploadSize = 1024000

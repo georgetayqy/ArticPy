@@ -7,6 +7,7 @@ This file is used to store some of the basic helper functions that are used freq
 # -------------------------------------------------------------------------------------------------------------------- #
 import io
 import os
+import sys
 import typing
 import nltk
 import numpy as np
@@ -20,6 +21,7 @@ import json
 import pickle
 import uuid
 import re
+import pathlib
 
 from collections import Counter
 from heapq import nlargest
@@ -27,6 +29,12 @@ from string import punctuation
 from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
+
+# CREATE STATIC DOWNLOAD LINK
+STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
+DOWNLOAD_PATH = STREAMLIT_STATIC_PATH / 'downloads'
+if not DOWNLOAD_PATH.is_dir():
+    DOWNLOAD_PATH.mkdir()
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -198,6 +206,9 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     """
     Takes in a Pandas DataFrame and prints out the DataFrame
 
+    Allowed for the checking of the dataframe size to avoid MESSAGE_SIZE_LIMIT errors and RuntimeExceptions
+    at runtime
+
     Parameter
     ----------
     data:                               Pandas DataFrame or Series object
@@ -208,56 +219,38 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     ----------
     """
 
-    if verbose_level != 0:
-        try:
-            if extract_from is not None:
-                st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
-            else:
-                st.dataframe(data.head(verbose_level), height=600, width=800)
-        except RuntimeError:
-            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-            st.dataframe(data.head(10), height=600, width=800)
-        except KeyError:
-            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
-        except Exception as ex:
-            st.error(f'Error: {ex}')
-        else:
-            if advanced:
+    try:
+        if data.memory_usage(deep=True).sum() < 50000000:
+            if verbose_level != 0:
                 if extract_from is not None:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data[[extract_from]].profile_report(
-                            explorative=True,
-                            minimal=True))
+                    st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
                 else:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data.profile_report(
-                            explorative=True,
-                            minimal=True))
+                    st.dataframe(data.head(verbose_level), height=600, width=800)
+            else:
+                if extract_from is not None:
+                    st.dataframe(data[[extract_from]], height=600, width=800)
+                else:
+                    st.dataframe(data, height=600, width=800)
+        else:
+            # REVERT T0 20 DATAPOINT IF DATAFRAME EXCEEDS LIMIT
+            st.warning('Warning: Size of DataFrame exceeds limits imposed. Defaulting to 20 data points of display...')
+            st.dataframe(data.head(20), height=600, width=800)
+    except KeyError:
+        st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
+    except Exception as ex:
+        st.error(f'Error: {ex}')
     else:
-        try:
+        if advanced:
             if extract_from is not None:
-                st.dataframe(data[[extract_from]], height=600, width=800)
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data[[extract_from]].profile_report(
+                        explorative=True,
+                        minimal=True))
             else:
-                st.dataframe(data, height=600, width=800)
-        except RuntimeError:
-            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-            st.dataframe(data.head(10), height=600, width=800)
-        except KeyError:
-            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
-        except Exception as ex:
-            st.error(f'Error: {ex}')
-        else:
-            if advanced:
-                if extract_from is not None:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data[[extract_from]].profile_report(
-                            explorative=True,
-                            minimal=True))
-                else:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data.profile_report(
-                            explorative=True,
-                            minimal=True))
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data.profile_report(
+                        explorative=True,
+                        minimal=True))
 
 
 def dominantTopic(vect, model, n_words):

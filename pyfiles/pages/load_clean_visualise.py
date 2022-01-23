@@ -9,6 +9,7 @@ visualisation part is handled by streamlit, streamlit_pandas_profiling/pandas_pr
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import re
 import numpy as np
 import pandas as pd
@@ -20,10 +21,13 @@ from config import load_clean_visualise as lcv
 from streamlit_tags import st_tags
 from texthero import stopwords
 from collections import Counter
+from plotly.io import to_image
 import plotly.express as px
 from utils import csp_downloaders
 from utils.helper import readFile, lemmatizeText, printDataFrame, prettyDownload
 from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder
+
+# TODO: fix pandas to file converters
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -33,6 +37,50 @@ def app():
     """
     Main function that will be called when the app is run and this module is called
     """
+
+    # INIT SESSION STATE
+    if ('clean_proceed' or 'country_extraction_proceed' or 'query_proceed' or
+            'modify_proceed') not in st.session_state:
+        st.session_state.clean_proceed = False
+        st.session_state.country_extraction_proceed = False
+        st.session_state.modify_proceed = False
+        st.session_state.query_proceed = False
+
+    def call_clean():
+        """Callback function to set the session state to true"""
+        st.session_state.clean_proceed = True
+
+    def call_extract_modify():
+        """Callback function to set the session state to true"""
+        st.session_state.country_extraction_proceed = True
+
+    def call_modify():
+        """Callback function to set the session state to true"""
+        st.session_state.modify_proceed = True
+
+    def call_query():
+        """Callback function to set the session state to true"""
+        st.session_state.query_proceed = True
+
+    def deinit_clean():
+        """Callback function to set the session state to false"""
+        st.session_state.clean_proceed = False
+
+    def deinit_modify():
+        """Callback function to set the session state to false"""
+        st.session_state.country_extraction_proceed = False
+        st.session_state.modify_proceed = False
+
+    def deinit_query():
+        """Callback function to set the session state to false"""
+        st.session_state.query_proceed = False
+
+    def deinit_master():
+        """Callback function to set the session state to false"""
+        st.session_state.clean_proceed = False
+        st.session_state.country_extraction_proceed = False
+        st.session_state.modify_proceed = False
+        st.session_state.query_proceed = False
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
@@ -66,8 +114,10 @@ def app():
     lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.')
-    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                      'Service Providers.',
+                                 on_change=deinit_master)
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                  on_change=deinit_master)
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -84,6 +134,7 @@ def app():
                 st.success(f'Data Loaded from **{lcv["DATA_COLUMN"]}**!')
         else:
             # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
             lcv['DATA'] = pd.DataFrame()
 
     elif lcv['FILE'] == 'Online':
@@ -99,6 +150,8 @@ def app():
                 except Exception as ex:
                     lcv['DATA'] = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+            else:
+                st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
@@ -113,6 +166,8 @@ def app():
                 except Exception as ex:
                     lcv['DATA'] = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+            else:
+                st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
@@ -144,7 +199,8 @@ def app():
         if lcv['SAVE']:
             if st.checkbox('Override Output Format?'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                      on_change=deinit_clean)
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -180,15 +236,18 @@ def app():
                                               'Files created from simple cleaning may be used for Summarization in NLP '
                                               'Toolkit while files created from complex cleaning may be used for '
                                               'Document-Term Matrix Creation in Document-Term Matrix. Note that for '
-                                              'most NLP Processes, the complex cleaning process is recommended.')
+                                              'most NLP Processes, the complex cleaning process is recommended.',
+                                         on_change=deinit_clean)
         lcv['TOKENIZE'] = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect '
                                                                          'this option if you do not want to tokenize '
-                                                                         'your data.')
+                                                                         'your data.',
+                                      on_change=deinit_clean)
 
         if lcv['CLEAN_MODE'] == 'Complex':
             lcv['EXTEND_STOPWORD'] = st.checkbox('Extend List of Stopwords?',
                                                  help='Select this option to extend the list of stopwords that will '
-                                                      'be used to clean your data.')
+                                                      'be used to clean your data.',
+                                                 on_change=deinit_clean)
             if lcv['EXTEND_STOPWORD']:
                 lcv['STOPWORD_LIST'] = st_tags(label='**Keyword List**',
                                                text='Press Enter to extend list...',
@@ -204,7 +263,8 @@ def app():
                                             'certain elementary analysis on the data. So far, we have implemented the '
                                             'ability to extract the countries mentioned in your data and to plot out '
                                             'the Data Points on a World Map and the ability to modify a single value '
-                                            'of the inputted DataFrame in place.')
+                                            'of the inputted DataFrame in place.',
+                                       on_change=deinit_modify)
         if lcv['MOD_MODE'] == 'Country Extraction':
             st.markdown('## Options\n')
             lcv['SAVE'] = st.checkbox('Save Outputs?',
@@ -215,7 +275,8 @@ def app():
             if lcv['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_modify)
                     if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -243,7 +304,7 @@ def app():
                 lcv['WORLD_MAP'] = st.checkbox('Generate a World Map Representation of the Countries Mentioned?',
                                                value=True)
         elif lcv['MOD_MODE'] == 'Inplace Data Modification':
-            lcv['FIXED_KEY'] = st.checkbox('Use Fixed Key for Editing Table?')
+            lcv['FIXED_KEY'] = st.checkbox('Use Fixed Key for Editing Table?', on_change=deinit_modify)
             lcv['HEIGHT'] = st.number_input('Height of Table', min_value=100, max_value=800, value=400)
 
     elif lcv['ANALYSIS_MODE'] == 'Data Query':
@@ -255,7 +316,8 @@ def app():
         if lcv['SAVE']:
             if st.checkbox('Override Output Format?'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                      on_change=deinit_query)
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -280,7 +342,8 @@ def app():
                                                         'processing power to complete. Deselect this option if this '
                                                         'if you do not require it.')
         lcv['MATCH'] = st.checkbox('Query Must Match Exactly?', help='Select this option if you want your query string/'
-                                                                     'condition to match exactly with your data.')
+                                                                     'condition to match exactly with your data.',
+                                   on_change=deinit_query)
 
         lcv['QUERY'] = st_tags(label='**Query**',
                                text='Press Enter to extend list...',
@@ -317,7 +380,7 @@ def app():
             else:
                 st.warning('File has not been loaded.')
 
-        if st.button('Begin Analysis', key='runner'):
+        if st.button('Begin Analysis', on_click=call_clean) or st.session_state.clean_proceed:
             # RESET STATE
             lcv['CLEANED_DATA'] = pd.DataFrame()
             lcv['CLEANED_DATA_TOKENIZED'] = pd.DataFrame()
@@ -326,11 +389,11 @@ def app():
                     (lcv['FILE'] == 'Online' and not lcv['DATA'].empty):
                 if not lcv['DATA'].empty:
                     try:
-                        lcv['DATA'] = lcv['DATA'].astype(str)
-                        lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].str.encode('ascii', 'ignore')\
-                            .str.decode('ascii')
+                        lcv['DATA'].dropna(inplace=True)
+                        lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].apply(lambda x: x.encode(
+                            'ascii', 'ignore').decode('ascii'))
                         lcv['DATA'] = pd.DataFrame(data=lcv['DATA'])
-                        lcv['DATA'] = lcv['DATA'].dropna()
+
                     except Exception as ex:
                         st.error(f'Error: {ex}')
 
@@ -340,7 +403,7 @@ def app():
 
                         if lcv['TOKENIZE']:
                             lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
-                            lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                            lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
 
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
@@ -352,11 +415,9 @@ def app():
                             lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             lcv['CLEANED_DATA'].dropna(inplace=True, subset=['CLEANED CONTENT'])
 
-                            lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
-
                             if lcv['TOKENIZE']:
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
                         except Exception as ex:
                             st.error(ex)
 
@@ -409,10 +470,9 @@ def app():
                                 # UPDATE TOKENS
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
                                 lcv['CLEANED_DATA_TOKENIZED'].update([str(text) for text in fin_list])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
-                                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
                             except Exception as ex:
                                 st.error(ex)
 
@@ -488,24 +548,69 @@ def app():
                                 try:
                                     st.markdown('---')
                                     st.markdown('## Download Data')
-                                    for data in lcv['FINALISED_DATA_LIST']:
+                                    for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                         if lcv['OVERRIDE_FORMAT'] is not None:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv['OVERRIDE_FORMAT']),
-                                                unsafe_allow_html=True)
+                                            if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_csv(index=False),
+                                                                   mime='text/csv',
+                                                                   file_name=f'{data[2]}.'
+                                                                             f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                   key=f'data{index}')
+                                            elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                                b_io = io.BytesIO()
+                                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                data[0].to_excel(writer, sheet_name='Sheet1')
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=b_io,
+                                                                   mime='application/vnd.openxmlformats-officedocument'
+                                                                        '.spreadsheetml.sheet',
+                                                                   file_name=f'{data[2]}.'
+                                                                             f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                   key=f'data{index}')
+                                            elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_json(index=False),
+                                                                   mime='application/json',
+                                                                   file_name=f'{data[2]}.'
+                                                                             f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                   key=f'data{index}')
+                                            elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_pickle(),
+                                                                   mime='application/octet-stream',
+                                                                   file_name=f'{data[2]}.'
+                                                                             f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                   key=f'data{index}')
                                         else:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{data[3]}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv["MODE"]),
-                                                unsafe_allow_html=True
-                                            )
+                                            if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_csv(index=False),
+                                                                   mime='text/csv',
+                                                                   file_name=f'{data[2]}.csv',
+                                                                   key=f'data{index}')
+                                            elif lcv['MODE'] == 'XLSX':
+                                                b_io = io.BytesIO()
+                                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                data[0].to_excel(writer, sheet_name='Sheet1')
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=b_io,
+                                                                   mime='application/vnd.openxmlformats-officedocument'
+                                                                        '.spreadsheetml.sheet',
+                                                                   file_name=f'{data[2]}.xlsx',
+                                                                   key=f'data{index}')
+                                            elif lcv['MODE'] == 'JSON':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_json(index=False),
+                                                                   mime='application/json',
+                                                                   file_name=f'{data[2]}.json',
+                                                                   key=f'data{index}')
+                                            elif lcv['MODE'] == 'PKL':
+                                                st.download_button(label=f'Download {data[1]}',
+                                                                   data=data[0].to_pickle(),
+                                                                   mime='application/octet-stream',
+                                                                   file_name=f'{data[2]}.pkl',
+                                                                   key=f'data{index}')
                                 except KeyError:
                                     st.error('Warning: Your data was not processed properly. Try again.')
                                 except Exception as ex:
@@ -517,86 +622,224 @@ def app():
                             try:
                                 st.markdown('---')
                                 st.markdown('## Download Data')
-                                for data in lcv['FINALISED_DATA_LIST']:
+                                for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                     if lcv['OVERRIDE_FORMAT'] is not None:
-                                        st.markdown(prettyDownload(
-                                            object_to_download=data[0],
-                                            download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                            button_text=f'Download {data[1]}',
-                                            override_index=data[4],
-                                            format_=lcv['OVERRIDE_FORMAT']),
-                                            unsafe_allow_html=True
-                                        )
+                                        if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_csv(index=False),
+                                                               mime='text/csv',
+                                                               file_name=f'{data[2]}.'
+                                                                         f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                               key=f'data{index}')
+                                        elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                            b_io = io.BytesIO()
+                                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                            data[0].to_excel(writer, sheet_name='Sheet1')
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=b_io,
+                                                               mime='application/vnd.openxmlformats-officedocument'
+                                                                    '.spreadsheetml.sheet',
+                                                               file_name=f'{data[2]}.'
+                                                                         f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                               key=f'data{index}')
+                                        elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_json(index=False),
+                                                               mime='application/json',
+                                                               file_name=f'{data[2]}.'
+                                                                         f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                               key=f'data{index}')
+                                        elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_pickle(),
+                                                               mime='application/octet-stream',
+                                                               file_name=f'{data[2]}.'
+                                                                         f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                               key=f'data{index}')
                                     else:
-                                        st.markdown(prettyDownload(
-                                            object_to_download=data[0],
-                                            download_filename=f'{data[2]}.{data[3]}',
-                                            button_text=f'Download {data[1]}',
-                                            override_index=data[4],
-                                            format_=lcv["MODE"]),
-                                            unsafe_allow_html=True
-                                        )
+                                        if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_csv(index=False),
+                                                               mime='text/csv',
+                                                               file_name=f'{data[2]}.csv',
+                                                               key=f'data{index}')
+                                        elif lcv['MODE'] == 'XLSX':
+                                            b_io = io.BytesIO()
+                                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                            data[0].to_excel(writer, sheet_name='Sheet1')
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=b_io,
+                                                               mime='application/vnd.openxmlformats-officedocument'
+                                                                    '.spreadsheetml.sheet',
+                                                               file_name=f'{data[2]}.xlsx',
+                                                               key=f'data{index}')
+                                        elif lcv['MODE'] == 'JSON':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_json(index=False),
+                                                               mime='application/json',
+                                                               file_name=f'{data[2]}.json',
+                                                               key=f'data{index}')
+                                        elif lcv['MODE'] == 'PKL':
+                                            st.download_button(label=f'Download {data[1]}',
+                                                               data=data[0].to_pickle(),
+                                                               mime='application/octet-stream',
+                                                               file_name=f'{data[2]}.pkl',
+                                                               key=f'data{index}')
                             except KeyError:
                                 st.error('Warning: Your data was not processed properly. Try again.')
                             except Exception as ex:
                                 st.error(f'Error: Unknown Fatal Error -> {ex}')
 
                         elif lcv['CLEAN_MODE'] == 'Complex':
+                            st.markdown('---')
+                            st.markdown('## Download Data')
                             if lcv['EXTEND_STOPWORD']:
                                 if lcv['FINALISE']:
                                     try:
-                                        st.markdown('---')
-                                        st.markdown('## Download Data')
-                                        for data in lcv['FINALISED_DATA_LIST']:
+                                        for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
+                                            st.markdown('---')
+                                            st.markdown('## Download Data')
                                             if lcv['OVERRIDE_FORMAT'] is not None:
-                                                st.markdown(prettyDownload(
-                                                    object_to_download=data[0],
-                                                    download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                                    button_text=f'Download {data[1]}',
-                                                    override_index=data[4],
-                                                    format_=lcv['OVERRIDE_FORMAT']),
-                                                    unsafe_allow_html=True
-                                                )
+                                                if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_csv(index=False),
+                                                                       mime='text/csv',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                                    b_io = io.BytesIO()
+                                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=b_io,
+                                                                       mime='application/vnd.openxmlformats-office'
+                                                                            'document.spreadsheetml.sheet',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_json(index=False),
+                                                                       mime='application/json',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_pickle(),
+                                                                       mime='application/octet-stream',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
                                             else:
-                                                st.markdown(prettyDownload(
-                                                    object_to_download=data[0],
-                                                    download_filename=f'{data[2]}.{data[3]}',
-                                                    button_text=f'Download {data[1]}',
-                                                    override_index=data[4],
-                                                    format_=lcv["MODE"]),
-                                                    unsafe_allow_html=True
-                                                )
+                                                if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_csv(index=False),
+                                                                       mime='text/csv',
+                                                                       file_name=f'{data[2]}.csv',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'XLSX':
+                                                    b_io = io.BytesIO()
+                                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=b_io,
+                                                                       mime='application/vnd.openxmlformats-office'
+                                                                            'document.spreadsheetml.sheet',
+                                                                       file_name=f'{data[2]}.xlsx',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'JSON':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_json(index=False),
+                                                                       mime='application/json',
+                                                                       file_name=f'{data[2]}.json',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'PKL':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_pickle(),
+                                                                       mime='application/octet-stream',
+                                                                       file_name=f'{data[2]}.pkl',
+                                                                       key=f'data{index}')
                                     except KeyError:
                                         st.error('Warning: Your data was not processed properly. Try again.')
                                     except Exception as ex:
                                         st.error(f'Error: Unknown Fatal Error -> {ex}')
                             else:
-                                try:
-                                    st.markdown('---')
-                                    st.markdown('## Download Data')
-                                    for data in lcv['FINALISED_DATA_LIST']:
-                                        if lcv['OVERRIDE_FORMAT'] is not None:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv['OVERRIDE_FORMAT']),
-                                                unsafe_allow_html=True
-                                            )
-                                        else:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{data[3]}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv["MODE"]),
-                                                unsafe_allow_html=True
-                                            )
-                                except KeyError:
-                                    st.error('Warning: Your Data as not processed properly. Try again.')
-                                except Exception as ex:
-                                    st.error(f'Error: Unknown Fatal Error -> {ex}')
+                                if lcv['FINALISE']:
+                                    try:
+                                        for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
+                                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                                st.markdown('---')
+                                                st.markdown('## Download Data')
+                                                if lcv['OVERRIDE_FORMAT'] == 'CSV' or \
+                                                        lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_csv(index=False),
+                                                                       mime='text/csv',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                                    b_io = io.BytesIO()
+                                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=b_io,
+                                                                       mime='application/vnd.openxmlformats-office'
+                                                                            'document.spreadsheetml.sheet',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_json(index=False),
+                                                                       mime='application/json',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                                elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_pickle(),
+                                                                       mime='application/octet-stream',
+                                                                       file_name=f'{data[2]}.'
+                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       key=f'data{index}')
+                                            else:
+                                                if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_csv(index=False),
+                                                                       mime='text/csv',
+                                                                       file_name=f'{data[2]}.csv',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'XLSX':
+                                                    b_io = io.BytesIO()
+                                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=b_io,
+                                                                       mime='application/vnd.openxmlformats-office'
+                                                                            'document.spreadsheetml.sheet',
+                                                                       file_name=f'{data[2]}.xlsx',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'JSON':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_json(index=False),
+                                                                       mime='application/json',
+                                                                       file_name=f'{data[2]}.json',
+                                                                       key=f'data{index}')
+                                                elif lcv['MODE'] == 'PKL':
+                                                    st.download_button(label=f'Download {data[1]}',
+                                                                       data=data[0].to_pickle(),
+                                                                       mime='application/octet-stream',
+                                                                       file_name=f'{data[2]}.pkl',
+                                                                       key=f'data{index}')
+                                    except KeyError:
+                                        st.error('Warning: Your Data as not processed properly. Try again.')
+                                    except Exception as ex:
+                                        st.error(f'Error: Unknown Fatal Error -> {ex}')
+                                else:
+                                    st.error('Hmm... For some reason your data was not processed properly. Try again.')
                 else:
                     st.error('Error: No Files Uploaded.')
             else:
@@ -626,7 +869,8 @@ def app():
                 else:
                     st.warning('File has not been loaded.')
 
-            if st.button('Begin Country Extraction', key='country'):
+            if st.button('Begin Country Extraction', on_click=call_extract_modify) or \
+                    st.session_state.country_extraction_proceed:
                 lcv['GLOBE_DATA'] = pd.DataFrame()
                 lcv['GLOBE_FIG'] = None
 
@@ -661,47 +905,126 @@ def app():
                             st.markdown('---')
                             st.markdown('## Download Data')
                             if lcv['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(
-                                    object_to_download=lcv['DATA'],
-                                    download_filename=f'globe_data.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Globe Data',
-                                    override_index=False,
-                                    format_=lcv['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True
-                                )
-                                st.markdown(prettyDownload(
-                                    object_to_download=lcv['GLOBE_DATA'],
-                                    download_filename=f'globe_data_concat.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Concatenated Globe Data',
-                                    override_index=False,
-                                    format_=lcv['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True
-                                )
+                                if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'globe_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'globe_data_concat.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='concat')
+                                elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    b_io1 = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    writer1 = pd.ExcelWriter(b_io1, engine='openpyxl')
+                                    lcv['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    lcv['GLOBE_DATA'].to_excel(writer1, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'globe_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=b_io1,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'globe_data_concat.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='concat')
+                                elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'globe_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'globe_data_concat.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='concat')
+                                elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'globe_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'globe_data_concat.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='concat')
                             else:
-                                st.markdown(prettyDownload(
-                                    object_to_download=lcv['DATA'],
-                                    download_filename=f'globe_data.{lcv["MODE"]}',
-                                    button_text=f'Download Globe Data',
-                                    override_index=False,
-                                    format_=lcv["MODE"]),
-                                    unsafe_allow_html=True
-                                )
-                                st.markdown(prettyDownload(
-                                    object_to_download=lcv['GLOBE_DATA'],
-                                    download_filename=f'globe_data_concat.csv',
-                                    button_text=f'Download Concatenated Globe Data',
-                                    override_index=False,
-                                    format_=lcv["MODE"]),
-                                    unsafe_allow_html=True
-                                )
+                                if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'globe_data.csv',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'globe_data_concat.csv',
+                                                       key='concat')
+                                elif lcv['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    b_io1 = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    writer1 = pd.ExcelWriter(b_io1, engine='openpyxl')
+                                    lcv['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    lcv['GLOBE_DATA'].to_excel(writer1, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'globe_data.xlsx',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=b_io1,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'globe_data_concat.xlsx',
+                                                       key='concat')
+                                elif lcv['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'globe_data.json',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'globe_data_concat.json',
+                                                       key='concat')
+                                elif lcv['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Globe Data',
+                                                       data=lcv['DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'globe_data.pkl',
+                                                       key='total')
+                                    st.download_button(label=f'Download Concatenated Globe Data',
+                                                       data=lcv['GLOBE_DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'globe_data_concat.pkl',
+                                                       key='concat')
+
                             if lcv['WORLD_MAP']:
-                                st.markdown(prettyDownload(
-                                    object_to_download=lcv['GLOBE_FIG'],
-                                    download_filename='map.png',
-                                    button_text=f'Download Map Representation',
-                                    override_index=False),
-                                    unsafe_allow_html=True
-                                )
+                                st.download_button(label=f'Download Map Representation',
+                                                   data=to_image(lcv['GLOBE_FIG']),
+                                                   mime='map.png',
+                                                   file_name=f'map.png',
+                                                   key='map')
                         except ValueError:
                             st.warning('Error: Not connected to the Internet. Plot may not be generated properly. '
                                        'Connect to the Internet and try again.')
@@ -740,9 +1063,35 @@ def app():
                             fit_columns_on_grid_load=True
                         )
 
-                    if st.button('Generate Modified Data'):
-                        st.markdown('## Download Data')
-                        st.markdown(prettyDownload(ag['data'], 'modified_data.csv', 'Download Modified Data', False))
+                    if st.button('Generate Modified Data', on_click=call_modify) or st.session_state.modify_proceed:
+                        if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                            st.download_button(label=f'Download Modified Data',
+                                               data=ag['data'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'modified_data.csv',
+                                               key='total')
+                        elif lcv['MODE'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            ag['data'].to_excel(writer, sheet_name='Sheet1')
+                            st.download_button(label=f'Download Modified Data',
+                                               data=b_io,
+                                               mime='application/vnd.openxmlformats-officedocument'
+                                                    '.spreadsheetml.sheet',
+                                               file_name=f'modified_data.xlsx',
+                                               key='total')
+                        elif lcv['MODE'] == 'JSON':
+                            st.download_button(label=f'Download Modified Data',
+                                               data=ag['data'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'modified_data.json',
+                                               key='total')
+                        elif lcv['MODE'] == 'PKL':
+                            st.download_button(label=f'Download Modified Data',
+                                               data=ag['data'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'modified_data.pkl',
+                                               key='total')
                 else:
                     st.warning('File has not been loaded.')
 
@@ -770,27 +1119,71 @@ def app():
                             fit_columns_on_grid_load=True
                         )
 
-                    if st.button('Generate Modified Data'):
+                    if st.button('Generate Modified Data', on_click=call_modify) or st.session_state.modify_proceed:
                         if lcv['SAVE']:
                             st.markdown('### Modified Data')
                             if lcv['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(
-                                    object_to_download=ag['data'],
-                                    download_filename=f'modified_data.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Modified Data',
-                                    override_index=False,
-                                    format_=lcv['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True
-                                )
+                                if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'modified_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    ag['data'].to_excel(writer, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'modified_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'modified_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'modified_data.'
+                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
                             else:
-                                st.markdown(prettyDownload(
-                                    object_to_download=ag['data'],
-                                    download_filename=f'modified_data.{lcv["MODE"].lower()}',
-                                    button_text=f'Download Modified Data',
-                                    override_index=False,
-                                    format_=lcv["MODE"]),
-                                    unsafe_allow_html=True
-                                )
+                                if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'modified_data.csv',
+                                                       key='total')
+                                elif lcv['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    ag['data'].to_excel(writer, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'modified_data.xlsx',
+                                                       key='total')
+                                elif lcv['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'modified_data.json',
+                                                       key='total')
+                                elif lcv['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Modified Data',
+                                                       data=ag['data'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'modified_data.pkl',
+                                                       key='total')
                 else:
                     st.warning('File has not been loaded.')
 
@@ -816,7 +1209,7 @@ def app():
             else:
                 st.warning('File has not been loaded.')
 
-        if st.button('Query Data', key='query'):
+        if st.button('Query Data', on_click=call_query) or st.session_state.query_proceed:
             # reset query
             lcv['QUERY_DATA'] = pd.DataFrame()
             lcv['DATA'] = lcv['DATA'].astype(str)
@@ -826,7 +1219,7 @@ def app():
                     try:
                         # make a copy of the original dataframe to avoid mutating it with .loc
                         temp = lcv['DATA'].copy()
-                        lcv['QUERY_DATA'] = temp.loc[temp[lcv['DATA_COLUMN']].str.contains(lcv['QUERY'],
+                        lcv['QUERY_DATA'] = temp.loc[temp[lcv['DATA_COLUMN']].str.contains('|'.join(lcv['QUERY']),
                                                                                            case=lcv['MATCH'])]
                     except Exception as ex:
                         st.error(f'Error: {ex}')
@@ -842,19 +1235,63 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Query')
                             if lcv['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
-                                                           download_filename=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                                           button_text=f'Download Download Queried Data',
-                                                           override_index=False,
-                                                           format_=lcv['OVERRIDE_FORMAT']),
-                                            unsafe_allow_html=True)
+                                if lcv['OVERRIDE_FORMAT'] == 'CSV' or lcv['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    lcv['QUERY_DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
+                                elif lcv['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                       key='total')
                             else:
-                                st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
-                                                           download_filename=f'query.{lcv["MODE"].lower()}',
-                                                           button_text=f'Download Queried Data',
-                                                           override_index=False,
-                                                           format_=lcv["MODE"]),
-                                            unsafe_allow_html=True)
+                                if lcv['MODE'] == 'CSV' or lcv['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'query.csv',
+                                                       key='total')
+                                elif lcv['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    lcv['QUERY_DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=b_io,
+                                                       mime='application/vnd.openxmlformats-officedocument'
+                                                            '.spreadsheetml.sheet',
+                                                       file_name=f'query.xlsx',
+                                                       key='total')
+                                elif lcv['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'query.json',
+                                                       key='total')
+                                elif lcv['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Download Queried Data',
+                                                       data=lcv['QUERY_DATA'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'query.pkl',
+                                                       key='total')
                     else:
                         st.error('Query did not find matching keywords. Try again.')
                 else:

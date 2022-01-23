@@ -8,21 +8,17 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 # -------------------------------------------------------------------------------------------------------------------- #
 import multiprocessing
 import os
-import numpy as np
 import pandas as pd
 import spacy
 import streamlit as st
 import plotly.graph_objs as go
 import plotly.figure_factory as ff
 import plotly.express as px
-import nltk
 import pyLDAvis
 import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
 import torch
-import matplotlib.pyplot as plt
-import transformers
 
 from streamlit_tags import st_tags
 from config import toolkit
@@ -33,7 +29,6 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from streamlit_pandas_profiling import st_profile_report
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from spacy.lang.en.stop_words import STOP_WORDS
-from spacy.lang.en import English
 from spacy import displacy
 from wordcloud import WordCloud
 from textblob import TextBlob
@@ -81,6 +76,8 @@ def app():
                                                       list(toolkit['DATA'].columns))
                 st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
         else:
+            # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
             toolkit['DATA'] = pd.DataFrame()
 
     elif toolkit['FILE'] == 'Online':
@@ -176,7 +173,7 @@ def app():
         # MAIN DATA PROCESSING
         if st.button('Generate Word Cloud', key='wc'):
             if not toolkit['DATA'].empty:
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 wc = WordCloud(background_color='white',
                                max_words=toolkit['MAX_WORDS'],
                                contour_width=toolkit['CONTOUR_WIDTH'],
@@ -262,8 +259,8 @@ def app():
             if toolkit['ONE_DATAPOINT']:
                 toolkit['DATAPOINT_SELECTOR'] = st.selectbox('Choose Data Point From Data', range(len(toolkit['DATA'])))
             else:
-                st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
-                        'automatically saved.')
+                st.info('You are conducting NER on the entire dataset. Only the final DataFrame is printed. NER '
+                        'output will be automatically saved.')
             toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
                                                        help='This option will analyse your DataFrame and display '
                                                             'advanced statistics on it. Note that this will require '
@@ -287,7 +284,7 @@ def app():
                 # EFFICIENT NLP PIPING
                 ner = []
                 lab = []
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
                                                disable=['tagger', 'parser', 'entity_linker', 'entity_ruler',
                                                         'textcat', 'textcat_multilabel', 'lemmatizer',
@@ -295,8 +292,8 @@ def app():
                                                         'sentencizer', 'tok2vec', 'transformer'],
                                                batch_size=2000,
                                                n_process=1):
-                    ner.append(str(list(zip([word.text for word in doc.ents], [word.label_ for word in doc.ents]))))
-                    lab.append(str(list(set([word.label_ for word in doc.ents]))))
+                    ner.append(list(zip([word.text for word in doc.ents], [word.label_ for word in doc.ents])))
+                    lab.append(list(set([word.label_ for word in doc.ents])))
                 toolkit['DATA']['NER'] = ner
                 toolkit['DATA']['COMPILED_LABELS'] = lab
 
@@ -418,8 +415,8 @@ def app():
                 toolkit['COLOUR_BCKGD'] = st.color_picker('Choose Colour of Render Background', value='#000000')
                 toolkit['COLOUR_TXT'] = st.color_picker('Choose Colour of Render Text', value='#ffffff')
             else:
-                st.info('You are conducting POS on the entire dataset. Only DataFrame is printed. POS output will be '
-                        'automatically saved.')
+                st.info('You are conducting POS on the entire dataset. Only the final DataFrame is printed. POS '
+                        'output will be automatically saved.')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
@@ -441,7 +438,7 @@ def app():
                 # EFFICIENT NLP PIPING
                 pos = []
                 lab = []
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
                                                disable=['ner', 'parser', 'entity_linker', 'entity_ruler',
                                                         'textcat', 'textcat_multilabel', 'lemmatizer',
@@ -449,8 +446,8 @@ def app():
                                                         'sentencizer', 'tok2vec', 'transformer'],
                                                batch_size=2000,
                                                n_process=1):
-                    pos.append(str(list(zip([str(word) for word in doc], [word.pos_ for word in doc]))))
-                    lab.append(str(list(set([word.pos_ for word in doc]))))
+                    pos.append(list(zip([str(word) for word in doc], [word.pos_ for word in doc])))
+                    lab.append(list(set([word.pos_ for word in doc])))
                 toolkit['DATA']['POS'] = pos
                 toolkit['DATA']['COMPILED_LABELS'] = lab
 
@@ -595,7 +592,8 @@ def app():
                 if not toolkit['DATA'].empty:
                     try:
                         # CLEAN UP AND STANDARDISE DATAFRAMES
-                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                        # toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                     except KeyError:
                         st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
                     except Exception as ex:
@@ -640,7 +638,7 @@ def app():
             st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
                         'advanced user, you may choose to modify the number of input tensors for the model. If '
                         'you do not wish to modify the setting, a default value of 512 will be used for your '
-                        'summmary.\n\n'
+                        'summary.\n\n'
                         'If your system has a GPU , you may wish to install the GPU (CUDA) enabled version '
                         'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
                         'and to check if your GPU is enabled.')
@@ -710,12 +708,13 @@ def app():
                                                     value=512)
 
             if st.button('Summarise', key='summary_t5'):
-                tokenizer = AutoTokenizer.from_pretrained('t5-base')
-                model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
-
                 if not toolkit['DATA'].empty:
-                    # to work with tensors, we need to convert the dataframe to a complex datatype
-                    toolkit['DATA'] = toolkit['DATA'].astype(object)
+                    # MOVED EXPENSIVE LOADING PROCEDURES INTO CHECK AND REMOVE EMPTY ROWS
+                    tokenizer = AutoTokenizer.from_pretrained('t5-base')
+                    model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
+                    toolkit['DATA'].dropna(inplace=True)
+
+                    # REMOVED STREAMLIT LIMITATION ON OTHER DATATYPES, WILL NOW WORK WITH TENSORS
                     toolkit['DATA']['ENCODED'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
                         apply(lambda x: tokenizer.encode('summarize: ' + x,
                                                          return_tensors='pt',
@@ -731,29 +730,33 @@ def app():
                     toolkit['DATA'].drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
                     toolkit['DATA']['SUMMARISED'] = toolkit['DATA']['SUMMARISED']. \
                         str.replace('<pad> ', '').str.replace('</s>', '')
-                    toolkit['DATA'] = toolkit['DATA'].astype(str)
 
-                if toolkit['VERBOSE']:
-                    st.markdown('## Summarised Text')
-                    printDataFrame(toolkit['DATA'], toolkit['VERBOSITY'], toolkit['ADVANCED_ANALYSIS'])
+                    # SHOW DATA
+                    if toolkit['VERBOSE']:
+                        st.markdown('## Summarised Text')
+                        printDataFrame(toolkit['DATA'], toolkit['VERBOSITY'], toolkit['ADVANCED_ANALYSIS'])
 
-                if toolkit['SAVE']:
-                    st.markdown('---')
-                    st.markdown('## Download Summarised Data')
-                    if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                                   button_text=f'Download Summarised Data',
-                                                   override_index=False,
-                                                   format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
-                    else:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'summarised.{toolkit["MODE"].lower()}',
-                                                   button_text=f'Download Summarised Data',
-                                                   override_index=False,
-                                                   format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                    # SAVE DATA
+                    if toolkit['SAVE']:
+                        st.markdown('---')
+                        st.markdown('## Download Summarised Data')
+                        if toolkit['OVERRIDE_FORMAT'] is not None:
+                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                       download_filename=f'summarised.'
+                                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       button_text=f'Download Summarised Data',
+                                                       override_index=False,
+                                                       format_=toolkit['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                       download_filename=f'summarised.{toolkit["MODE"].lower()}',
+                                                       button_text=f'Download Summarised Data',
+                                                       override_index=False,
+                                                       format_=toolkit['MODE']),
+                                        unsafe_allow_html=True)
+                else:
+                    st.error('Error: Your Dataset was not loaded properly. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -811,7 +814,7 @@ def app():
                     }
 
                     toolkit['DATA']['VADER SENTIMENT TEXT'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                        replace(to_replace=replacer, regex=True)
+                        replace(to_replace=replacer, regex=True).dropna(inplace=False)
 
                     vader_analyser = SentimentIntensityAnalyzer()
 
@@ -940,12 +943,13 @@ def app():
                             format_=toolkit['OVERRIDE_FORMAT']),
                             unsafe_allow_html=True)
                     else:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'sentiment_scores.{toolkit["MODE"].lower()}',
-                                                   button_text=f'Download Sentiment Score Data',
-                                                   override_index=False,
-                                                   format_=toolkit["MODE"]),
-                                    unsafe_allow_html=True)
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'sentiment_scores.{toolkit["MODE"].lower()}',
+                            button_text=f'Download Sentiment Score Data',
+                            override_index=False,
+                            format_=toolkit["MODE"]),
+                            unsafe_allow_html=True)
 
                     if toolkit['HAC_PLOT'] is not None:
                         st.markdown('## Graphs')
@@ -967,7 +971,6 @@ def app():
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
-# TODO
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                TOPIC MODELLING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -1475,7 +1478,11 @@ def app():
         toolkit['CLASSIFY_TOPIC'] = st_tags(label='**Topics**',
                                             text='Press Enter to extend list...',
                                             maxtags=9999999,
-                                            key='classify_topics')
+                                            key='classify_topics',
+                                            suggestions=['Arts', 'Business', 'Data', 'Entertainment', 'Environment',
+                                                         'Fashion', 'Medicine', 'Music', 'Politics', 'Science',
+                                                         'Sports', 'Technology', 'Trade', 'Traffic', 'Weather',
+                                                         'World'])
 
         if len(toolkit['CLASSIFY_TOPIC']) != 0:
             st.info(f'**{toolkit["CLASSIFY_TOPIC"]}** Topics are Detected!')
@@ -1483,37 +1490,39 @@ def app():
             st.info('No Topics Detected.')
 
         if st.button('Classify Text', key='classify'):
-            toolkit['DATA'] = toolkit['DATA'].astype(object)
-            classifier = pipeline('zero-shot-classification')
-            toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
-            toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
-                apply(lambda x: list(zip(x['labels'].tolist(), x['scores'].tolist())))
-            toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
-                apply(lambda x: max(x, key=itemgetter[1])[0])
-            toolkit['DATA'] = toolkit['DATA'].astype(str)
+            if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:
+                toolkit['DATA'].dropna(inplace=True)  # REMOVE THE EMPTY VALUES
+                classifier = pipeline('zero-shot-classification')
+                toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
+                    apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
+                toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
+                    apply(lambda x: list(zip(x['labels'], x['scores'])))
+                toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
+                    apply(lambda x: max(x, key=itemgetter(1))[0])
 
-            if toolkit['VERBOSE']:
-                st.markdown('## Classified Data')
-                printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
-                               advanced=toolkit['ADVANCED_ANALYSIS'])
+                if toolkit['VERBOSE']:
+                    st.markdown('## Classified Data')
+                    printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
+                                   advanced=toolkit['ADVANCED_ANALYSIS'])
 
-            if toolkit['SAVE']:
-                st.markdown('---')
-                st.markdown('## Download Data')
-                if toolkit['OVERRIDE_FORMAT'] is not None:
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['DATA'],
-                        download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                        button_text=f'Download Classified Data',
-                        override_index=False,
-                        format_=toolkit['OVERRIDE_FORMAT']),
-                        unsafe_allow_html=True)
-                else:
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['DATA'],
-                        download_filename=f'classified.{toolkit["MODE"].lower()}',
-                        button_text=f'Download Classified Data',
-                        override_index=False,
-                        format_=toolkit['MODE']),
-                        unsafe_allow_html=True)
+                if toolkit['SAVE']:
+                    st.markdown('---')
+                    st.markdown('## Download Data')
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                            button_text=f'Download Classified Data',
+                            override_index=False,
+                            format_=toolkit['OVERRIDE_FORMAT']),
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'classified.{toolkit["MODE"].lower()}',
+                            button_text=f'Download Classified Data',
+                            override_index=False,
+                            format_=toolkit['MODE']),
+                            unsafe_allow_html=True)
+            else:
+                st.error('Error: Dataset not properly loaded or Topics List is empty. Try again.')

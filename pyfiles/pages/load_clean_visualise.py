@@ -561,10 +561,10 @@ def app():
                                                 b_io = io.BytesIO()
                                                 writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                 data[0].to_excel(writer, sheet_name='Sheet1')
+                                                writer.save()
                                                 st.download_button(label=f'Download {data[1]}',
-                                                                   data=b_io,
-                                                                   mime='application/vnd.openxmlformats-officedocument'
-                                                                        '.spreadsheetml.sheet',
+                                                                   data=b_io.getvalue(),
+                                                                   mime='application/octet-stream',
                                                                    file_name=f'{data[2]}.'
                                                                              f'{lcv["OVERRIDE_FORMAT"].lower()}',
                                                                    key=f'data{index}')
@@ -593,10 +593,10 @@ def app():
                                                 b_io = io.BytesIO()
                                                 writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                 data[0].to_excel(writer, sheet_name='Sheet1')
+                                                writer.save()
                                                 st.download_button(label=f'Download {data[1]}',
-                                                                   data=b_io,
-                                                                   mime='application/vnd.openxmlformats-officedocument'
-                                                                        '.spreadsheetml.sheet',
+                                                                   data=b_io.getvalue(),
+                                                                   mime='application/octet-stream',
                                                                    file_name=f'{data[2]}.xlsx',
                                                                    key=f'data{index}')
                                             elif lcv['MODE'] == 'JSON':
@@ -635,12 +635,11 @@ def app():
                                             b_io = io.BytesIO()
                                             writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                             data[0].to_excel(writer, sheet_name='Sheet1')
+                                            writer.save()
                                             st.download_button(label=f'Download {data[1]}',
-                                                               data=b_io,
-                                                               mime='application/vnd.openxmlformats-officedocument'
-                                                                    '.spreadsheetml.sheet',
-                                                               file_name=f'{data[2]}.'
-                                                                         f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                               data=b_io.getvalue(),
+                                                               mime='application/octet-stream',
+                                                               file_name=f'{data[2]}.xlsx',
                                                                key=f'data{index}')
                                         elif lcv['OVERRIDE_FORMAT'] == 'JSON':
                                             st.download_button(label=f'Download {data[1]}',
@@ -668,9 +667,8 @@ def app():
                                             writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                             data[0].to_excel(writer, sheet_name='Sheet1')
                                             st.download_button(label=f'Download {data[1]}',
-                                                               data=b_io,
-                                                               mime='application/vnd.openxmlformats-officedocument'
-                                                                    '.spreadsheetml.sheet',
+                                                               data=b_io.getvalue(),
+                                                               mime='application/octet-stream',
                                                                file_name=f'{data[2]}.xlsx',
                                                                key=f'data{index}')
                                         elif lcv['MODE'] == 'JSON':
@@ -711,12 +709,11 @@ def app():
                                                     b_io = io.BytesIO()
                                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                     data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    writer.save()
                                                     st.download_button(label=f'Download {data[1]}',
-                                                                       data=b_io,
-                                                                       mime='application/vnd.openxmlformats-office'
-                                                                            'document.spreadsheetml.sheet',
-                                                                       file_name=f'{data[2]}.'
-                                                                                 f'{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                                       data=b_io.getvalue(),
+                                                                       mime='application/octet-stream',
+                                                                       file_name=f'{data[2]}.xlsx',
                                                                        key=f'data{index}')
                                                 elif lcv['OVERRIDE_FORMAT'] == 'JSON':
                                                     st.download_button(label=f'Download {data[1]}',
@@ -743,10 +740,10 @@ def app():
                                                     b_io = io.BytesIO()
                                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                     data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    writer.save()
                                                     st.download_button(label=f'Download {data[1]}',
-                                                                       data=b_io,
-                                                                       mime='application/vnd.openxmlformats-office'
-                                                                            'document.spreadsheetml.sheet',
+                                                                       data=b_io.getvalue(),
+                                                                       mime='application/octet-stream',
                                                                        file_name=f'{data[2]}.xlsx',
                                                                        key=f'data{index}')
                                                 elif lcv['MODE'] == 'JSON':
@@ -784,10 +781,10 @@ def app():
                                                     b_io = io.BytesIO()
                                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                     data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    writer.save()
                                                     st.download_button(label=f'Download {data[1]}',
-                                                                       data=b_io,
-                                                                       mime='application/vnd.openxmlformats-office'
-                                                                            'document.spreadsheetml.sheet',
+                                                                       data=b_io.getvalue(),
+                                                                       mime='application/octet-stream',
                                                                        file_name=f'{data[2]}.'
                                                                                  f'{lcv["OVERRIDE_FORMAT"].lower()}',
                                                                        key=f'data{index}')
@@ -816,10 +813,10 @@ def app():
                                                     b_io = io.BytesIO()
                                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                                     data[0].to_excel(writer, sheet_name='Sheet1')
+                                                    writer.save()
                                                     st.download_button(label=f'Download {data[1]}',
-                                                                       data=b_io,
-                                                                       mime='application/vnd.openxmlformats-office'
-                                                                            'document.spreadsheetml.sheet',
+                                                                       data=b_io.getvalue(),
+                                                                       mime='application/octet-stream',
                                                                        file_name=f'{data[2]}.xlsx',
                                                                        key=f'data{index}')
                                                 elif lcv['MODE'] == 'JSON':
@@ -923,19 +920,19 @@ def app():
                                     b_io1 = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     writer1 = pd.ExcelWriter(b_io1, engine='openpyxl')
+                                    writer.save()
+                                    writer1.save()
                                     lcv['DATA'].to_excel(writer, sheet_name='Sheet1')
                                     lcv['GLOBE_DATA'].to_excel(writer1, sheet_name='Sheet1')
                                     st.download_button(label=f'Download Globe Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'globe_data.'
                                                                  f'{lcv["OVERRIDE_FORMAT"].lower()}',
                                                        key='total')
                                     st.download_button(label=f'Download Concatenated Globe Data',
-                                                       data=b_io1,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io1.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'globe_data_concat.'
                                                                  f'{lcv["OVERRIDE_FORMAT"].lower()}',
                                                        key='concat')
@@ -982,18 +979,18 @@ def app():
                                     b_io1 = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     writer1 = pd.ExcelWriter(b_io1, engine='openpyxl')
+                                    writer.save()
+                                    writer1.save()
                                     lcv['DATA'].to_excel(writer, sheet_name='Sheet1')
                                     lcv['GLOBE_DATA'].to_excel(writer1, sheet_name='Sheet1')
                                     st.download_button(label=f'Download Globe Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'globe_data.xlsx',
                                                        key='total')
                                     st.download_button(label=f'Download Concatenated Globe Data',
-                                                       data=b_io1,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io1.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'globe_data_concat.xlsx',
                                                        key='concat')
                                 elif lcv['MODE'] == 'JSON':
@@ -1074,10 +1071,10 @@ def app():
                             b_io = io.BytesIO()
                             writer = pd.ExcelWriter(b_io, engine='openpyxl')
                             ag['data'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
                             st.download_button(label=f'Download Modified Data',
-                                               data=b_io,
-                                               mime='application/vnd.openxmlformats-officedocument'
-                                                    '.spreadsheetml.sheet',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
                                                file_name=f'modified_data.xlsx',
                                                key='total')
                         elif lcv['MODE'] == 'JSON':
@@ -1134,10 +1131,10 @@ def app():
                                     b_io = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     ag['data'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
                                     st.download_button(label=f'Download Modified Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'modified_data.'
                                                                  f'{lcv["OVERRIDE_FORMAT"].lower()}',
                                                        key='total')
@@ -1166,10 +1163,10 @@ def app():
                                     b_io = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     ag['data'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
                                     st.download_button(label=f'Download Modified Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'modified_data.xlsx',
                                                        key='total')
                                 elif lcv['MODE'] == 'JSON':
@@ -1245,10 +1242,10 @@ def app():
                                     b_io = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     lcv['QUERY_DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
                                     st.download_button(label=f'Download Download Queried Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',
                                                        key='total')
                                 elif lcv['OVERRIDE_FORMAT'] == 'JSON':
@@ -1274,10 +1271,10 @@ def app():
                                     b_io = io.BytesIO()
                                     writer = pd.ExcelWriter(b_io, engine='openpyxl')
                                     lcv['QUERY_DATA'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
                                     st.download_button(label=f'Download Download Queried Data',
-                                                       data=b_io,
-                                                       mime='application/vnd.openxmlformats-officedocument'
-                                                            '.spreadsheetml.sheet',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
                                                        file_name=f'query.xlsx',
                                                        key='total')
                                 elif lcv['MODE'] == 'JSON':

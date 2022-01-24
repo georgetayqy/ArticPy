@@ -6,6 +6,7 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import multiprocessing
 import os
 import pandas as pd
@@ -19,6 +20,7 @@ import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
 import torch
+import plotly
 
 from streamlit_tags import st_tags
 from config import toolkit
@@ -44,6 +46,98 @@ def app():
     Main function that will be called when the app is run
     """
 
+    # INIT SESSION STATE
+    if ('modelling', 'classification', 'sentiment', 'wc', 'ner', 'pos', 'summarise',
+            'summarised_advanced') not in st.session_state:
+        st.session_state.modelling = False
+        st.session_state.classification = False
+        st.session_state.sentiment = False
+        st.session_state.wc = False
+        st.session_state.ner = False
+        st.session_state.pos = False
+        st.session_state.summarise = False
+        st.session_state.summarised_advanced = False
+
+    def call_modelling():
+        """Callback function to set session state to True"""
+        st.session_state.modelling = True
+
+    def call_classification():
+        """Callback function to set session state to True"""
+        st.session_state.classification = True
+
+    def call_sentiment():
+        """Callback function to set session state to True"""
+        st.session_state.sentiment = True
+
+    def call_wc():
+        """Callback function to set session state to True"""
+        st.session_state.wc = True
+
+    def call_ner():
+        """Callback function to set session state to True"""
+        st.session_state.ner = True
+
+    def call_pos():
+        """Callback function to set session state to True"""
+        st.session_state.pos = True
+
+    def call_summarise():
+        """Callback function to set session state to True"""
+        st.session_state.summarise = True
+
+    def call_summarised_advanced():
+        """Callback function to set session state to True"""
+        st.session_state.summarised_advanced = True
+
+    def deinit_modelling():
+        """Callback function to set session state to False"""
+        st.session_state.modelling = False
+
+    def deinit_classification():
+        """Callback function to set session state to False"""
+        st.session_state.classification = False
+
+    def deinit_sentiment():
+        """Callback function to set session state to False"""
+        st.session_state.sentiment = False
+
+    def deinit_wc():
+        """Callback function to set session state to False"""
+        st.session_state.wc = False
+
+    def deinit_ner():
+        """Callback function to set session state to False"""
+        st.session_state.ner = False
+
+    def deinit_pos():
+        """Callback function to set session state to False"""
+        st.session_state.pos = False
+
+    def deinit_summarise():
+        """Callback function to set session state to False"""
+        st.session_state.summarise = False
+
+    def deinit_summarised_advanced():
+        """Callback function to set session state to False"""
+        st.session_state.summarised_advanced = False
+
+    def deinit_master_summary():
+        """Callback function to set session state to False"""
+        st.session_state.summarise = False
+        st.session_state.summarised_advanced = False
+
+    def deinit_master():
+        """Master Reset """
+        st.session_state.modelling = False
+        st.session_state.classification = False
+        st.session_state.sentiment = False
+        st.session_state.wc = False
+        st.session_state.ner = False
+        st.session_state.pos = False
+        st.session_state.summarise = False
+        st.session_state.summarised_advanced = False
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -62,6 +156,16 @@ def app():
                                           '"Online" if you wish to pull a file from any one of the supported Cloud '
                                           'Service Providers.')
     toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                              FUNCTION SELECTOR                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+    st.markdown('## NLP Operations\n'
+                'Select the NLP functions which you wish to execute.')
+    toolkit['APP_MODE'] = st.selectbox('Select the NLP Operation to execute',
+                                       ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
+                                        'Named Entity Recognition', 'POS Tagging', 'Summarise'))
+    st.info(f'**{toolkit["APP_MODE"]}** Selected')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -127,15 +231,6 @@ def app():
                 st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# |                                              FUNCTION SELECTOR                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
-    st.markdown('## NLP Operations\n'
-                'Select the NLP functions which you wish to execute.')
-    toolkit['APP_MODE'] = st.selectbox('Select the NLP Operation to execute',
-                                       ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
-                                        'Named Entity Recognition', 'POS Tagging', 'Summarise'))
-    st.info(f'**{toolkit["APP_MODE"]}** Selected')
-# -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if toolkit['APP_MODE'] == 'Word Cloud':
@@ -171,7 +266,7 @@ def app():
                                                value=400)
 
         # MAIN DATA PROCESSING
-        if st.button('Generate Word Cloud', key='wc'):
+        if st.button('Generate Word Cloud', on_click=call_wc) or st.session_state.wc:
             if not toolkit['DATA'].empty:
                 toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 wc = WordCloud(background_color='white',
@@ -188,13 +283,13 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Image')
-                    st.markdown(prettyDownload(
-                        object_to_download=wc,
-                        download_filename='wordcloud.png',
-                        button_text='Download Queried Data',
-                        override_index=False),
-                        unsafe_allow_html=True
-                    )
+                    buf = io.BytesIO()
+                    wc.to_image().save(buf, format='png')
+                    st.download_button(label=f'Download Word Cloud',
+                                       data=buf.getvalue(),
+                                       mime='application/octet-stream',
+                                       file_name='wordcloud.png',
+                                       key='img')
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -272,14 +367,15 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_ner)
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
                 toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
-        if st.button('Conduct Named Entity Recognition', key='ner'):
+        if st.button('Conduct Named Entity Recognition', on_click=call_ner) or st.session_state.ner:
             if not toolkit['DATA'].empty:
                 # EFFICIENT NLP PIPING
                 ner = []
@@ -317,34 +413,74 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(
-                            prettyDownload(
-                                object_to_download=toolkit['DATA'],
-                                download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                button_text=f'Download NER Data',
-                                override_index=False,
-                                format_=toolkit['OVERRIDE_FORMAT']),
-                            unsafe_allow_html=True
-                        )
+                        if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'ner.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='ner_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download NER Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'ner.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='ner_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'ner.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='ner_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'ner.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='ner_download')
                     else:
-                        st.markdown(
-                            prettyDownload(
-                                object_to_download=toolkit['DATA'],
-                                download_filename=f'ner.{toolkit["MODE"].lower()}',
-                                button_text=f'Download NER Data',
-                                override_index=False,
-                                format_=toolkit['MODE']),
-                            unsafe_allow_html=True
-                        )
+                        if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'ner.csv',
+                                               key='ner_download')
+                        elif toolkit['MODE'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download NER Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'ner.xlsx',
+                                               key='ner_download')
+                        elif toolkit['MODE'] == 'JSON':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'ner.json',
+                                               key='ner_download')
+                        elif toolkit['MODE'] == 'PKL':
+                            st.download_button(label=f'Download NER Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'ner.pkl',
+                                               key='ner_download')
+
                     if toolkit['ONE_DATAPOINT']:
-                        st.markdown(
-                            prettyDownload(
-                                object_to_download=toolkit['SVG'],
-                                download_filename='rendering.html',
-                                button_text=f'Download Rendering Data',
-                                override_index=False),
-                            unsafe_allow_html=True
-                        )
+                        st.download_button(label=f'Download Rendering Data',
+                                           data=bytes(toolkit['SVG'], 'utf-8'),
+                                           mime='application/octet-stream',
+                                           file_name=f'ner.pkl',
+                                           key='ner_download')
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -423,14 +559,15 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_pos)
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
                 toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
-        if st.button('Start POS Tagging', key='pos'):
+        if st.button('Start POS Tagging', on_click=call_pos) or st.session_state.pos:
             # RESET OUTPUTS
             toolkit['SVG'] = None
 
@@ -473,28 +610,74 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'pos.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                                   button_text=f'Download POS Data',
-                                                   override_index=False,
-                                                   format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
+                        if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'pos.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='pos_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download POS Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'pos.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='pos_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'pos.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='pos_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'pos.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='pos_download')
                     else:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'pos.{toolkit["MODE"].lower()}',
-                                                   button_text=f'Download POS Data',
-                                                   override_index=False,
-                                                   format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                        if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'pos.csv',
+                                               key='pos_download')
+                        elif toolkit['MODE'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download POS Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'pos.xlsx',
+                                               key='pos_download')
+                        elif toolkit['MODE'] == 'JSON':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'pos.json',
+                                               key='pos_download')
+                        elif toolkit['MODE'] == 'PKL':
+                            st.download_button(label=f'Download POS Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'pos.pkl',
+                                               key='pos_download')
 
                     if toolkit['VERBOSE'] and toolkit['ONE_DATAPOINT']:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['SVG'],
-                            download_filename='rendering.html',
-                            button_text=f'Download Rendering Data',
-                            override_index=False),
-                            unsafe_allow_html=True
-                        )
+                        st.download_button(label=f'Download Rendering Data',
+                                           data=bytes(toolkit['SVG'], 'utf-8'),
+                                           mime='application/octet-stream',
+                                           file_name=f'ner.pkl',
+                                           key='ner_download')
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -566,7 +749,8 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                              on_change=deinit_summarise)
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -588,7 +772,7 @@ def app():
                                                                 'it.')
 
             # MAIN PROCESSING
-            if st.button('Summarise Text', key='runner'):
+            if st.button('Summarise Text', on_click=call_summarise) or st.session_state.summarise:
                 if not toolkit['DATA'].empty:
                     try:
                         # CLEAN UP AND STANDARDISE DATAFRAMES
@@ -615,20 +799,67 @@ def app():
                         st.markdown('---')
                         st.markdown('## Download Data')
                         if toolkit['OVERRIDE_FORMAT'] is not None:
-                            st.markdown(prettyDownload(
-                                object_to_download=toolkit['DATA'],
-                                download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                button_text=f'Download Summarised Data',
-                                override_index=False,
-                                format_=toolkit['OVERRIDE_FORMAT']),
-                                unsafe_allow_html=True)
+                            if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_csv(index=False),
+                                                   mime='text/csv',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                b_io = io.BytesIO()
+                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                writer.save()
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=b_io.getvalue(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_json(index=False),
+                                                   mime='application/json',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_pickle(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
                         else:
-                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                       download_filename=f'summarised.{toolkit["MODE"].lower()}',
-                                                       button_text=f'Download Summarised Data',
-                                                       override_index=False,
-                                                       format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                            if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_csv(index=False),
+                                                   mime='text/csv',
+                                                   file_name=f'summarised.csv',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'XLSX':
+                                b_io = io.BytesIO()
+                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                writer.save()
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=b_io.getvalue(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.xlsx',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'JSON':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_json(index=False),
+                                                   mime='application/json',
+                                                   file_name=f'summarised.json',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'PKL':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_pickle(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.pkl',
+                                                   key='summarised_download')
                 else:
                     st.error('Error: Data not loaded properly. Try again.')
 
@@ -670,7 +901,8 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                              on_click=deinit_summarised_advanced)
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -707,7 +939,7 @@ def app():
                                                     max_value=10000,
                                                     value=512)
 
-            if st.button('Summarise', key='summary_t5'):
+            if st.button('Summarise', on_click=call_summarised_advanced) or st.session_state.summarised_advanced:
                 if not toolkit['DATA'].empty:
                     # MOVED EXPENSIVE LOADING PROCEDURES INTO CHECK AND REMOVE EMPTY ROWS
                     tokenizer = AutoTokenizer.from_pretrained('t5-base')
@@ -741,20 +973,67 @@ def app():
                         st.markdown('---')
                         st.markdown('## Download Summarised Data')
                         if toolkit['OVERRIDE_FORMAT'] is not None:
-                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                       download_filename=f'summarised.'
-                                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                                       button_text=f'Download Summarised Data',
-                                                       override_index=False,
-                                                       format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                            if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_csv(index=False),
+                                                   mime='text/csv',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                b_io = io.BytesIO()
+                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                writer.save()
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=b_io.getvalue(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_json(index=False),
+                                                   mime='application/json',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
+                            elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_pickle(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.'
+                                                             f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                   key='summarised_download')
                         else:
-                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                       download_filename=f'summarised.{toolkit["MODE"].lower()}',
-                                                       button_text=f'Download Summarised Data',
-                                                       override_index=False,
-                                                       format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                            if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_csv(index=False),
+                                                   mime='text/csv',
+                                                   file_name=f'summarised.csv',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'XLSX':
+                                b_io = io.BytesIO()
+                                writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                                writer.save()
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=b_io.getvalue(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.xlsx',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'JSON':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_json(index=False),
+                                                   mime='application/json',
+                                                   file_name=f'summarised.json',
+                                                   key='summarised_download')
+                            elif toolkit['MODE'] == 'PKL':
+                                st.download_button(label=f'Download Summarised Data',
+                                                   data=toolkit['DATA'].to_pickle(),
+                                                   mime='application/octet-stream',
+                                                   file_name=f'summarised.pkl',
+                                                   key='summarised_download')
                 else:
                     st.error('Error: Your Dataset was not loaded properly. Try again.')
 
@@ -780,7 +1059,8 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_sentiment)
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -803,7 +1083,7 @@ def app():
                                                             'option if this if you do not require it.')
 
         # MAIN PROCESSING
-        if st.button('Start Analysis', key='analysis'):
+        if st.button('Start Analysis', on_click=call_sentiment) or st.session_state.sentiment:
             if not toolkit['DATA'].empty:
                 if toolkit['BACKEND_ANALYSER'] == 'VADER':
                     replacer = {
@@ -935,39 +1215,84 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['DATA'],
-                            download_filename=f'sentiment_scores.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                            button_text=f'Download Sentiment Score Data',
-                            override_index=False,
-                            format_=toolkit['OVERRIDE_FORMAT']),
-                            unsafe_allow_html=True)
+                        if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'sentiment_scores.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='sentiment_scores_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'sentiment_scores.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='sentiment_scores_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'sentiment_scores.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='sentiment_scores_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'sentiment_scores.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='sentiment_scores_download')
                     else:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['DATA'],
-                            download_filename=f'sentiment_scores.{toolkit["MODE"].lower()}',
-                            button_text=f'Download Sentiment Score Data',
-                            override_index=False,
-                            format_=toolkit["MODE"]),
-                            unsafe_allow_html=True)
+                        if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'sentiment_scores.csv',
+                                               key='sentiment_scores_download')
+                        elif toolkit['MODE'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'sentiment_scores.xlsx',
+                                               key='sentiment_scores_download')
+                        elif toolkit['MODE'] == 'JSON':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'sentiment_scores.json',
+                                               key='sentiment_scores_download')
+                        elif toolkit['MODE'] == 'PKL':
+                            st.download_button(label=f'Download Sentiment Score Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'sentiment_scores.pkl',
+                                               key='sentiment_scores_download')
 
                     if toolkit['HAC_PLOT'] is not None:
                         st.markdown('## Graphs')
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['HAC_PLOT'],
-                            download_filename='plot.png',
-                            button_text=f'Download Plot',
-                            override_index=False),
-                            unsafe_allow_html=True
-                        )
+                        img = plotly.io.to_image(toolkit['HAC_PLOT'])
+                        st.download_button(label=f'Download Plot',
+                                           data=img,
+                                           mime='application/octet-stream',
+                                           file_name=f'plot.png',
+                                           key=f'hac_plot')
+
                     if toolkit['HAC_PLOT1'] is not None:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['HAC_PLOT1'],
-                            download_filename='normal_plot.png',
-                            button_text=f'Download Normal Distribution Data',
-                            override_index=False),
-                            unsafe_allow_html=True
-                        )
+                        img = plotly.io.to_image(toolkit['HAC_PLOT1'])
+                        st.download_button(label=f'Download Normal Distribution Plot',
+                                           data=img,
+                                           mime='application/octet-stream',
+                                           file_name=f'plot.png',
+                                           key=f'hac_plot1')
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -1010,7 +1335,8 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_modelling)
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -1110,7 +1436,7 @@ def app():
                     toolkit['W_PLOT'] = st.checkbox('Generate Word Representation of LSI Plot?')
                     toolkit['COLOUR'] = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
 
-        if st.button('Start Modelling', key='topic'):
+        if st.button('Start Modelling', on_click=call_modelling) or st.session_state.modelling:
             if not toolkit['DATA'].empty:
                 try:
                     toolkit['CV'] = CountVectorizer(min_df=toolkit['MIN_DF'],
@@ -1167,50 +1493,141 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lda_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'lda_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lda_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'lda_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lda_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lda_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'lda_topic_{index}.csv',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lda_topic_{index}.xlsx',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'lda_topic_{index}.json',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lda_topic_{index}.pkl',
+                                                           key=f'data{index}')
 
                             st.markdown('### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
                             else:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                                if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.csv',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.xlsx',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.json',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.pkl',
+                                                       key='summarised_download')
 
                             st.markdown('### Other Requested Data')
-                            st.markdown(prettyDownload(
-                                object_to_download=pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']),
-                                download_filename='lda.html',
-                                button_text='Download pyLDAvis Rendering',
-                                override_index=False),
-                                unsafe_allow_html=True
-                            )
+                            st.download_button(label=f'Download pyLDAvis Rendering',
+                                               data=bytes(pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']),
+                                                          'utf-8'),
+                                               mime='application/octet-stream',
+                                               file_name='lda.html',
+                                               key='pyldavis')
 
                     # NMF
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Non-Negative Matrix Factorization':
@@ -1253,41 +1670,133 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'nmf_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'nmf_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'nmf_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'nmf_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'nmf_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'nmf_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'nmf_topic_{index}.csv',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'nmf_topic_{index}.xlsx',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'nmf_topic_{index}.json',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'nmf_topic_{index}.pkl',
+                                                           key=f'data{index}')
 
                             st.markdown('### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
                             else:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                                if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.csv',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.xlsx',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.json',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.pkl',
+                                                       key='summarised_download')
 
                     # LSI
                     elif toolkit['NLP_TOPIC_MODEL'] == 'Latent Semantic Indexing':
@@ -1367,58 +1876,150 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lsi_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'lsi_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lsi_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'lsi_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
+                                    elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lsi_topic_{index}.'
+                                                                     f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                           key=f'data{index}')
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lsi_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_csv(index=False),
+                                                           mime='text/csv',
+                                                           file_name=f'lsi_topic_{index}.csv',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'XLSX':
+                                        b_io = io.BytesIO()
+                                        writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                        data.to_excel(writer, sheet_name='Sheet1')
+                                        writer.save()
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=b_io.getvalue(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lsi_topic_{index}.xlsx',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'JSON':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_json(index=False),
+                                                           mime='application/json',
+                                                           file_name=f'lsi_topic_{index}.json',
+                                                           key=f'data{index}')
+                                    elif toolkit['MODE'] == 'PKL':
+                                        st.download_button(label=f'Download Download Topic List Data Entry {index}',
+                                                           data=data.to_pickle(),
+                                                           mime='application/octet-stream',
+                                                           file_name=f'lsi_topic_{index}.pkl',
+                                                           key=f'data{index}')
 
                             st.markdown('### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
+                                if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
+                                elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.'
+                                                                 f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       key='summarised_download')
                             else:
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['KW'],
-                                    download_filename=f'summary_topics.{toolkit["MODE"].lower()}',
-                                    button_text=f'Download Summarised Topic/Word Data',
-                                    override_index=False,
-                                    format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                                if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'summary_topics.csv',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    toolkit['KW'].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.xlsx',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'summary_topics.json',
+                                                       key='summarised_download')
+                                elif toolkit['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download Summarised Topic/Word Data',
+                                                       data=toolkit['KW'].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'summary_topics.pkl',
+                                                       key='summarised_download')
 
                             if toolkit['VERBOSE'] and toolkit['PLOT']:
                                 st.markdown('### Other Requested Data')
-                                st.markdown(prettyDownload(
-                                    object_to_download=toolkit['MAR_FIG'],
-                                    download_filename=f'marker_figure.png',
-                                    button_text='Download Marked Figure',
-                                    override_index=False),
-                                    unsafe_allow_html=True)
+                                img = plotly.io.to_image(toolkit['MAR_FIG'])
+                                st.download_button(label=f'Download Marked Figure',
+                                                   data=img,
+                                                   mime='application/octet-stream',
+                                                   file_name='marker_figure.png',
+                                                   key='mar_fig')
 
                                 if toolkit['W_PLOT']:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=toolkit['WORD_FIG'],
-                                        download_filename=f'word_figure.png',
-                                        button_text='Download Word Figure',
-                                        override_index=False),
-                                        unsafe_allow_html=True)
+                                    img1 = plotly.io.to_image(toolkit['WORD_FIG'])
+                                    st.download_button(label=f'Download Word Figure',
+                                                       data=img1,
+                                                       mime='application/octet-stream',
+                                                       file_name='word_figure.png',
+                                                       key='word_fig')
             else:
                 st.error('Error: File not loaded properly. Try again.')
 
@@ -1461,6 +2062,15 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                          on_change=deinit_classification)
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
 
         if toolkit['VERBOSE']:
@@ -1489,7 +2099,7 @@ def app():
         else:
             st.info('No Topics Detected.')
 
-        if st.button('Classify Text', key='classify'):
+        if st.button('Classify Text', on_click=call_classification) or st.session_state.classification:
             if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:
                 toolkit['DATA'].dropna(inplace=True)  # REMOVE THE EMPTY VALUES
                 classifier = pipeline('zero-shot-classification')
@@ -1509,20 +2119,66 @@ def app():
                     st.markdown('---')
                     st.markdown('## Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['DATA'],
-                            download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                            button_text=f'Download Classified Data',
-                            override_index=False,
-                            format_=toolkit['OVERRIDE_FORMAT']),
-                            unsafe_allow_html=True)
+                        if toolkit['OVERRIDE_FORMAT'] == 'CSV' or toolkit['OVERRIDE_FORMAT'] == 'HDF5':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'classified.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='classified_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download Classified Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'classified.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='classified_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'JSON':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'classified.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='classified_download')
+                        elif toolkit['OVERRIDE_FORMAT'] == 'PKL':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'classified.'
+                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                               key='classified_download')
                     else:
-                        st.markdown(prettyDownload(
-                            object_to_download=toolkit['DATA'],
-                            download_filename=f'classified.{toolkit["MODE"].lower()}',
-                            button_text=f'Download Classified Data',
-                            override_index=False,
-                            format_=toolkit['MODE']),
-                            unsafe_allow_html=True)
+                        if toolkit['MODE'] == 'CSV' or toolkit['MODE'] == 'HDF5':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_csv(index=False),
+                                               mime='text/csv',
+                                               file_name=f'classified.csv',
+                                               key='classified_download')
+                        elif toolkit['MODE'] == 'XLSX':
+                            b_io = io.BytesIO()
+                            writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                            toolkit['DATA'].to_excel(writer, sheet_name='Sheet1')
+                            writer.save()
+                            st.download_button(label=f'Download Classified Data',
+                                               data=b_io.getvalue(),
+                                               mime='application/octet-stream',
+                                               file_name=f'classified.xlsx',
+                                               key='classified_download')
+                        elif toolkit['MODE'] == 'JSON':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_json(index=False),
+                                               mime='application/json',
+                                               file_name=f'classified.json',
+                                               key='classified_download')
+                        elif toolkit['MODE'] == 'PKL':
+                            st.download_button(label=f'Download Classified Data',
+                                               data=toolkit['DATA'].to_pickle(),
+                                               mime='application/octet-stream',
+                                               file_name=f'classified.pkl',
+                                               key='classified_download')
             else:
                 st.error('Error: Dataset not properly loaded or Topics List is empty. Try again.')

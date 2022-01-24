@@ -7,6 +7,7 @@ This file is used to store some of the basic helper functions that are used freq
 # -------------------------------------------------------------------------------------------------------------------- #
 import io
 import os
+import toml
 import sys
 import typing
 import nltk
@@ -206,8 +207,9 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     """
     Takes in a Pandas DataFrame and prints out the DataFrame
 
-    Allowed for the checking of the dataframe size to avoid MESSAGE_SIZE_LIMIT errors and RuntimeExceptions
-    at runtime
+    Maximum Message Size can now be altered through Streamlit config files, however, a sanity
+    check of the maximum size of the message is also done to ensure that the DataFrame can be
+    properly printed to screen
 
     Parameter
     ----------
@@ -219,8 +221,15 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     ----------
     """
 
+    # READ STREAMLIT CONFIG TOML FILE
+    if os.path.exists(os.path.join(os.getcwd(), '.streamlit', 'config.toml')):
+        parsed = toml.load(f'{os.getcwd()}/.streamlit/config.toml')
+    else:
+        raise FileNotFoundError('Config File for Streamlit Server is missing. Kindly ensure that your source code '
+                                'is fully downloaded and that the important config files are downloaded.')
+
     try:
-        if data.memory_usage(deep=True).sum() < 50000000:
+        if data.memory_usage(deep=True).sum() < (int(parsed['server']['maxMessageSize']) * 1000000):
             if verbose_level != 0:
                 if extract_from is not None:
                     st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
@@ -344,7 +353,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
         button_uuid = str(uuid.uuid4()).replace('-', '')
         button_id = re.sub('\d+', '', button_uuid)
 
-        custom_css = f""" 
+        custom_css = f"""
             <style>
                 #{button_id} {{
                     background-color: rgb(255, 255, 255);
@@ -357,7 +366,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     border-style: solid;
                     border-color: rgb(230, 234, 241);
                     border-image: initial;
-                }} 
+                }}
                 #{button_id}:hover {{
                     border-color: rgb(79, 187, 255);
                     color: rgb(246, 51, 102);

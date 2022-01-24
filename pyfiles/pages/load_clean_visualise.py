@@ -207,11 +207,11 @@ def app():
                 lcv['OVERRIDE_FORMAT'] = None
 
         lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                          'are printed to screen. If you get an error telling you that the '
-                                          'DataFrame size is too large to proceed, kindly lower the number of '
-                                          'data points you wish to visualise or download the file and visualise '
-                                          'it through Excel or any other DataFrame visualising Python packages')
+                                     help='Note that there is an size limit for the DataFrames that are '
+                                          'printed to screen. If you get an error telling you that the DataFrame size '
+                                          'is too large to proceed, kindly lower the number of data points you wish '
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -283,11 +283,12 @@ def app():
                     lcv['OVERRIDE_FORMAT'] = None
 
             lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                         help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                              'are printed to screen. If you get an error telling you that the '
-                                              'DataFrame size is too large to proceed, kindly lower the number of '
-                                              'data points you wish to visualise or download the file and visualise '
-                                              'it through Excel or any other DataFrame visualising Python packages')
+                                         help='Note that there is an size limit for the DataFrames that are '
+                                              'printed to screen. If you get an error telling you that the DataFrame '
+                                              'size is too large to proceed, kindly lower the number of data points '
+                                              'you wish to visualise or increase the maximum size of items to print '
+                                              'to screen through the maxMessageSize setting in the Streamlit config '
+                                              'file.')
             if lcv['VERBOSE']:
                 lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                              key='Data points to display?',
@@ -324,11 +325,11 @@ def app():
                 lcv['OVERRIDE_FORMAT'] = None
 
         lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                          'are printed to screen. If you get an error telling you that the '
-                                          'DataFrame size is too large to proceed, kindly lower the number of '
-                                          'data points you wish to visualise or download the file and visualise '
-                                          'it through Excel or any other DataFrame visualising Python packages')
+                                     help='Note that there is an size limit for the DataFrames that are '
+                                          'printed to screen. If you get an error telling you that the DataFrame size '
+                                          'is too large to proceed, kindly lower the number of data points you wish '
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',

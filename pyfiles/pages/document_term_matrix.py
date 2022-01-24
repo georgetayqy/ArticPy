@@ -7,10 +7,12 @@ A large portion of this module uses the nltk and scikit-learn packages to create
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             IMPORT RELEVANT LIBRARIES                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import os
 import pathlib
 import platform
 import pandas as pd
+import plotly.graph_objects
 import streamlit as st
 
 from config import dtm
@@ -28,6 +30,18 @@ def app():
     """
     Main function that will be called when the app is run and this module is called
     """
+
+    # INIT SESSION STATE
+    if 'proceed' not in st.session_state:
+        st.session_state.proceed = False
+
+    def call_dtm():
+        """Callback function to set the session state to false"""
+        st.session_state.proceed = True
+
+    def deinit_dtm():
+        """Callback function to set the session state to false"""
+        st.session_state.proceed = False
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                     INIT                                                         | #
@@ -73,8 +87,10 @@ def app():
     dtm['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.')
-    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'))
+                                      'Service Providers.',
+                                 on_change=deinit_dtm)
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'),
+                                  on_change=deinit_dtm)
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -147,18 +163,19 @@ def app():
                                                     'file format by default but this behaviour can be overridden.')
     if dtm['SAVE']:
         if st.checkbox('Override Output Format?'):
-            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
+                                                  on_change=deinit_dtm)
             if dtm['OVERRIDE_FORMAT'] == dtm['MODE']:
                 st.warning('Warning: Overridden Format is the same as Input Format')
         else:
             dtm['OVERRIDE_FORMAT'] = None
 
     dtm['VERBOSE_DTM'] = st.checkbox('Display DataFrame of Document-Term Matrix?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that are '
+                                     help='Note that there is an size limit for the DataFrames that are '
                                           'printed to screen. If you get an error telling you that the DataFrame size '
                                           'is too large to proceed, kindly lower the number of data points you wish '
-                                          'to visualise or download the file and visualise it through Excel or any '
-                                          'other DataFrame visualising Python packages')
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
     if dtm['VERBOSE_DTM']:
         dtm['VERBOSITY_DTM'] = st.slider('Data Points to Display for Document-Term Matrix?',
                                          min_value=1,
@@ -206,7 +223,7 @@ def app():
         else:
             st.warning('File has not been loaded.')
 
-    if st.button('Proceed', key='doc'):
+    if st.button('Proceed', on_click=call_dtm) or st.session_state.proceed:
         if (dtm['FILE'] == 'Local' and dtm['DATA_PATH']) or \
                 (dtm['FILE'] == 'Online' and not dtm['DATA'].empty):
             st.info('Data loaded properly!')
@@ -301,21 +318,85 @@ def app():
                 if dtm['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    for data in dtm['FINALISED_DATA_LIST']:
+                    for index, data in enumerate(dtm['FINALISED_DATA_LIST']):
                         if dtm['OVERRIDE_FORMAT'] is not None:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                            if not isinstance(data[0], plotly.graph_objs.Figure):
+                                if dtm['OVERRIDE_FORMAT'] == 'CSV' or dtm['OVERRIDE_FORMAT'] == 'HDF5':
+                                    st.download_button(label=f'Download {data[1]} Data',
+                                                       data=data[0].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'{data[2]}.'
+                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       key=f'data{index}')
+                                elif dtm['OVERRIDE_FORMAT'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'{data[2]}.'
+                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       key=f'data{index}')
+                                elif dtm['OVERRIDE_FORMAT'] == 'JSON':
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=data[0].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'{data[2]}.'
+                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       key=f'data{index}')
+                                elif dtm['OVERRIDE_FORMAT'] == 'PKL':
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=data[0].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'{data[2]}.'
+                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       key=f'data{index}')
+                            else:
+                                img = plotly.io.to_image(data[0])
+                                st.download_button(label=f'Download {data[1]}',
+                                                   data=img,
+                                                   mime='application/octet-stream',
+                                                   file_name=f'{data[2]}.png',
+                                                   key=f'data{index}')
                         else:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{data[3]}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm["MODE"]),
-                                        unsafe_allow_html=True)
+                            if not isinstance(data[0], plotly.graph_objs.Figure):
+                                if dtm['MODE'] == 'CSV' or dtm['MODE'] == 'HDF5':
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=data[0].to_csv(index=False),
+                                                       mime='text/csv',
+                                                       file_name=f'{data[2]}.csv',
+                                                       key=f'data{index}')
+                                elif dtm['MODE'] == 'XLSX':
+                                    b_io = io.BytesIO()
+                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
+                                    data[0].to_excel(writer, sheet_name='Sheet1')
+                                    writer.save()
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=b_io.getvalue(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'{data[2]}.xlsx',
+                                                       key=f'data{index}')
+                                elif dtm['MODE'] == 'JSON':
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=data[0].to_json(index=False),
+                                                       mime='application/json',
+                                                       file_name=f'{data[2]}.json',
+                                                       key=f'data{index}')
+                                elif dtm['MODE'] == 'PKL':
+                                    st.download_button(label=f'Download {data[1]}',
+                                                       data=data[0].to_pickle(),
+                                                       mime='application/octet-stream',
+                                                       file_name=f'{data[2]}.pkl',
+                                                       key=f'data{index}')
+                            else:
+                                img = plotly.io.to_image(data[0])
+                                st.download_button(label=f'Download {data[1]}',
+                                                   data=img,
+                                                   mime='application/octet-stream',
+                                                   file_name=f'{data[2]}.png',
+                                                   key=f'data{index}')
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

@@ -320,19 +320,33 @@ def app():
                     st.markdown('## Download Data')
                     for index, data in enumerate(dtm['FINALISED_DATA_LIST']):
                         if dtm['OVERRIDE_FORMAT'] is not None:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                            if data[3] != '.png':
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4],
+                                                           format_=dtm['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.png',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4]),
+                                            unsafe_allow_html=True)
                         else:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{data[3]}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm["MODE"]),
-                                        unsafe_allow_html=True)
+                            if data[3] != '.png':
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}{data[3]}',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4],
+                                                           format_=dtm["MODE"]),
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.png',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4]),
+                                            unsafe_allow_html=True)
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

@@ -4,7 +4,7 @@ dataFrameSerialization = "legacy"
 
 [server]
 maxUploadSize = 1024000
-maxMessageSize = 10240
+maxMessageSize = 102400
 
 [theme]
 base = "light"

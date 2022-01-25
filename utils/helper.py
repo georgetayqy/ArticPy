@@ -31,12 +31,6 @@ from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
 
-# CREATE STATIC DOWNLOAD LINK
-STREAMLIT_STATIC_PATH = pathlib.Path(st.__path__[0]) / 'static'
-DOWNLOAD_PATH = STREAMLIT_STATIC_PATH / 'downloads'
-if not DOWNLOAD_PATH.is_dir():
-    DOWNLOAD_PATH.mkdir()
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               HELPER FUNCTIONS                                                   | #
@@ -358,7 +352,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                 #{button_id} {{
                     background-color: rgb(255, 255, 255);
                     color: rgb(38, 39, 48);
-                    padding: 0.25em 0.38em;
+                    padding: 0.40em 0.90em;
                     position: relative;
                     text-decoration: none;
                     border-radius: 4px;
@@ -369,7 +363,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                 }}
                 #{button_id}:hover {{
                     border-color: rgb(79, 187, 255);
-                    color: rgb(246, 51, 102);
+                    color: rgb(79, 187, 255);
                 }}
                 #{button_id}:active {{
                     box-shadow: none;

@@ -320,83 +320,19 @@ def app():
                     st.markdown('## Download Data')
                     for index, data in enumerate(dtm['FINALISED_DATA_LIST']):
                         if dtm['OVERRIDE_FORMAT'] is not None:
-                            if not isinstance(data[0], plotly.graph_objs.Figure):
-                                if dtm['OVERRIDE_FORMAT'] == 'CSV' or dtm['OVERRIDE_FORMAT'] == 'HDF5':
-                                    st.download_button(label=f'Download {data[1]} Data',
-                                                       data=data[0].to_csv(index=False),
-                                                       mime='text/csv',
-                                                       file_name=f'{data[2]}.'
-                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       key=f'data{index}')
-                                elif dtm['OVERRIDE_FORMAT'] == 'XLSX':
-                                    b_io = io.BytesIO()
-                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
-                                    data[0].to_excel(writer, sheet_name='Sheet1')
-                                    writer.save()
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=b_io.getvalue(),
-                                                       mime='application/octet-stream',
-                                                       file_name=f'{data[2]}.'
-                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       key=f'data{index}')
-                                elif dtm['OVERRIDE_FORMAT'] == 'JSON':
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=data[0].to_json(index=False),
-                                                       mime='application/json',
-                                                       file_name=f'{data[2]}.'
-                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       key=f'data{index}')
-                                elif dtm['OVERRIDE_FORMAT'] == 'PKL':
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=data[0].to_pickle(),
-                                                       mime='application/octet-stream',
-                                                       file_name=f'{data[2]}.'
-                                                                 f'{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       key=f'data{index}')
-                            else:
-                                img = plotly.io.to_image(data[0])
-                                st.download_button(label=f'Download {data[1]}',
-                                                   data=img,
-                                                   mime='application/octet-stream',
-                                                   file_name=f'{data[2]}.png',
-                                                   key=f'data{index}')
+                            st.markdown(prettyDownload(object_to_download=data[0],
+                                                       download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                       button_text=f'Download {data[1]} Data',
+                                                       override_index=data[4],
+                                                       format_=dtm['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
                         else:
-                            if not isinstance(data[0], plotly.graph_objs.Figure):
-                                if dtm['MODE'] == 'CSV' or dtm['MODE'] == 'HDF5':
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=data[0].to_csv(index=False),
-                                                       mime='text/csv',
-                                                       file_name=f'{data[2]}.csv',
-                                                       key=f'data{index}')
-                                elif dtm['MODE'] == 'XLSX':
-                                    b_io = io.BytesIO()
-                                    writer = pd.ExcelWriter(b_io, engine='openpyxl')
-                                    data[0].to_excel(writer, sheet_name='Sheet1')
-                                    writer.save()
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=b_io.getvalue(),
-                                                       mime='application/octet-stream',
-                                                       file_name=f'{data[2]}.xlsx',
-                                                       key=f'data{index}')
-                                elif dtm['MODE'] == 'JSON':
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=data[0].to_json(index=False),
-                                                       mime='application/json',
-                                                       file_name=f'{data[2]}.json',
-                                                       key=f'data{index}')
-                                elif dtm['MODE'] == 'PKL':
-                                    st.download_button(label=f'Download {data[1]}',
-                                                       data=data[0].to_pickle(),
-                                                       mime='application/octet-stream',
-                                                       file_name=f'{data[2]}.pkl',
-                                                       key=f'data{index}')
-                            else:
-                                img = plotly.io.to_image(data[0])
-                                st.download_button(label=f'Download {data[1]}',
-                                                   data=img,
-                                                   mime='application/octet-stream',
-                                                   file_name=f'{data[2]}.png',
-                                                   key=f'data{index}')
+                            st.markdown(prettyDownload(object_to_download=data[0],
+                                                       download_filename=f'{data[2]}.{data[3]}',
+                                                       button_text=f'Download {data[1]} Data',
+                                                       override_index=data[4],
+                                                       format_=dtm["MODE"]),
+                                        unsafe_allow_html=True)
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

@@ -6,6 +6,7 @@ This file also allows users to set the app config for the app
 
 # IMPORT STREAMLIT
 import streamlit as st
+from pyfiles.pages import load_clean_visualise, document_term_matrix, toolkit_nlp
 
 
 # DEFINE THE MULTIPAGE CLASS TO MANAGE THE APPS
@@ -15,23 +16,29 @@ class MultiPage:
     """
 
     def __init__(self) -> None:
-        """Constructor class to generate a list which will store all our applications as an instance variable."""
-        self.pages = []
+        """Constructor to generate a list which will store all our applications as an instance variable."""
+
+        # SAVE FUNCTIONS TO SESSION STATE TO PRESERVE FUNCTIONS ACROSS RERUNS
+        if 'pages' not in st.session_state:
+            st.session_state.pages = [{'title': 'Load, Clean and Visualise', 'function': load_clean_visualise.app},
+                                      {'title': 'Document-Term Matrix', 'function': document_term_matrix.app},
+                                      {'title': 'NLP Toolkit', 'function': toolkit_nlp.app}]
 
     def add_page(self, title, func) -> None:
         """
-        Class Method to Add pages to the project
+        Class Method to add pages to the app
 
         Arguments
         ----------
-        title ([str]):          The title of page which we are adding to the list of apps
+        title:                  The title of page which we are adding to the list of apps
         func:                   Python function to render this page in Streamlit
         ----------
         """
 
-        self.pages.append({"title": title,
-                           "function": func
-                           })
+        st.session_state.pages.append({
+            "title": title,
+            "function": func
+        })
 
     def run(self):
         """
@@ -48,7 +55,7 @@ class MultiPage:
 
         # PAGE SELECTOR
         page = st.sidebar.selectbox('NLP Functions',
-                                    self.pages,
+                                    st.session_state.pages,
                                     format_func=lambda page: page['title'])
         # RUN THE APP
         try:

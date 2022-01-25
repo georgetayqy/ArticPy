@@ -20,7 +20,6 @@ import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
 import torch
-import plotly
 
 from streamlit_tags import st_tags
 from config import toolkit
@@ -46,89 +45,6 @@ def app():
     Main function that will be called when the app is run
     """
 
-    # INIT SESSION STATE
-    if ('modelling', 'classification', 'sentiment', 'wc', 'ner', 'pos', 'summarise',
-            'summarised_advanced') not in st.session_state:
-        st.session_state.modelling = False
-        st.session_state.classification = False
-        st.session_state.sentiment = False
-        st.session_state.wc = False
-        st.session_state.ner = False
-        st.session_state.pos = False
-        st.session_state.summarise = False
-        st.session_state.summarised_advanced = False
-
-    def call_modelling():
-        """Callback function to set session state to True"""
-        st.session_state.modelling = True
-
-    def call_classification():
-        """Callback function to set session state to True"""
-        st.session_state.classification = True
-
-    def call_sentiment():
-        """Callback function to set session state to True"""
-        st.session_state.sentiment = True
-
-    def call_wc():
-        """Callback function to set session state to True"""
-        st.session_state.wc = True
-
-    def call_ner():
-        """Callback function to set session state to True"""
-        st.session_state.ner = True
-
-    def call_pos():
-        """Callback function to set session state to True"""
-        st.session_state.pos = True
-
-    def call_summarise():
-        """Callback function to set session state to True"""
-        st.session_state.summarise = True
-
-    def deinit_modelling():
-        """Callback function to set session state to False"""
-        st.session_state.modelling = False
-
-    def deinit_classification():
-        """Callback function to set session state to False"""
-        st.session_state.classification = False
-
-    def deinit_sentiment():
-        """Callback function to set session state to False"""
-        st.session_state.sentiment = False
-
-    def deinit_wc():
-        """Callback function to set session state to False"""
-        st.session_state.wc = False
-
-    def deinit_ner():
-        """Callback function to set session state to False"""
-        st.session_state.ner = False
-
-    def deinit_pos():
-        """Callback function to set session state to False"""
-        st.session_state.pos = False
-
-    def deinit_summarise():
-        """Callback function to set session state to False"""
-        st.session_state.summarise = False
-
-    def deinit_summarised_advanced():
-        """Callback function to set session state to False"""
-        st.session_state.summarised_advanced = False
-
-    def deinit_master():
-        """Master Reset """
-        st.session_state.modelling = False
-        st.session_state.classification = False
-        st.session_state.sentiment = False
-        st.session_state.wc = False
-        st.session_state.ner = False
-        st.session_state.pos = False
-        st.session_state.summarise = False
-        st.session_state.summarised_advanced = False
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -145,10 +61,8 @@ def app():
     toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                      help='Choose "Local" if you wish to upload a file from your machine or choose '
                                           '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                          'Service Providers.',
-                                     on_change=deinit_master)
-    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                      on_change=deinit_master)
+                                          'Service Providers.')
+    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -242,8 +156,7 @@ def app():
         toolkit['MAX_WORDS'] = col1.number_input('Key in the maximum number of words to display',
                                                  min_value=2,
                                                  max_value=1000,
-                                                 value=200,
-                                                 on_change=deinit_wc)
+                                                 value=200)
         toolkit['CONTOUR_WIDTH'] = col1_.number_input('Key in the contour width of your WordCloud',
                                                       min_value=1,
                                                       max_value=10,
@@ -258,7 +171,7 @@ def app():
                                                value=400)
 
         # MAIN DATA PROCESSING
-        if st.button('Generate Word Cloud', on_click=call_wc) or st.session_state.wc:
+        if st.button('Generate Word Cloud', key='wc'):
             if not toolkit['DATA'].empty:
                 toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 wc = WordCloud(background_color='white',
@@ -300,8 +213,8 @@ def app():
                     'workflow.')
         st.markdown('## Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
-                    'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
-                    'one point. However, you will still be able to download a text/html file containing '
+                    'outputs, you will only be able to visualise the NER outputs for a single document. '
+                    'However, you will still be able to download a text/html file containing '
                     'the outputs for you to save onto your disks.\n'
                     '### NLP Models\n'
                     'Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
@@ -333,6 +246,7 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('**Accuracy Model** Loaded!')
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Choose Number of Data Points to Display',
@@ -357,15 +271,14 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                          on_change=deinit_ner)
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
                 toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
-        if st.button('Conduct Named Entity Recognition', on_click=call_ner) or st.session_state.ner:
+        if st.button('Conduct Named Entity Recognition', key='ner'):
             if not toolkit['DATA'].empty:
                 # EFFICIENT NLP PIPING
                 ner = []
@@ -474,6 +387,7 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('**Accuracy Model** Loaded!')
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Choose Number of Data Points to Display',
@@ -500,15 +414,14 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                          on_change=deinit_pos)
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
                 toolkit['OVERRIDE_FORMAT'] = None
 
         # MAIN PROCESSING
-        if st.button('Start POS Tagging', on_click=call_pos) or st.session_state.pos:
+        if st.button('Start POS Tagging', key='pos'):
             # RESET OUTPUTS
             toolkit['SVG'] = None
 
@@ -595,7 +508,7 @@ def app():
         st.markdown('## Summary Complexity')
         st.markdown('**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
                     'sentences. No machine learning model was used to produce a unique summary of the text.\n\n'
-                    '**Advanced Mode** uses the Pytorch and Huggingface Transformers library to produce summaries '
+                    '**Advanced Mode** uses the PyTorch and Huggingface Transformers library to produce summaries '
                     'using Google\'s T5 Model.')
         toolkit['SUM_MODE'] = st.selectbox('Choose Mode', ('Basic', 'Advanced'))
 
@@ -644,8 +557,7 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                              on_change=deinit_summarise)
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -703,8 +615,7 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                              on_click=deinit_summarised_advanced)
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -740,7 +651,7 @@ def app():
                                                     max_value=10000,
                                                     value=512)
 
-        if st.button('Summarise Text', on_click=call_summarise) or st.session_state.summarise:
+        if st.button('Summarise Text', key='summarise'):
             if toolkit['SUM_MODE'] == 'Basic':
                 if not toolkit['DATA'].empty:
                     try:
@@ -856,8 +767,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                          on_change=deinit_sentiment)
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -880,7 +790,7 @@ def app():
                                                             'option if this if you do not require it.')
 
         # MAIN PROCESSING
-        if st.button('Start Analysis', on_click=call_sentiment) or st.session_state.sentiment:
+        if st.button('Start Analysis', key='sentiment'):
             if not toolkit['DATA'].empty:
                 if toolkit['BACKEND_ANALYSER'] == 'VADER':
                     replacer = {
@@ -1086,8 +996,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                          on_change=deinit_modelling)
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -1187,7 +1096,7 @@ def app():
                     toolkit['W_PLOT'] = st.checkbox('Generate Word Representation of LSI Plot?')
                     toolkit['COLOUR'] = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
 
-        if st.button('Start Modelling', on_click=call_modelling) or st.session_state.modelling:
+        if st.button('Start Modelling', key='topic_modelling'):
             if not toolkit['DATA'].empty:
                 try:
                     toolkit['CV'] = CountVectorizer(min_df=toolkit['MIN_DF'],
@@ -1541,8 +1450,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                          on_change=deinit_classification)
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -1575,7 +1483,7 @@ def app():
         else:
             st.info('No Topics Detected.')
 
-        if st.button('Classify Text', on_click=call_classification) or st.session_state.classification:
+        if st.button('Classify Text', key='classify'):
             if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:
                 toolkit['DATA'].dropna(inplace=True)  # REMOVE THE EMPTY VALUES
                 classifier = pipeline('zero-shot-classification')

@@ -8,7 +8,6 @@ This file is used to store some of the basic helper functions that are used freq
 import io
 import os
 import toml
-import sys
 import typing
 import nltk
 import numpy as np
@@ -22,12 +21,10 @@ import json
 import pickle
 import uuid
 import re
-import pathlib
 
 from collections import Counter
 from heapq import nlargest
 from string import punctuation
-from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
 
@@ -330,7 +327,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
                 elif format_.lower() == 'pkl':
                     out = io.BytesIO()
-                    object_to_download.to_pickle(path=out)
+                    pickle.dump(object_to_download, out)
                     object_to_download = out.getvalue()
                 else:
                     raise ValueError('Error: Unrecognised File Format')
@@ -343,7 +340,7 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
     else:
         try:
             b64 = base64.b64encode(object_to_download.encode()).decode()
-        except AttributeError as e:
+        except AttributeError:
             b64 = base64.b64encode(object_to_download).decode()
 
         button_uuid = str(uuid.uuid4()).replace('-', '')

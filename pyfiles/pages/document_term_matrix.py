@@ -31,18 +31,6 @@ def app():
     Main function that will be called when the app is run and this module is called
     """
 
-    # INIT SESSION STATE
-    if 'proceed' not in st.session_state:
-        st.session_state.proceed = False
-
-    def call_dtm():
-        """Callback function to set the session state to false"""
-        st.session_state.proceed = True
-
-    def deinit_dtm():
-        """Callback function to set the session state to false"""
-        st.session_state.proceed = False
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                     INIT                                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -87,10 +75,8 @@ def app():
     dtm['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.',
-                                 on_change=deinit_dtm)
-    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'),
-                                  on_change=deinit_dtm)
+                                      'Service Providers.')
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -163,8 +149,7 @@ def app():
                                                     'file format by default but this behaviour can be overridden.')
     if dtm['SAVE']:
         if st.checkbox('Override Output Format?'):
-            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'),
-                                                  on_change=deinit_dtm)
+            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
             if dtm['OVERRIDE_FORMAT'] == dtm['MODE']:
                 st.warning('Warning: Overridden Format is the same as Input Format')
         else:
@@ -223,7 +208,7 @@ def app():
         else:
             st.warning('File has not been loaded.')
 
-    if st.button('Proceed', on_click=call_dtm) or st.session_state.proceed:
+    if st.button('Proceed', key='dtm'):
         if (dtm['FILE'] == 'Local' and dtm['DATA_PATH']) or \
                 (dtm['FILE'] == 'Online' and not dtm['DATA'].empty):
             st.info('Data loaded properly!')
@@ -322,7 +307,8 @@ def app():
                         if dtm['OVERRIDE_FORMAT'] is not None:
                             if data[3] != '.png':
                                 st.markdown(prettyDownload(object_to_download=data[0],
-                                                           download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                           download_filename=f'{data[2]}.'
+                                                                             f'{dtm["OVERRIDE_FORMAT"].lower()}',
                                                            button_text=f'Download {data[1]} Data',
                                                            override_index=data[4],
                                                            format_=dtm['OVERRIDE_FORMAT']),

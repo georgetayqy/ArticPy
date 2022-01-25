@@ -7,10 +7,12 @@ A large portion of this module uses the nltk and scikit-learn packages to create
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                             IMPORT RELEVANT LIBRARIES                                            | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import os
 import pathlib
 import platform
 import pandas as pd
+import plotly.graph_objects
 import streamlit as st
 
 from config import dtm
@@ -88,6 +90,7 @@ def app():
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
         else:
             # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
             dtm['DATA'] = pd.DataFrame()
 
     elif dtm['FILE'] == 'Online':
@@ -153,11 +156,11 @@ def app():
             dtm['OVERRIDE_FORMAT'] = None
 
     dtm['VERBOSE_DTM'] = st.checkbox('Display DataFrame of Document-Term Matrix?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that are '
+                                     help='Note that there is an size limit for the DataFrames that are '
                                           'printed to screen. If you get an error telling you that the DataFrame size '
                                           'is too large to proceed, kindly lower the number of data points you wish '
-                                          'to visualise or download the file and visualise it through Excel or any '
-                                          'other DataFrame visualising Python packages')
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
     if dtm['VERBOSE_DTM']:
         dtm['VERBOSITY_DTM'] = st.slider('Data Points to Display for Document-Term Matrix?',
                                          min_value=1,
@@ -205,7 +208,7 @@ def app():
         else:
             st.warning('File has not been loaded.')
 
-    if st.button('Proceed', key='doc'):
+    if st.button('Proceed', key='dtm'):
         if (dtm['FILE'] == 'Local' and dtm['DATA_PATH']) or \
                 (dtm['FILE'] == 'Online' and not dtm['DATA'].empty):
             st.info('Data loaded properly!')
@@ -300,21 +303,36 @@ def app():
                 if dtm['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Data')
-                    for data in dtm['FINALISED_DATA_LIST']:
+                    for index, data in enumerate(dtm['FINALISED_DATA_LIST']):
                         if dtm['OVERRIDE_FORMAT'] is not None:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{dtm["OVERRIDE_FORMAT"].lower()}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                            if data[3] != '.png':
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.'
+                                                                             f'{dtm["OVERRIDE_FORMAT"].lower()}',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4],
+                                                           format_=dtm['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.png',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4]),
+                                            unsafe_allow_html=True)
                         else:
-                            st.markdown(prettyDownload(object_to_download=data[0],
-                                                       download_filename=f'{data[2]}.{data[3]}',
-                                                       button_text=f'Download {data[1]} Data',
-                                                       override_index=data[4],
-                                                       format_=dtm["MODE"]),
-                                        unsafe_allow_html=True)
+                            if data[3] != '.png':
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}{data[3]}',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4],
+                                                           format_=dtm["MODE"]),
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(prettyDownload(object_to_download=data[0],
+                                                           download_filename=f'{data[2]}.png',
+                                                           button_text=f'Download {data[1]} Data',
+                                                           override_index=data[4]),
+                                            unsafe_allow_html=True)
             else:
                 st.error('Error: DTM not created properly. Try again.')
         else:

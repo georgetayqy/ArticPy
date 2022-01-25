@@ -6,23 +6,20 @@ This module uses CPU-optimised pipelines and hence a GPU is optional in this mod
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                         IMPORT RELEVANT LIBRARIES                                                | #
 # -------------------------------------------------------------------------------------------------------------------- #
+import io
 import multiprocessing
 import os
-import numpy as np
 import pandas as pd
 import spacy
 import streamlit as st
 import plotly.graph_objs as go
 import plotly.figure_factory as ff
 import plotly.express as px
-import nltk
 import pyLDAvis
 import pyLDAvis.gensim_models
 import pyLDAvis.sklearn
 import streamlit.components.v1
 import torch
-import matplotlib.pyplot as plt
-import transformers
 
 from streamlit_tags import st_tags
 from config import toolkit
@@ -33,7 +30,6 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from streamlit_pandas_profiling import st_profile_report
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from spacy.lang.en.stop_words import STOP_WORDS
-from spacy.lang.en import English
 from spacy import displacy
 from wordcloud import WordCloud
 from textblob import TextBlob
@@ -60,85 +56,86 @@ def app():
                 'and save the cleaned  data onto your workstation. Those files may come in useful in '
                 'the functionality of this app.\n\n')
 
+    st.markdown('## Upload Data\n')
+    col1, col1_ = st.columns(2)
+    toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                     help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                          '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                          'Service Providers.')
+    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                                 FILE UPLOADING                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+    if toolkit['FILE'] == 'Local':
+        toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
+        if toolkit['DATA_PATH'] is not None:
+            toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
+            if not toolkit['DATA'].empty:
+                toolkit['DATA'] = toolkit['DATA'].astype(str)
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+        else:
+            # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
+            toolkit['DATA'] = pd.DataFrame()
+
+    elif toolkit['FILE'] == 'Online':
+        st.info(f'File Format Selected: **{toolkit["MODE"]}**')
+        toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+
+        if toolkit['CSP'] == 'Azure':
+            azure = csp_downloaders.AzureDownloader()
+            if azure.SUCCESSFUL:
+                try:
+                    azure.downloadBlob()
+                    toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
+        elif toolkit['CSP'] == 'Amazon':
+            aws = csp_downloaders.AWSDownloader()
+            if aws.SUCCESSFUL:
+                try:
+                    aws.downloadFile()
+                    toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
+        elif toolkit['CSP'] == 'Google':
+            gcs = csp_downloaders.GoogleDownloader()
+            if gcs.SUCCESSFUL:
+                try:
+                    gcs.downloadBlob()
+                    toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
+                except Exception as ex:
+                    st.error(f'Error: {ex}. Try again.')
+
+            if not toolkit['DATA'].empty:
+                toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
+                                                      list(toolkit['DATA'].columns))
+                st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              FUNCTION SELECTOR                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## NLP Operations\n'
                 'Select the NLP functions which you wish to execute.')
     toolkit['APP_MODE'] = st.selectbox('Select the NLP Operation to execute',
-                                       ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment', 'Word Cloud',
-                                        'Named Entity Recognition', 'POS Tagging', 'Summarise'))
+                                       ('Topic Modelling', 'Topic Classification', 'Analyse Sentiment',
+                                        'Word Cloud', 'Named Entity Recognition', 'POS Tagging', 'Summarise'))
     st.info(f'**{toolkit["APP_MODE"]}** Selected')
-
-    if toolkit['APP_MODE'] != 'News Classifier':
-        st.markdown('## Upload Data\n')
-        col1, col1_ = st.columns(2)
-        toolkit['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
-                                         help='Choose "Local" if you wish to upload a file from your machine or choose '
-                                              '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                              'Service Providers.')
-        toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                 FILE UPLOADING                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
-        if toolkit['FILE'] == 'Local':
-            toolkit['DATA_PATH'] = st.file_uploader(f'Load {toolkit["MODE"]} File', type=[toolkit['MODE']])
-            if toolkit['DATA_PATH'] is not None:
-                toolkit['DATA'] = readFile(toolkit['DATA_PATH'], toolkit['MODE'])
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA'] = toolkit['DATA'].astype(str)
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-            else:
-                toolkit['DATA'] = pd.DataFrame()
-
-        elif toolkit['FILE'] == 'Online':
-            st.info(f'File Format Selected: **{toolkit["MODE"]}**')
-            toolkit['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
-
-            if toolkit['CSP'] == 'Azure':
-                azure = csp_downloaders.AzureDownloader()
-                if azure.SUCCESSFUL:
-                    try:
-                        azure.downloadBlob()
-                        toolkit['DATA'] = readFile(azure.AZURE_DOWNLOAD_PATH, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-
-            elif toolkit['CSP'] == 'Amazon':
-                aws = csp_downloaders.AWSDownloader()
-                if aws.SUCCESSFUL:
-                    try:
-                        aws.downloadFile()
-                        toolkit['DATA'] = readFile(aws.AWS_FILE_NAME, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
-
-            elif toolkit['CSP'] == 'Google':
-                gcs = csp_downloaders.GoogleDownloader()
-                if gcs.SUCCESSFUL:
-                    try:
-                        gcs.downloadBlob()
-                        toolkit['DATA'] = readFile(gcs.GOOGLE_DESTINATION_FILE_NAME, toolkit['MODE'])
-                    except Exception as ex:
-                        st.error(f'Error: {ex}. Try again.')
-
-                if not toolkit['DATA'].empty:
-                    toolkit['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored',
-                                                          list(toolkit['DATA'].columns))
-                    st.success(f'Data Loaded from {toolkit["DATA_COLUMN"]}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            WORD CLOUD VISUALISATION                                              | #
@@ -150,8 +147,6 @@ def app():
                     'of all the documents.\n\n'
                     'Note that the documents should not be tokenized, but it should be cleaned and lemmatized to '
                     'avoid double-counting words.')
-
-        # FLAGS
         st.markdown('## Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
@@ -178,7 +173,7 @@ def app():
         # MAIN DATA PROCESSING
         if st.button('Generate Word Cloud', key='wc'):
             if not toolkit['DATA'].empty:
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                 wc = WordCloud(background_color='white',
                                max_words=toolkit['MAX_WORDS'],
                                contour_width=toolkit['CONTOUR_WIDTH'],
@@ -193,13 +188,13 @@ def app():
                 if toolkit['SAVE']:
                     st.markdown('---')
                     st.markdown('## Download Image')
-                    st.markdown(prettyDownload(
-                        object_to_download=wc,
-                        download_filename='wordcloud.png',
-                        button_text='Download Queried Data',
-                        override_index=False),
-                        unsafe_allow_html=True
-                    )
+                    buf = io.BytesIO()
+                    wc.to_image().save(buf, format='png')
+                    st.download_button(label=f'Download Word Cloud',
+                                       data=buf.getvalue(),
+                                       mime='application/octet-stream',
+                                       file_name='wordcloud.png',
+                                       key='img')
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -216,12 +211,10 @@ def app():
                     'does not seem to be fully supported in Streamlit.\n\n'
                     'In the meantime, it may be better to process your data in smaller batches to speed up your '
                     'workflow.')
-
-        # FLAGS
         st.markdown('## Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
-                    'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
-                    'one point. However, you will still be able to download a text/html file containing '
+                    'outputs, you will only be able to visualise the NER outputs for a single document. '
+                    'However, you will still be able to download a text/html file containing '
                     'the outputs for you to save onto your disks.\n'
                     '### NLP Models\n'
                     'Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
@@ -253,6 +246,7 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('**Accuracy Model** Loaded!')
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Choose Number of Data Points to Display',
@@ -264,8 +258,8 @@ def app():
             if toolkit['ONE_DATAPOINT']:
                 toolkit['DATAPOINT_SELECTOR'] = st.selectbox('Choose Data Point From Data', range(len(toolkit['DATA'])))
             else:
-                st.info('You are conducting NER on the entire dataset. Only DataFrame is printed. NER output will be '
-                        'automatically saved.')
+                st.info('You are conducting NER on the entire dataset. Only the final DataFrame is printed. NER '
+                        'output will be automatically saved.')
             toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
                                                        help='This option will analyse your DataFrame and display '
                                                             'advanced statistics on it. Note that this will require '
@@ -286,18 +280,21 @@ def app():
         # MAIN PROCESSING
         if st.button('Conduct Named Entity Recognition', key='ner'):
             if not toolkit['DATA'].empty:
-                # CLEAN UP AND STANDARDISE DATAFRAMES
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                toolkit['DATA']['NER'] = ''
-                toolkit['DATA']['COMPILED_LABELS'] = ''
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
-
-                for index in range(len(toolkit['DATA'])):
-                    temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                    toolkit['DATA'].at[index, 'NER'] = str(list(zip([word.text for word in temp_nlp.ents],
-                                                                    [word.label_ for word in temp_nlp.ents])))
-                    toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.label_ for word
-                                                                                 in temp_nlp.ents])))
+                # EFFICIENT NLP PIPING
+                ner = []
+                lab = []
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
+                for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
+                                               disable=['tagger', 'parser', 'entity_linker', 'entity_ruler',
+                                                        'textcat', 'textcat_multilabel', 'lemmatizer',
+                                                        'morphologizer', 'attribute_ruler', 'senter',
+                                                        'sentencizer', 'tok2vec', 'transformer'],
+                                               batch_size=2000,
+                                               n_process=1):
+                    ner.append(list(zip([word.text for word in doc.ents], [word.label_ for word in doc.ents])))
+                    lab.append(list(set([word.label_ for word in doc.ents])))
+                toolkit['DATA']['NER'] = ner
+                toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
                     st.markdown('## NER DataFrame')
@@ -332,13 +329,15 @@ def app():
                                                    override_index=False,
                                                    format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['SVG'],
-                        download_filename='rendering.html',
-                        button_text=f'Download Rendering Data',
-                        override_index=False),
-                        unsafe_allow_html=True
-                    )
+
+                    if toolkit['ONE_DATAPOINT']:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['SVG'],
+                            download_filename='rendering.html',
+                            button_text=f'Download Rendering Data',
+                            override_index=False),
+                            unsafe_allow_html=True
+                        )
             else:
                 st.error('Error: Data not loaded properly. Try again.')
 
@@ -354,9 +353,6 @@ def app():
                     'looking to implement multiprocessing into the app to optimise it.\n\n'
                     'In the meantime, it may be better to process your data in smaller batches to speed up your '
                     'workflow.')
-
-        # FLAGS
-        st.markdown('## Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
                     'outputs, you will only be able to visualise the NER outputs for a single piece of text at any '
                     'one point. However, you will still be able to download a text/html file containing '
@@ -391,6 +387,7 @@ def app():
                 st.error(f'Unknown Error: {ex}. Try again.')
             else:
                 st.info('**Accuracy Model** Loaded!')
+
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Choose Number of Data Points to Display',
@@ -409,8 +406,8 @@ def app():
                 toolkit['COLOUR_BCKGD'] = st.color_picker('Choose Colour of Render Background', value='#000000')
                 toolkit['COLOUR_TXT'] = st.color_picker('Choose Colour of Render Text', value='#ffffff')
             else:
-                st.info('You are conducting POS on the entire dataset. Only DataFrame is printed. POS output will be '
-                        'automatically saved.')
+                st.info('You are conducting POS on the entire dataset. Only the final DataFrame is printed. POS '
+                        'output will be automatically saved.')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
@@ -429,15 +426,21 @@ def app():
             toolkit['SVG'] = None
 
             if not toolkit['DATA'].empty:
-                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                toolkit['DATA']['POS'] = ''
-                toolkit['DATA'] = toolkit['DATA'].astype(str)
-
-                for index in range(len(toolkit['DATA'])):
-                    temp_nlp = toolkit['NLP'](toolkit['DATA'][toolkit['DATA_COLUMN']][index])
-                    toolkit['DATA'].at[index, 'POS'] = str(list(zip([str(word) for word in temp_nlp],
-                                                                    [word.pos_ for word in temp_nlp])))
-                    toolkit['DATA'].at[index, 'COMPILED_LABELS'] = str(list(set([word.pos_ for word in temp_nlp])))
+                # EFFICIENT NLP PIPING
+                pos = []
+                lab = []
+                toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
+                for doc in toolkit['NLP'].pipe(toolkit['DATA'][toolkit['DATA_COLUMN']].to_list(),
+                                               disable=['ner', 'parser', 'entity_linker', 'entity_ruler',
+                                                        'textcat', 'textcat_multilabel', 'lemmatizer',
+                                                        'morphologizer', 'attribute_ruler', 'senter',
+                                                        'sentencizer', 'tok2vec', 'transformer'],
+                                               batch_size=2000,
+                                               n_process=1):
+                    pos.append(list(zip([str(word) for word in doc], [word.pos_ for word in doc])))
+                    lab.append(list(set([word.pos_ for word in doc])))
+                toolkit['DATA']['POS'] = pos
+                toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
                     st.markdown('## POS DataFrame')
@@ -447,7 +450,6 @@ def app():
                     if toolkit['ONE_DATAPOINT']:
                         verbose_data_copy = toolkit['DATA'].copy()
                         temp_df = verbose_data_copy[toolkit['DATA_COLUMN']][toolkit['DATAPOINT_SELECTOR']]
-                        st.markdown('## DisplaCy Rendering')
                         st.info('Renders are not shown due to the sheer size of the image. Kindly save the render in '
                                 'HTML format below to view it.')
                         toolkit['SVG'] = displacy.render(list(toolkit['NLP'](str(temp_df)).sents),
@@ -506,7 +508,7 @@ def app():
         st.markdown('## Summary Complexity')
         st.markdown('**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
                     'sentences. No machine learning model was used to produce a unique summary of the text.\n\n'
-                    '**Advanced Mode** uses the Pytorch and Huggingface Transformers library to produce summaries '
+                    '**Advanced Mode** uses the PyTorch and Huggingface Transformers library to produce summaries '
                     'using Google\'s T5 Model.')
         toolkit['SUM_MODE'] = st.selectbox('Choose Mode', ('Basic', 'Advanced'))
 
@@ -575,15 +577,87 @@ def app():
                                                                 'require some time and processing power to complete. '
                                                                 'Deselect this option if this if you do not require '
                                                                 'it.')
+        elif toolkit['SUM_MODE'] == 'Advanced':
+            # FLAGS
+            st.markdown('## Options')
+            st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
+                        'advanced user, you may choose to modify the number of input tensors for the model. If '
+                        'you do not wish to modify the setting, a default value of 512 will be used for your '
+                        'summary.\n\n'
+                        'If your system has a GPU , you may wish to install the GPU (CUDA) enabled version '
+                        'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
+                        'and to check if your GPU is enabled.')
+            with st.expander('GPU-enabled Features'):
+                col, col_ = st.columns(2)
+                with col:
+                    st.markdown('### PyTorch for CUDA 10.2')
+                    if st.button('Install Relevant Packages', key='10.2'):
+                        os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
+                                  ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
+                with col_:
+                    st.markdown('### PyTorch for CUDA 11.3')
+                    if st.button('Install Relevant Packages', key='11.3'):
+                        os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
+                                  ' -f https://download.pytorch.org/whl/cu113/torch_stable.html')
+                st.markdown('---')
+                if st.button('Check if GPU is properly installed'):
+                    st.info(f'GPU Installation Status: **{torch.cuda.is_available()}**')
+                if st.button('Check GPU used'):
+                    try:
+                        st.info(f'GPU Device **{torch.cuda.get_device_name(torch.cuda.current_device())}** in use.')
+                    except AssertionError:
+                        st.error('Your version of PyTorch is CPU-optimised. Download and install any of the above two '
+                                 'supported GPU-enabled PyTorch versions to use your GPU and silence this error.')
+                    except Exception as ex:
+                        st.error(ex)
 
-            # MAIN PROCESSING
-            if st.button('Summarise Text', key='runner'):
+            toolkit['SAVE'] = st.checkbox('Save Outputs?')
+            if toolkit['SAVE']:
+                if st.checkbox('Override Output Format?'):
+                    toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                    if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                        st.warning('Warning: Overridden Format is the same as Input Format')
+                else:
+                    st.error('Error: Data not loaded properly. Try again.')
+
+            toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
+            if toolkit['VERBOSE']:
+                toolkit['VERBOSITY'] = st.slider('Data points',
+                                                 key='Data points to display?',
+                                                 min_value=0,
+                                                 max_value=1000,
+                                                 value=20,
+                                                 help='Select 0 to display all Data Points')
+                toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
+                                                           help='This option will analyse your DataFrame and display '
+                                                                'advanced statistics on it. Note that this will '
+                                                                'require some time and processing power to complete. '
+                                                                'Deselect this option if this if you do not require '
+                                                                'it.')
+
+            col2, col2_ = st.columns(2)
+
+            toolkit['MIN_WORDS'] = col2.number_input('Key in the minimum number of words to summarise to',
+                                                     min_value=1,
+                                                     max_value=1000,
+                                                     value=80)
+            toolkit['MAX_WORDS'] = col2_.number_input('Key in the maximum number of words to summarise to',
+                                                      min_value=80,
+                                                      max_value=1000,
+                                                      value=150)
+            toolkit['MAX_TENSOR'] = st.number_input('Key in the maximum number of vectors to consider',
+                                                    min_value=1,
+                                                    max_value=10000,
+                                                    value=512)
+
+        if st.button('Summarise Text', key='summarise'):
+            if toolkit['SUM_MODE'] == 'Basic':
                 if not toolkit['DATA'].empty:
                     try:
                         # CLEAN UP AND STANDARDISE DATAFRAMES
-                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]]
-                        toolkit['DATA']['SUMMARY'] = np.nan
-                        toolkit['DATA'] = toolkit['DATA'].astype(str)
+                        # toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].astype(str)
+                        toolkit['DATA'] = toolkit['DATA'][[toolkit['DATA_COLUMN']]].dropna(inplace=False)
                     except KeyError:
                         st.error('Warning: CLEANED CONTENT is not found in the file uploaded. Try again.')
                     except Exception as ex:
@@ -622,88 +696,14 @@ def app():
                 else:
                     st.error('Error: Data not loaded properly. Try again.')
 
-        elif toolkit['SUM_MODE'] == 'Advanced':
-            # FLAGS
-            st.markdown('## Options')
-            st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
-                        'advanced user, you may choose to modify the number of input tensors for the model. If '
-                        'you do not wish to modify the setting, a default value of 512 will be used for your '
-                        'summmary.\n\n'
-                        'If your system has a GPU enabled, you may wish to install the GPU (CUDA) enabled version '
-                        'of PyTorch. If so, click on the expander below to install the correct version of PyTorch '
-                        'and to check if your GPU is enabled.')
-            with st.expander('GPU-enabled Features'):
-                col, col_ = st.columns(2)
-                with col:
-                    st.markdown('### PyTorch for CUDA 10.2')
-                    if st.button('Install Relevant Packages', key='10.2'):
-                        os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
-                                  ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
-                with col_:
-                    st.markdown('### PyTorch for CUDA 11.3')
-                    if st.button('Install Relevant Packages', key='11.3'):
-                        os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
-                                  ' -f https://download.pytorch.org/whl/cu113/torch_stable.html')
-                st.markdown('---')
-                if st.button('Check if GPU is properly installed'):
-                    st.info(f'GPU Installation Status: **{torch.cuda.is_available()}**')
-                if st.button('Check GPU used'):
-                    try:
-                        st.info(f'GPU Device **{torch.cuda.get_device_name(torch.cuda.current_device())}** in use.')
-                    except AssertionError:
-                        st.error('Your version of PyTorch is CPU-optimised. Download and install any of the above two '
-                                 'supported GPU-enabled PyTorch versions to use your GPU and silence this error.')
-                    except Exception as ex:
-                        st.error(ex)
-
-            toolkit['SAVE'] = st.checkbox('Save Outputs?')
-            if toolkit['SAVE']:
-                if st.checkbox('Override Output Format?'):
-                    toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
-                    if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
-                        st.warning('Warning: Overridden Format is the same as Input Format')
-                else:
-                    toolkit['OVERRIDE_FORMAT'] = None
-
-            toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
-
-            if toolkit['VERBOSE']:
-                toolkit['VERBOSITY'] = st.slider('Data points',
-                                                 key='Data points to display?',
-                                                 min_value=0,
-                                                 max_value=1000,
-                                                 value=20,
-                                                 help='Select 0 to display all Data Points')
-                toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
-                                                           help='This option will analyse your DataFrame and display '
-                                                                'advanced statistics on it. Note that this will '
-                                                                'require some time and processing power to complete. '
-                                                                'Deselect this option if this if you do not require '
-                                                                'it.')
-
-            col2, col2_ = st.columns(2)
-
-            toolkit['MIN_WORDS'] = col2.number_input('Key in the minimum number of words to summarise to',
-                                                     min_value=1,
-                                                     max_value=1000,
-                                                     value=80)
-            toolkit['MAX_WORDS'] = col2_.number_input('Key in the maximum number of words to summarise to',
-                                                      min_value=80,
-                                                      max_value=1000,
-                                                      value=150)
-            toolkit['MAX_TENSOR'] = st.number_input('Key in the maximum number of vectors to consider',
-                                                    min_value=1,
-                                                    max_value=10000,
-                                                    value=512)
-
-            if st.button('Summarise', key='summary_t5'):
-                tokenizer = AutoTokenizer.from_pretrained('t5-base')
-                model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
-
+            elif toolkit['SUM_MODE'] == 'Advanced':
                 if not toolkit['DATA'].empty:
-                    # to work with tensors, we need to convert the dataframe to a complex datatype
-                    toolkit['DATA'] = toolkit['DATA'].astype(object)
+                    # MOVED EXPENSIVE LOADING PROCEDURES INTO CHECK AND REMOVE EMPTY ROWS
+                    tokenizer = AutoTokenizer.from_pretrained('t5-base')
+                    model = AutoModelWithLMHead.from_pretrained('t5-base', return_dict=True)
+                    toolkit['DATA'].dropna(inplace=True)
+
+                    # REMOVED STREAMLIT LIMITATION ON OTHER DATATYPES, WILL NOW WORK WITH TENSORS
                     toolkit['DATA']['ENCODED'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
                         apply(lambda x: tokenizer.encode('summarize: ' + x,
                                                          return_tensors='pt',
@@ -719,29 +719,33 @@ def app():
                     toolkit['DATA'].drop(columns=['ENCODED', 'OUTPUTS'], inplace=True)
                     toolkit['DATA']['SUMMARISED'] = toolkit['DATA']['SUMMARISED']. \
                         str.replace('<pad> ', '').str.replace('</s>', '')
-                    toolkit['DATA'] = toolkit['DATA'].astype(str)
 
-                if toolkit['VERBOSE']:
-                    st.markdown('## Summarised Text')
-                    printDataFrame(toolkit['DATA'], toolkit['VERBOSITY'], toolkit['ADVANCED_ANALYSIS'])
+                    # SHOW DATA
+                    if toolkit['VERBOSE']:
+                        st.markdown('## Summarised Text')
+                        printDataFrame(toolkit['DATA'], toolkit['VERBOSITY'], toolkit['ADVANCED_ANALYSIS'])
 
-                if toolkit['SAVE']:
-                    st.markdown('---')
-                    st.markdown('## Download Summarised Data')
-                    if toolkit['OVERRIDE_FORMAT'] is not None:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'summarised.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                                   button_text=f'Download Summarised Data',
-                                                   override_index=False,
-                                                   format_=toolkit['OVERRIDE_FORMAT']),
-                                    unsafe_allow_html=True)
-                    else:
-                        st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
-                                                   download_filename=f'summarised.{toolkit["MODE"].lower()}',
-                                                   button_text=f'Download Summarised Data',
-                                                   override_index=False,
-                                                   format_=toolkit['MODE']),
-                                    unsafe_allow_html=True)
+                    # SAVE DATA
+                    if toolkit['SAVE']:
+                        st.markdown('---')
+                        st.markdown('## Download Summarised Data')
+                        if toolkit['OVERRIDE_FORMAT'] is not None:
+                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                       download_filename=f'summarised.'
+                                                                         f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                                       button_text=f'Download Summarised Data',
+                                                       override_index=False,
+                                                       format_=toolkit['OVERRIDE_FORMAT']),
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
+                                                       download_filename=f'summarised.{toolkit["MODE"].lower()}',
+                                                       button_text=f'Download Summarised Data',
+                                                       override_index=False,
+                                                       format_=toolkit['MODE']),
+                                        unsafe_allow_html=True)
+                else:
+                    st.error('Error: Your Dataset was not loaded properly. Try again.')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                              SENTIMENT ANALYSIS                                                  | #
@@ -750,10 +754,7 @@ def app():
         st.markdown('---')
         st.markdown('# Sentiment Analysis\n'
                     'For this module, both the VADER and TextBlob models will be used to analyse the sentiment of the '
-                    'text you upload.\n'
-                    'For VADER, your sentiment score will be ')
-
-        # FLAGS
+                    'text you upload.\n')
         st.markdown('## Options')
         toolkit['BACKEND_ANALYSER'] = st.selectbox('Choose the Backend Engine Used to Conduct Sentiment Analysis',
                                                    ('VADER', 'TextBlob'),
@@ -789,7 +790,7 @@ def app():
                                                             'option if this if you do not require it.')
 
         # MAIN PROCESSING
-        if st.button('Start Analysis', key='analysis'):
+        if st.button('Start Analysis', key='sentiment'):
             if not toolkit['DATA'].empty:
                 if toolkit['BACKEND_ANALYSER'] == 'VADER':
                     replacer = {
@@ -800,65 +801,67 @@ def app():
                     }
 
                     toolkit['DATA']['VADER SENTIMENT TEXT'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                        replace(to_replace=replacer, regex=True)
+                        replace(to_replace=replacer, regex=True).dropna(inplace=False)
 
                     vader_analyser = SentimentIntensityAnalyzer()
-                    sent_score_list = []
-                    sent_label_list = []
 
-                    for i in toolkit['DATA']['VADER SENTIMENT TEXT'].tolist():
-                        sent_score = vader_analyser.polarity_scores(i)
+                    def score2label(score: int or float):
+                        if score < 0:
+                            return 'Negative'
+                        elif score == 0:
+                            return 'Neutral'
+                        else:
+                            return 'Positive'
 
-                        if sent_score['compound'] > 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Positive')
-                        elif sent_score['compound'] == 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Neutral')
-                        elif sent_score['compound'] < 0:
-                            sent_score_list.append(sent_score['compound'])
-                            sent_label_list.append('Negative')
-
-                    toolkit['DATA']['VADER OVERALL SENTIMENT'] = sent_label_list
-                    toolkit['DATA']['VADER OVERALL SCORE'] = sent_score_list
-                    toolkit['DATA']['VADER POSITIVE SCORING'] = [vader_analyser.polarity_scores(doc)['pos'] for doc in
-                                                                 toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
-                    toolkit['DATA']['VADER NEUTRAL SCORING'] = [vader_analyser.polarity_scores(doc)['neu'] for doc in
-                                                                toolkit['DATA']['VADER SENTIMENT TEXT'].values.tolist()]
-                    toolkit['DATA']['VADER NEGATIVE SCORING'] = [vader_analyser.polarity_scores(doc)['neg'] for doc in
-                                                                 toolkit['DATA']['VADER SENTIMENT TEXT']
-                                                                 .values.tolist()]
+                    toolkit['DATA']['VADER OVERALL SCORE'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['compound']
+                    )
+                    toolkit['DATA']['VADER OVERALL SENTIMENT'] = toolkit['DATA']['VADER OVERALL SCORE'].apply(
+                        lambda x: score2label(x)
+                    )
+                    toolkit['DATA']['VADER POSITIVE SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['pos']
+                    )
+                    toolkit['DATA']['VADER NEUTRAL SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['neu']
+                    )
+                    toolkit['DATA']['VADER NEGATIVE SCORING'] = toolkit['DATA']['VADER SENTIMENT TEXT'].apply(
+                        lambda x: vader_analyser.polarity_scores(x)['neg']
+                    )
 
                 elif toolkit['BACKEND_ANALYSER'] == 'TextBlob':
                     try:
-                        pol_list = []
-                        sub_list = []
+                        def score2label(score: int or float):
+                            if score < 0:
+                                return 'Negative'
+                            elif score == 0:
+                                return 'Neutral'
+                            else:
+                                return 'Positive'
+
+                        def score2subject(score: int or float):
+                            if score < 0.5:
+                                return 'Objective'
+                            elif score > 0.5:
+                                return 'Subjective'
+                            elif score == 0.5:
+                                return 'Neutral'
 
                         # APPLY POLARITY FUNCTION
-                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                            apply(lambda x: TextBlob(x).sentiment.polarity)
-                        for i in toolkit['DATA']['POLARITY SCORE'].tolist():
-                            if float(i) > 0:
-                                pol_list.append('Positive')
-                            elif float(i) < 0:
-                                pol_list.append('Negative')
-                            elif float(i) == 0:
-                                pol_list.append('Neutral')
-                        toolkit['DATA']['POLARITY SENTIMENT'] = pol_list
+                        toolkit['DATA']['POLARITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']].apply(
+                            lambda x: TextBlob(x).sentiment.polarity
+                        )
+                        toolkit['DATA']['POLARITY SENTIMENT'] = toolkit['DATA']['POLARITY SCORE'].apply(
+                            lambda x: score2label(float(x))
+                        )
 
                         # APPLY SUBJECTIVITY FUNCTION
                         toolkit['DATA']['SUBJECTIVITY SCORE'] = toolkit['DATA'][toolkit['DATA_COLUMN']].apply(
                             lambda x: TextBlob(x).sentiment.subjectivity
                         )
-                        for i in toolkit['DATA']['SUBJECTIVITY SCORE'].tolist():
-                            if float(i) < 0.5:
-                                sub_list.append('Objective')
-                            elif float(i) > 0.5:
-                                sub_list.append('Subjective')
-                            elif float(i) == 0.5:
-                                sub_list.append('Neutral')
-                        toolkit['DATA']['SUBJECTIVITY SENTIMENT'] = sub_list
+                        toolkit['DATA']['SUBJECTIVITY SENTIMENT'] = toolkit['DATA']['SUBJECTIVITY SCORE'].apply(
+                            lambda x: score2subject(float(x))
+                        )
                     except Exception as ex:
                         st.error(f'Error: {ex}')
 
@@ -943,6 +946,7 @@ def app():
                             override_index=False),
                             unsafe_allow_html=True
                         )
+
                     if toolkit['HAC_PLOT1'] is not None:
                         st.markdown(prettyDownload(
                             object_to_download=toolkit['HAC_PLOT1'],
@@ -963,6 +967,12 @@ def app():
         st.markdown('Ensure that your data is **lemmatized and properly cleaned**; data **should not be tokenized** '
                     'for this step. Use the Load, Clean and Visualise module to clean and lemmatize your data if you '
                     'have not done so already.\n\n')
+        st.markdown('## Topic Modelling Model Selection')
+        toolkit['NLP_TOPIC_MODEL'] = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
+                                                                          'Non-Negative Matrix Factorization',
+                                                                          'Latent Semantic Indexing'))
+        st.info(f'**{toolkit["NLP_TOPIC_MODEL"]}** Selected')
+
         with st.expander('Short Explanation on Models used'):
             st.markdown(
                 '#### Latent Dirichlet Allocation (LDA)\n'
@@ -976,16 +986,9 @@ def app():
                 '-3caf3a6bb6da, NMF is an unsupervised learning technique to decompose (factorise) high-'
                 'dimensional vectors into non-negative lower-dimensional vectors.\n\n'
                 '#### Latent Semantic Indexing (LSI)\n'
-                'Extracted from https://www.searchenginejournal.com/latent-semantic-indexing-wont-help-seo/240705/'
-                '#:~:text=Latent%20semantic%20indexing%20(also%20referred,of%20those%20words%20and%20documents, '
-                'LSI is a technique of analysing a document to discover statistical co-occurrences of words which '
-                'appear to gather, which gives us insights into the topics of the words and of the document.')
-
-        st.markdown('## Topic Modelling Model Selection')
-        toolkit['NLP_TOPIC_MODEL'] = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
-                                                                          'Non-Negative Matrix Factorization',
-                                                                          'Latent Semantic Indexing'))
-        st.info(f'**{toolkit["NLP_TOPIC_MODEL"]}** Selected')
+                'Extracted from https://en.wikipedia.org/wiki/Latent_semantic_analysis, LSI is a NLP technique that '
+                'analyses the relationship between a set of documents and the terms they contain by producing '
+                'a set of concepts related to the documents and terms.')
 
         # FLAGS
         st.markdown('## Options')
@@ -1093,7 +1096,7 @@ def app():
                     toolkit['W_PLOT'] = st.checkbox('Generate Word Representation of LSI Plot?')
                     toolkit['COLOUR'] = st.color_picker('Choose Colour of Marker to Display', value='#2ACAEA')
 
-        if st.button('Start Modelling', key='topic'):
+        if st.button('Start Modelling', key='topic_modelling'):
             if not toolkit['DATA'].empty:
                 try:
                     toolkit['CV'] = CountVectorizer(min_df=toolkit['MIN_DF'],
@@ -1150,20 +1153,20 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lda_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'lda_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lda_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'lda_topics_{index}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
@@ -1236,20 +1239,20 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'nmf_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'nmf_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'nmf_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'nmf_topics_{index}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
@@ -1350,20 +1353,20 @@ def app():
                             st.markdown('---')
                             st.markdown('## Save Data\n'
                                         '### Topics')
-                            for i in range(len(toolkit['TOPIC_TEXT'])):
+                            for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lsi_topics_{i}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'lsi_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['OVERRIDE_FORMAT']),
                                         unsafe_allow_html=True)
                                 else:
                                     st.markdown(prettyDownload(
-                                        object_to_download=toolkit['TOPIC_TEXT'][i],
-                                        download_filename=f'lsi_topics_{i}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {i}',
+                                        object_to_download=data,
+                                        download_filename=f'lsi_topics_{index}.{toolkit["MODE"].lower()}',
+                                        button_text=f'Download Topic List Data Entry {index}',
                                         override_index=False,
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
@@ -1444,6 +1447,14 @@ def app():
         toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
 
         if toolkit['VERBOSE']:
@@ -1461,7 +1472,11 @@ def app():
         toolkit['CLASSIFY_TOPIC'] = st_tags(label='**Topics**',
                                             text='Press Enter to extend list...',
                                             maxtags=9999999,
-                                            key='classify_topics')
+                                            key='classify_topics',
+                                            suggestions=['Arts', 'Business', 'Data', 'Entertainment', 'Environment',
+                                                         'Fashion', 'Medicine', 'Music', 'Politics', 'Science',
+                                                         'Sports', 'Technology', 'Trade', 'Traffic', 'Weather',
+                                                         'World'])
 
         if len(toolkit['CLASSIFY_TOPIC']) != 0:
             st.info(f'**{toolkit["CLASSIFY_TOPIC"]}** Topics are Detected!')
@@ -1469,37 +1484,39 @@ def app():
             st.info('No Topics Detected.')
 
         if st.button('Classify Text', key='classify'):
-            toolkit['DATA'] = toolkit['DATA'].astype(object)
-            classifier = pipeline('zero-shot-classification')
-            toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
-                apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
-            toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
-                apply(lambda x: list(zip(x['labels'].tolist(), x['scores'].tolist())))
-            toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
-                apply(lambda x: max(x, key=itemgetter[1])[0])
-            toolkit['DATA'] = toolkit['DATA'].astype(str)
+            if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:
+                toolkit['DATA'].dropna(inplace=True)  # REMOVE THE EMPTY VALUES
+                classifier = pipeline('zero-shot-classification')
+                toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
+                    apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
+                toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \
+                    apply(lambda x: list(zip(x['labels'], x['scores'])))
+                toolkit['DATA']['MOST PROBABLE TOPIC'] = toolkit['DATA']['CLASSIFIED']. \
+                    apply(lambda x: max(x, key=itemgetter(1))[0])
 
-            if toolkit['VERBOSE']:
-                st.markdown('## Classified Data')
-                printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
-                               advanced=toolkit['ADVANCED_ANALYSIS'])
+                if toolkit['VERBOSE']:
+                    st.markdown('## Classified Data')
+                    printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
+                                   advanced=toolkit['ADVANCED_ANALYSIS'])
 
-            if toolkit['SAVE']:
-                st.markdown('---')
-                st.markdown('## Download Data')
-                if toolkit['OVERRIDE_FORMAT'] is not None:
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['DATA'],
-                        download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                        button_text=f'Download Classified Data',
-                        override_index=False,
-                        format_=toolkit['OVERRIDE_FORMAT']),
-                        unsafe_allow_html=True)
-                else:
-                    st.markdown(prettyDownload(
-                        object_to_download=toolkit['DATA'],
-                        download_filename=f'classified.{toolkit["MODE"].lower()}',
-                        button_text=f'Download Classified Data',
-                        override_index=False,
-                        format_=toolkit['MODE']),
-                        unsafe_allow_html=True)
+                if toolkit['SAVE']:
+                    st.markdown('---')
+                    st.markdown('## Download Data')
+                    if toolkit['OVERRIDE_FORMAT'] is not None:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'classified.{toolkit["OVERRIDE_FORMAT"].lower()}',
+                            button_text=f'Download Classified Data',
+                            override_index=False,
+                            format_=toolkit['OVERRIDE_FORMAT']),
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown(prettyDownload(
+                            object_to_download=toolkit['DATA'],
+                            download_filename=f'classified.{toolkit["MODE"].lower()}',
+                            button_text=f'Download Classified Data',
+                            override_index=False,
+                            format_=toolkit['MODE']),
+                            unsafe_allow_html=True)
+            else:
+                st.error('Error: Dataset not properly loaded or Topics List is empty. Try again.')

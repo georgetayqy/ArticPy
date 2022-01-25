@@ -7,6 +7,7 @@ This file is used to store some of the basic helper functions that are used freq
 # -------------------------------------------------------------------------------------------------------------------- #
 import io
 import os
+import toml
 import typing
 import nltk
 import numpy as np
@@ -24,27 +25,14 @@ import re
 from collections import Counter
 from heapq import nlargest
 from string import punctuation
-from PIL import Image
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                             DOWNLOAD DEPENDENCIES                                                | #
-# -------------------------------------------------------------------------------------------------------------------- #
-with st.spinner('Downloading WordNet Corpora...'):
-    nltk.download('wordnet')
-    nltk.download('vader_lexicon')
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                         GLOBAL VARIABLES DECLARATION                                             | #
-# -------------------------------------------------------------------------------------------------------------------- #
-lemmatizer = WordNetLemmatizer()
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                               HELPER FUNCTIONS                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
-def readFile(filepath, fformat):
+def readFile(filepath: str or os.path, fformat: str):
     """
     This is a helper function to read the data
 
@@ -90,10 +78,11 @@ def lemmatizeText(text):
     :param text:                        Text to lemmatize (string)
     ----------
     """
+    lemmatizer = WordNetLemmatizer()
     return [lemmatizer.lemmatize(word) for word in text]
 
 
-def summarise(text, stopwords, pos_tag, nlp, sent_count):
+def summarise(text: pd.DataFrame, stopwords: list or set, pos_tag, nlp, sent_count: int):
     """
     This function summarise the text dataframe
 
@@ -209,6 +198,10 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     """
     Takes in a Pandas DataFrame and prints out the DataFrame
 
+    Maximum Message Size can now be altered through Streamlit config files, however, a sanity
+    check of the maximum size of the message is also done to ensure that the DataFrame can be
+    properly printed to screen
+
     Parameter
     ----------
     data:                               Pandas DataFrame or Series object
@@ -219,56 +212,45 @@ def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
     ----------
     """
 
-    if verbose_level != 0:
-        try:
-            if extract_from is not None:
-                st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
-            else:
-                st.dataframe(data.head(verbose_level), height=600, width=800)
-        except RuntimeError:
-            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-            st.dataframe(data.head(10), height=600, width=800)
-        except KeyError:
-            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
-        except Exception as ex:
-            st.error(f'Error: {ex}')
-        else:
-            if advanced:
-                if extract_from is not None:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data[[extract_from]].profile_report(
-                            explorative=True,
-                            minimal=True))
-                else:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data.profile_report(
-                            explorative=True,
-                            minimal=True))
+    # READ STREAMLIT CONFIG TOML FILE
+    if os.path.exists(os.path.join(os.getcwd(), '.streamlit', 'config.toml')):
+        parsed = toml.load(f'{os.getcwd()}/.streamlit/config.toml')
     else:
-        try:
-            if extract_from is not None:
-                st.dataframe(data[[extract_from]], height=600, width=800)
-            else:
-                st.dataframe(data, height=600, width=800)
-        except RuntimeError:
-            st.warning('Warning: Size of DataFrame is too large. Defaulting to 10 data points...')
-            st.dataframe(data.head(10), height=600, width=800)
-        except KeyError:
-            st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
-        except Exception as ex:
-            st.error(f'Error: {ex}')
-        else:
-            if advanced:
+        raise FileNotFoundError('Config File for Streamlit Server is missing. Kindly ensure that your source code '
+                                'is fully downloaded and that the important config files are downloaded.')
+
+    try:
+        if data.memory_usage(deep=True).sum() < (int(parsed['server']['maxMessageSize']) * 1000000):
+            if verbose_level != 0:
                 if extract_from is not None:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data[[extract_from]].profile_report(
-                            explorative=True,
-                            minimal=True))
+                    st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
                 else:
-                    with st.expander('Advanced Profile Report'):
-                        st_profile_report(data.profile_report(
-                            explorative=True,
-                            minimal=True))
+                    st.dataframe(data.head(verbose_level), height=600, width=800)
+            else:
+                if extract_from is not None:
+                    st.dataframe(data[[extract_from]], height=600, width=800)
+                else:
+                    st.dataframe(data, height=600, width=800)
+        else:
+            # REVERT T0 20 DATAPOINT IF DATAFRAME EXCEEDS LIMIT
+            st.warning('Warning: Size of DataFrame exceeds limits imposed. Defaulting to 20 data points of display...')
+            st.dataframe(data.head(20), height=600, width=800)
+    except KeyError:
+        st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
+    except Exception as ex:
+        st.error(f'Error: {ex}')
+    else:
+        if advanced:
+            if extract_from is not None:
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data[[extract_from]].profile_report(
+                        explorative=True,
+                        minimal=True))
+            else:
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data.profile_report(
+                        explorative=True,
+                        minimal=True))
 
 
 def dominantTopic(vect, model, n_words):
@@ -292,81 +274,84 @@ def dominantTopic(vect, model, n_words):
 
 
 def prettyDownload(object_to_download: typing.Any, download_filename: str, button_text: str,
-                   override_index: bool, format_: typing.Optional[str] = None) -> str:
+                   override_index: bool, format_: typing.Optional[str] = None,
+                   pil_image: bool = False) -> str:
     """
     Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
 
     Generates a link to download the given object_to_download.
 
     :rtype: object
-    :param object_to_download:  The object to be downloaded, enter in a list to convert all dataframes into a final
-                                Excel sheet to output
-    :param download_filename: filename and extension of file. e.g. mydata.csv, some_txt_output.txt
-    :param button_text: Text to display on download button (e.g. 'click here to download file')
-    :param override_index: Overrides
-    :param format_: Format of the output file
-    :return: the anchor tag to download object_to_download
+    :param object_to_download:      The object to be downloaded, enter in a list to convert all dataframes into a final
+                                    Excel sheet to output
+    :param download_filename:       Filename and extension of file. e.g. mydata.csv, some_txt_output.txt
+    :param button_text:             Text to display on download button (e.g. 'click here to download file')
+    :param override_index:          Overrides Index
+    :param format_:                 Format of the output file
+    :param pil_image:               Defines whether or not input file is a PIL Image
+    :return:                        the anchor tag to download object_to_download
     """
 
     try:
-        if isinstance(object_to_download, bytes):
-            pass
-        elif isinstance(object_to_download, list):
-            out = io.BytesIO()
-            writer = pd.ExcelWriter(out, engine='openpyxl')
-
-            for dataframe in enumerate(object_to_download):
-                dataframe[1].to_excel(writer, sheet_name=f'Sheet{dataframe[0]}', index=override_index)
-
-            writer.save()
-            object_to_download = out.getvalue()
-        elif isinstance(object_to_download, str):
-            object_to_download = bytes(object_to_download, 'utf-8')
-        elif isinstance(object_to_download, pd.DataFrame):
-            if format_.lower() == 'xlsx':
-                out = io.BytesIO()
-                writer = pd.ExcelWriter(out, engine='openpyxl')
-                object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
-                writer.save()
-                object_to_download = out.getvalue()
-            elif format_.lower() == 'csv':
-                object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
-            elif format_.lower() == 'json':
-                object_to_download = object_to_download.to_json(index=override_index)
-            elif format_.lower() == 'hdf5':
-                st.warning('Output to HDF5 format is not currently supported. Defaulting to CSV instead...')
-                object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
-            elif format_.lower() == 'pkl':
-                out = io.BytesIO()
-                object_to_download.to_pickle(path=out)
-                object_to_download = out.getvalue()
-            else:
-                raise ValueError('Error: Unrecognised File Format')
-        elif isinstance(object_to_download, plotly.graph_objs.Figure):
-            object_to_download = plotly.io.to_image(object_to_download)
-        elif isinstance(object_to_download, Image):
+        if pil_image:
             buffer = io.BytesIO()
             object_to_download.save(buffer, format='png')
             object_to_download = buffer.getvalue()
         else:
-            object_to_download = json.dumps(object_to_download)
+            if isinstance(object_to_download, bytes):
+                pass
+            elif isinstance(object_to_download, list):
+                out = io.BytesIO()
+                writer = pd.ExcelWriter(out, engine='openpyxl')
+
+                for dataframe in enumerate(object_to_download):
+                    dataframe[1].to_excel(writer, sheet_name=f'Sheet{dataframe[0]}', index=override_index)
+
+                writer.save()
+                object_to_download = out.getvalue()
+            elif isinstance(object_to_download, str):
+                object_to_download = bytes(object_to_download, 'utf-8')
+            elif isinstance(object_to_download, pd.DataFrame):
+                if format_.lower() == 'xlsx':
+                    out = io.BytesIO()
+                    writer = pd.ExcelWriter(out, engine='openpyxl')
+                    object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
+                    writer.save()
+                    object_to_download = out.getvalue()
+                elif format_.lower() == 'csv':
+                    object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+                elif format_.lower() == 'json':
+                    object_to_download = object_to_download.to_json(index=override_index)
+                elif format_.lower() == 'hdf5':
+                    st.warning('Output to HDF5 format is not currently supported. Defaulting to CSV instead...')
+                    object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+                elif format_.lower() == 'pkl':
+                    out = io.BytesIO()
+                    pickle.dump(object_to_download, out)
+                    object_to_download = out.getvalue()
+                else:
+                    raise ValueError('Error: Unrecognised File Format')
+            elif isinstance(object_to_download, plotly.graph_objs.Figure):
+                object_to_download = plotly.io.to_image(object_to_download)
+            else:
+                object_to_download = json.dumps(object_to_download)
     except Exception as ex:
         st.error(ex)
     else:
         try:
             b64 = base64.b64encode(object_to_download.encode()).decode()
-        except AttributeError as e:
+        except AttributeError:
             b64 = base64.b64encode(object_to_download).decode()
 
         button_uuid = str(uuid.uuid4()).replace('-', '')
         button_id = re.sub('\d+', '', button_uuid)
 
-        custom_css = f""" 
+        custom_css = f"""
             <style>
                 #{button_id} {{
                     background-color: rgb(255, 255, 255);
                     color: rgb(38, 39, 48);
-                    padding: 0.25em 0.38em;
+                    padding: 0.40em 0.90em;
                     position: relative;
                     text-decoration: none;
                     border-radius: 4px;
@@ -374,14 +359,14 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     border-style: solid;
                     border-color: rgb(230, 234, 241);
                     border-image: initial;
-                }} 
+                }}
                 #{button_id}:hover {{
-                    border-color: rgb(246, 51, 102);
-                    color: rgb(246, 51, 102);
+                    border-color: rgb(79, 187, 255);
+                    color: rgb(79, 187, 255);
                 }}
                 #{button_id}:active {{
                     box-shadow: none;
-                    background-color: rgb(246, 51, 102);
+                    background-color: rgb(79, 187, 255);
                     color: white;
                     }}
             </style> """

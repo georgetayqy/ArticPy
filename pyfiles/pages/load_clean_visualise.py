@@ -20,6 +20,7 @@ from config import load_clean_visualise as lcv
 from streamlit_tags import st_tags
 from texthero import stopwords
 from collections import Counter
+from plotly.io import to_image
 import plotly.express as px
 from utils import csp_downloaders
 from utils.helper import readFile, lemmatizeText, printDataFrame, prettyDownload
@@ -59,7 +60,7 @@ def app():
                                              '**Data Query**: \tThis mode allows users to query their data for '
                                              'specific keywords of interest.',
                                         key='analysis_mode_data')
-    st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected!')
+    st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected')
 
     st.markdown('## Upload Data\n')
     col1, col1_ = st.columns(2)
@@ -84,6 +85,7 @@ def app():
                 st.success(f'Data Loaded from **{lcv["DATA_COLUMN"]}**!')
         else:
             # RESET
+            st.warning('Warning: Your Dataset file is not loaded.')
             lcv['DATA'] = pd.DataFrame()
 
     elif lcv['FILE'] == 'Online':
@@ -99,6 +101,8 @@ def app():
                 except Exception as ex:
                     lcv['DATA'] = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+            else:
+                st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
@@ -113,6 +117,8 @@ def app():
                 except Exception as ex:
                     lcv['DATA'] = pd.DataFrame()
                     st.error(f'Error: {ex}. Try again.')
+            else:
+                st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
@@ -151,11 +157,11 @@ def app():
                 lcv['OVERRIDE_FORMAT'] = None
 
         lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                          'are printed to screen. If you get an error telling you that the '
-                                          'DataFrame size is too large to proceed, kindly lower the number of '
-                                          'data points you wish to visualise or download the file and visualise '
-                                          'it through Excel or any other DataFrame visualising Python packages')
+                                     help='Note that there is an size limit for the DataFrames that are '
+                                          'printed to screen. If you get an error telling you that the DataFrame size '
+                                          'is too large to proceed, kindly lower the number of data points you wish '
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -194,9 +200,7 @@ def app():
                                                text='Press Enter to extend list...',
                                                maxtags=9999999,
                                                key='extender')
-                if len(lcv['STOPWORD_LIST']) != 0:
-                    st.info('**Alert**: Words detected.')
-                else:
+                if len(lcv['STOPWORD_LIST']) == 0:
                     st.info('**Alert**: No Words detected')
 
     elif lcv['ANALYSIS_MODE'] == 'Data Modification':
@@ -224,11 +228,12 @@ def app():
                     lcv['OVERRIDE_FORMAT'] = None
 
             lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                         help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                              'are printed to screen. If you get an error telling you that the '
-                                              'DataFrame size is too large to proceed, kindly lower the number of '
-                                              'data points you wish to visualise or download the file and visualise '
-                                              'it through Excel or any other DataFrame visualising Python packages')
+                                         help='Note that there is an size limit for the DataFrames that are '
+                                              'printed to screen. If you get an error telling you that the DataFrame '
+                                              'size is too large to proceed, kindly lower the number of data points '
+                                              'you wish to visualise or increase the maximum size of items to print '
+                                              'to screen through the maxMessageSize setting in the Streamlit config '
+                                              'file.')
             if lcv['VERBOSE']:
                 lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                              key='Data points to display?',
@@ -264,11 +269,11 @@ def app():
                 lcv['OVERRIDE_FORMAT'] = None
 
         lcv['VERBOSE'] = st.checkbox('Display Outputs?',
-                                     help='Note that there is an size limit (50 MB) for the DataFrames that '
-                                          'are printed to screen. If you get an error telling you that the '
-                                          'DataFrame size is too large to proceed, kindly lower the number of '
-                                          'data points you wish to visualise or download the file and visualise '
-                                          'it through Excel or any other DataFrame visualising Python packages')
+                                     help='Note that there is an size limit for the DataFrames that are '
+                                          'printed to screen. If you get an error telling you that the DataFrame size '
+                                          'is too large to proceed, kindly lower the number of data points you wish '
+                                          'to visualise or increase the maximum size of items to print to screen '
+                                          'through the maxMessageSize setting in the Streamlit config file.')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -319,7 +324,7 @@ def app():
             else:
                 st.warning('File has not been loaded.')
 
-        if st.button('Begin Analysis', key='runner'):
+        if st.button('Begin Analysis', key='clean'):
             # RESET STATE
             lcv['CLEANED_DATA'] = pd.DataFrame()
             lcv['CLEANED_DATA_TOKENIZED'] = pd.DataFrame()
@@ -328,11 +333,11 @@ def app():
                     (lcv['FILE'] == 'Online' and not lcv['DATA'].empty):
                 if not lcv['DATA'].empty:
                     try:
-                        lcv['DATA'] = lcv['DATA'].astype(str)
-                        lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].str.encode('ascii', 'ignore')\
-                            .str.decode('ascii')
+                        lcv['DATA'].dropna(inplace=True)
+                        lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].apply(lambda x: x.encode(
+                            'ascii', 'ignore').decode('ascii'))
                         lcv['DATA'] = pd.DataFrame(data=lcv['DATA'])
-                        lcv['DATA'] = lcv['DATA'].dropna()
+
                     except Exception as ex:
                         st.error(f'Error: {ex}')
 
@@ -342,7 +347,7 @@ def app():
 
                         if lcv['TOKENIZE']:
                             lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
-                            lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                            lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
 
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
@@ -354,11 +359,9 @@ def app():
                             lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                             lcv['CLEANED_DATA'].dropna(inplace=True, subset=['CLEANED CONTENT'])
 
-                            lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
-
                             if lcv['TOKENIZE']:
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
                         except Exception as ex:
                             st.error(ex)
 
@@ -411,10 +414,9 @@ def app():
                                 # UPDATE TOKENS
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
                                 lcv['CLEANED_DATA_TOKENIZED'].update([str(text) for text in fin_list])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
-                                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
                             except Exception as ex:
                                 st.error(ex)
 
@@ -490,7 +492,7 @@ def app():
                                 try:
                                     st.markdown('---')
                                     st.markdown('## Download Data')
-                                    for data in lcv['FINALISED_DATA_LIST']:
+                                    for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                         if lcv['OVERRIDE_FORMAT'] is not None:
                                             st.markdown(prettyDownload(
                                                 object_to_download=data[0],
@@ -502,7 +504,7 @@ def app():
                                         else:
                                             st.markdown(prettyDownload(
                                                 object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{data[3]}',
+                                                download_filename=f'{data[2]}{data[3]}',
                                                 button_text=f'Download {data[1]}',
                                                 override_index=data[4],
                                                 format_=lcv["MODE"]),
@@ -519,7 +521,7 @@ def app():
                             try:
                                 st.markdown('---')
                                 st.markdown('## Download Data')
-                                for data in lcv['FINALISED_DATA_LIST']:
+                                for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                     if lcv['OVERRIDE_FORMAT'] is not None:
                                         st.markdown(prettyDownload(
                                             object_to_download=data[0],
@@ -532,7 +534,7 @@ def app():
                                     else:
                                         st.markdown(prettyDownload(
                                             object_to_download=data[0],
-                                            download_filename=f'{data[2]}.{data[3]}',
+                                            download_filename=f'{data[2]}{data[3]}',
                                             button_text=f'Download {data[1]}',
                                             override_index=data[4],
                                             format_=lcv["MODE"]),
@@ -544,12 +546,14 @@ def app():
                                 st.error(f'Error: Unknown Fatal Error -> {ex}')
 
                         elif lcv['CLEAN_MODE'] == 'Complex':
+                            st.markdown('---')
+                            st.markdown('## Download Data')
                             if lcv['EXTEND_STOPWORD']:
                                 if lcv['FINALISE']:
                                     try:
-                                        st.markdown('---')
-                                        st.markdown('## Download Data')
-                                        for data in lcv['FINALISED_DATA_LIST']:
+                                        for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
+                                            st.markdown('---')
+                                            st.markdown('## Download Data')
                                             if lcv['OVERRIDE_FORMAT'] is not None:
                                                 st.markdown(prettyDownload(
                                                     object_to_download=data[0],
@@ -562,7 +566,7 @@ def app():
                                             else:
                                                 st.markdown(prettyDownload(
                                                     object_to_download=data[0],
-                                                    download_filename=f'{data[2]}.{data[3]}',
+                                                    download_filename=f'{data[2]}{data[3]}',
                                                     button_text=f'Download {data[1]}',
                                                     override_index=data[4],
                                                     format_=lcv["MODE"]),
@@ -573,32 +577,33 @@ def app():
                                     except Exception as ex:
                                         st.error(f'Error: Unknown Fatal Error -> {ex}')
                             else:
-                                try:
-                                    st.markdown('---')
-                                    st.markdown('## Download Data')
-                                    for data in lcv['FINALISED_DATA_LIST']:
-                                        if lcv['OVERRIDE_FORMAT'] is not None:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv['OVERRIDE_FORMAT']),
-                                                unsafe_allow_html=True
-                                            )
-                                        else:
-                                            st.markdown(prettyDownload(
-                                                object_to_download=data[0],
-                                                download_filename=f'{data[2]}.{data[3]}',
-                                                button_text=f'Download {data[1]}',
-                                                override_index=data[4],
-                                                format_=lcv["MODE"]),
-                                                unsafe_allow_html=True
-                                            )
-                                except KeyError:
-                                    st.error('Warning: Your Data as not processed properly. Try again.')
-                                except Exception as ex:
-                                    st.error(f'Error: Unknown Fatal Error -> {ex}')
+                                if lcv['FINALISE']:
+                                    try:
+                                        for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
+                                            if lcv['OVERRIDE_FORMAT'] is not None:
+                                                st.markdown(prettyDownload(
+                                                    object_to_download=data[0],
+                                                    download_filename=f'{data[2]}.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                                    button_text=f'Download {data[1]}',
+                                                    override_index=data[4],
+                                                    format_=lcv['OVERRIDE_FORMAT']),
+                                                    unsafe_allow_html=True
+                                                )
+                                            else:
+                                                st.markdown(prettyDownload(
+                                                    object_to_download=data[0],
+                                                    download_filename=f'{data[2]}{data[3]}',
+                                                    button_text=f'Download {data[1]}',
+                                                    override_index=data[4],
+                                                    format_=lcv["MODE"]),
+                                                    unsafe_allow_html=True
+                                                )
+                                    except KeyError:
+                                        st.error('Warning: Your Data as not processed properly. Try again.')
+                                    except Exception as ex:
+                                        st.error(f'Error: Unknown Fatal Error -> {ex}')
+                                else:
+                                    st.error('Hmm... For some reason your data was not processed properly. Try again.')
                 else:
                     st.error('Error: No Files Uploaded.')
             else:
@@ -742,9 +747,25 @@ def app():
                             fit_columns_on_grid_load=True
                         )
 
-                    if st.button('Generate Modified Data'):
-                        st.markdown('## Download Data')
-                        st.markdown(prettyDownload(ag['data'], 'modified_data.csv', 'Download Modified Data', False))
+                    if st.button('Generate Modified Data', key='modified_data'):
+                        if lcv['OVERRIDE_FORMAT'] is not None:
+                            st.markdown(prettyDownload(
+                                object_to_download=ag['data'],
+                                download_filename=f'modified_data.{lcv["OVERRIDE_FORMAT"].lower()}',
+                                button_text=f'Download Modified Data',
+                                override_index=False,
+                                format_=lcv['OVERRIDE_FORMAT']),
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(prettyDownload(
+                                object_to_download=ag['data'],
+                                download_filename=f'modified_data.{lcv["MODE"].lower()}',
+                                button_text=f'Download Modified Data',
+                                override_index=False,
+                                format_=lcv["MODE"]),
+                                unsafe_allow_html=True
+                            )
                 else:
                     st.warning('File has not been loaded.')
 
@@ -772,7 +793,7 @@ def app():
                             fit_columns_on_grid_load=True
                         )
 
-                    if st.button('Generate Modified Data'):
+                    if st.button('Generate Modified Data', key='modify_other'):
                         if lcv['SAVE']:
                             st.markdown('### Modified Data')
                             if lcv['OVERRIDE_FORMAT'] is not None:
@@ -826,9 +847,9 @@ def app():
             if not lcv['DATA'].empty:
                 if lcv['QUERY_SUCCESS']:
                     try:
-                        # make a copy of the original dataframe to avoid mutating it with .loc
+                        # COPY DATAFRAME TO AVOID MUTATIONS WITH LOC
                         temp = lcv['DATA'].copy()
-                        lcv['QUERY_DATA'] = temp.loc[temp[lcv['DATA_COLUMN']].str.contains(lcv['QUERY'],
+                        lcv['QUERY_DATA'] = temp.loc[temp[lcv['DATA_COLUMN']].str.contains('|'.join(lcv['QUERY']),
                                                                                            case=lcv['MATCH'])]
                     except Exception as ex:
                         st.error(f'Error: {ex}')

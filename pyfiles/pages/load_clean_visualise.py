@@ -39,15 +39,15 @@ def app():
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.title('Load, Clean and Visualise Data')
-    st.markdown('## Init\n'
-                'This module is used for the visualisation and cleaning of data used for NLP Analysis on news articles.'
-                ' Since this process uses the `nltk` stopword corpus, the corpus will automatically download onto your '
-                'device when you run the app. Please ensure that sufficient storage (~1 GB) of storage space is free '
-                'and that you are connected to the Internet to ensure that the corpus can be successfully downloaded. '
-                'If the download fails, rerun the app again and ensure that your device has sufficient space and is '
-                'connected to the Internet.\n\n '
-                'For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
-                'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n')
+    with st.expander('Module Description'):
+        st.markdown('This module is used for the visualisation and cleaning of data used for NLP Analysis on news '
+                    'articles. Since this process uses the `nltk` stopword corpus, the corpus will automatically '
+                    'download onto your device when you run the app. Please ensure that sufficient storage (~1 GB) '
+                    'of storage space is free and that you are connected to the Internet to ensure that the corpus '
+                    'can be successfully downloaded. If the download fails, rerun the app again and ensure that your '
+                    'device has sufficient space and is connected to the Internet.\n\n '
+                    'For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
+                    'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n')
 
     st.markdown('## Processing Mode\n\n'
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '
@@ -451,38 +451,38 @@ def app():
 
                     if lcv['VERBOSE']:
                         if lcv['CLEAN_MODE'] == 'None':
-                            st.markdown('## Raw DataFrame')
+                            st.markdown('### Raw DataFrame')
                             printDataFrame(data=lcv['DATA'], verbose_level=lcv['VERBOSITY'],
                                            advanced=lcv['ADVANCED_ANALYSIS'])
                             if lcv['TOKENIZE']:
-                                st.markdown('## Tokenized DataFrame')
+                                st.markdown('### Tokenized DataFrame')
                                 printDataFrame(data=lcv['CLEANED_DATA_TOKENIZED'], verbose_level=lcv['VERBOSITY'],
                                                advanced=lcv['ADVANCED_ANALYSIS'])
                         elif lcv['CLEAN_MODE'] == 'Simple':
-                            st.markdown('## Cleaned DataFrame')
+                            st.markdown('### Cleaned DataFrame')
                             printDataFrame(data=lcv['CLEANED_DATA'], verbose_level=lcv['VERBOSITY'],
                                            advanced=lcv['ADVANCED_ANALYSIS'])
                             if lcv['TOKENIZE']:
-                                st.markdown('## Cleaned Tokenized DataFrame')
+                                st.markdown('### Cleaned Tokenized DataFrame')
                                 printDataFrame(data=lcv['CLEANED_DATA_TOKENIZED'], verbose_level=lcv['VERBOSITY'],
                                                advanced=lcv['ADVANCED_ANALYSIS'])
                         elif lcv['CLEAN_MODE'] == 'Complex':
                             if lcv['EXTEND_STOPWORD']:
                                 if lcv['FINALISE']:
-                                    st.markdown('## Cleaned DataFrame')
+                                    st.markdown('### Cleaned DataFrame')
                                     printDataFrame(data=lcv['CLEANED_DATA'], verbose_level=lcv['VERBOSITY'],
                                                    advanced=lcv['ADVANCED_ANALYSIS'])
                                     if lcv['TOKENIZE']:
-                                        st.markdown('## Cleaned Tokenized DataFrame')
+                                        st.markdown('### Cleaned Tokenized DataFrame')
                                         printDataFrame(data=lcv['CLEANED_DATA_TOKENIZED'],
                                                        verbose_level=lcv['VERBOSITY'],
                                                        advanced=lcv['ADVANCED_ANALYSIS'])
                             else:
-                                st.markdown('## Cleaned DataFrame')
+                                st.markdown('### Cleaned DataFrame')
                                 printDataFrame(data=lcv['CLEANED_DATA'], verbose_level=lcv['VERBOSITY'],
                                                advanced=lcv['ADVANCED_ANALYSIS'])
                                 if lcv['TOKENIZE']:
-                                    st.markdown('## Cleaned Tokenized DataFrame')
+                                    st.markdown('### Cleaned Tokenized DataFrame')
                                     printDataFrame(data=lcv['CLEANED_DATA_TOKENIZED'], verbose_level=lcv['VERBOSITY'],
                                                    advanced=lcv['ADVANCED_ANALYSIS'])
 
@@ -491,7 +491,7 @@ def app():
                             if lcv['TOKENIZE']:
                                 try:
                                     st.markdown('---')
-                                    st.markdown('## Download Data')
+                                    st.markdown('### Download Data')
                                     for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                         if lcv['OVERRIDE_FORMAT'] is not None:
                                             st.markdown(prettyDownload(
@@ -520,7 +520,7 @@ def app():
                         elif lcv['CLEAN_MODE'] == 'Simple':
                             try:
                                 st.markdown('---')
-                                st.markdown('## Download Data')
+                                st.markdown('### Download Data')
                                 for index, data in enumerate(lcv['FINALISED_DATA_LIST']):
                                     if lcv['OVERRIDE_FORMAT'] is not None:
                                         st.markdown(prettyDownload(
@@ -547,7 +547,7 @@ def app():
 
                         elif lcv['CLEAN_MODE'] == 'Complex':
                             st.markdown('---')
-                            st.markdown('## Download Data')
+                            st.markdown('### Download Data')
                             if lcv['EXTEND_STOPWORD']:
                                 if lcv['FINALISE']:
                                     try:
@@ -656,17 +656,17 @@ def app():
                                                       title='Country Name Mention Frequency')
 
                     if lcv['VERBOSE']:
-                        st.markdown('## Country Name Mention Frequency')
+                        st.markdown('### Country Name Mention Frequency')
                         printDataFrame(data=lcv['GLOBE_DATA'], verbose_level=lcv['VERBOSITY'],
                                        advanced=lcv['ADVANCED_ANALYSIS'])
                         if lcv['WORLD_MAP']:
-                            st.markdown('## World Map Representation')
+                            st.markdown('### World Map Representation')
                             st.plotly_chart(lcv['GLOBE_FIG'])
 
                     if lcv['SAVE']:
                         try:
                             st.markdown('---')
-                            st.markdown('## Download Data')
+                            st.markdown('### Download Data')
                             if lcv['OVERRIDE_FORMAT'] is not None:
                                 st.markdown(prettyDownload(
                                     object_to_download=lcv['DATA'],
@@ -858,12 +858,12 @@ def app():
 
                     if not lcv['QUERY_DATA'].empty:
                         if lcv['VERBOSE']:
-                            st.markdown('## Query Results')
+                            st.markdown('### Query Results')
                             printDataFrame(data=lcv['QUERY_DATA'], verbose_level=lcv['VERBOSITY'],
                                            advanced=lcv['ADVANCED_ANALYSIS'])
                         if lcv['SAVE']:
                             st.markdown('---')
-                            st.markdown('## Save Query')
+                            st.markdown('### Save Query')
                             if lcv['OVERRIDE_FORMAT'] is not None:
                                 st.markdown(prettyDownload(object_to_download=lcv['QUERY_DATA'],
                                                            download_filename=f'query.{lcv["OVERRIDE_FORMAT"].lower()}',

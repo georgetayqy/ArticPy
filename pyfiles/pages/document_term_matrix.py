@@ -35,40 +35,40 @@ def app():
 # |                                                     INIT                                                         | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.title('Document-Term Matrix and Word Frequency Analysis')
-    st.markdown('## Init\n'
-                'Before proceeding, you will need to download the corpus needed to process your data. To do so, click '
-                'on the "Begin Download" button below. Please ensure that you have at least 3 GB of free disk space '
-                'available so that you are able to download the corpus onto your system and that your device is '
-                'connected to the Internet.')
+    with st.expander('Module Description'):
+        st.markdown('Before proceeding, you will need to download the corpus needed to process your data. To do so, '
+                    'click on the "Begin Download" button below. Please ensure that you have at least 3 GB of free '
+                    'disk space available so that you are able to download the corpus onto your system and that your '
+                    'device is connected to the Internet.')
 
-    # CHECK IF THE DATA HAS BEEN DOWNLOADED
-    if platform.system() == 'Windows':
-        if pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').is_dir():
-            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').iterdir()):
-                st.info('NTLK Data Detected')
+        # CHECK IF THE DATA HAS BEEN DOWNLOADED
+        if platform.system() == 'Windows':
+            if pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').is_dir():
+                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').iterdir()):
+                    st.info('NTLK Data Detected')
+                else:
+                    st.warning('NLTK Data Not Detected')
             else:
                 st.warning('NLTK Data Not Detected')
-        else:
-            st.warning('NLTK Data Not Detected')
-    elif platform.system() == 'Linux':
-        if pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').is_dir():
-            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').iterdir()):
-                st.info('NTLK Data Detected')
+        elif platform.system() == 'Linux':
+            if pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').is_dir():
+                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').iterdir()):
+                    st.info('NTLK Data Detected')
+                else:
+                    st.warning('NLTK Data Not Detected')
             else:
                 st.warning('NLTK Data Not Detected')
-        else:
-            st.warning('NLTK Data Not Detected')
-    elif platform.system() == 'Darwin':
-        if pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').is_dir():
-            if any(pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').iterdir()):
-                st.info('NTLK Data Detected')
+        elif platform.system() == 'Darwin':
+            if pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').is_dir():
+                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').iterdir()):
+                    st.info('NTLK Data Detected')
+                else:
+                    st.warning('NLTK Data Not Detected')
             else:
                 st.warning('NLTK Data Not Detected')
-        else:
-            st.warning('NLTK Data Not Detected')
 
-    if st.button('Begin Download', key='download-model'):
-        os.system('python -m nltk.downloader all')
+        if st.button('Begin Download', key='download-model'):
+            os.system('python -m nltk.downloader all')
 
     st.markdown('## Upload Data\n')
     col1, col1_ = st.columns(2)
@@ -250,7 +250,7 @@ def app():
 
                 if dtm['VERBOSE_DTM']:
                     # VISUALISE THE DATA
-                    st.markdown('## DTM Data\n'
+                    st.markdown('### DTM Data\n'
                                 'The Document-Term Matrix will now be displayed on screen.')
                     try:
                         st.dataframe(dtm['DTM'].transpose().head(dtm["VERBOSITY_DTM"]).transpose(),
@@ -263,7 +263,7 @@ def app():
                         st.error(f'Error: {ex}')
 
                     if dtm['VERBOSE_ANALYSIS']:
-                        st.markdown(f'## Top {dtm["N"]} Words in DTM\n'
+                        st.markdown(f'### Top {dtm["N"]} Words in DTM\n'
                                     'The following DataFrame contains the sorted Document-Term Matrix, displaying the '
                                     f'top {dtm["N"]} words of the Document-Term Matrix. If 0 is seen above, you have '
                                     'chose to print out the entire DataFrame onto the screen.')
@@ -302,7 +302,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
                 if dtm['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Data')
+                    st.markdown('### Download Data')
                     for index, data in enumerate(dtm['FINALISED_DATA_LIST']):
                         if dtm['OVERRIDE_FORMAT'] is not None:
                             if data[3] != '.png':

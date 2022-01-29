@@ -49,12 +49,12 @@ def app():
 # |                                                    INIT                                                          | #
 # -------------------------------------------------------------------------------------------------------------------- #
     st.title('NLP Toolkit')
-    st.markdown('## Init\n'
-                'This module uses the *spaCy* package to conduct the necessary NLP preprocessing and '
-                'analysis tasks for users to make sense of the text they pass into app. Note that this app requires '
-                'the data to be decently cleaned; if you have not done so, run the *Load, Clean and Visualise* module '
-                'and save the cleaned  data onto your workstation. Those files may come in useful in '
-                'the functionality of this app.\n\n')
+    with st.expander('Module Description'):
+        st.markdown('This module uses the *spaCy* package to conduct the necessary NLP preprocessing and '
+                    'analysis tasks for users to make sense of the text they pass into app. Note that this app '
+                    'requires the data to be decently cleaned; if you have not done so, run the '
+                    '*Load, Clean and Visualise* module and save the cleaned data onto your workstation. '
+                    'Those files may come in useful in the functionality of this app.')
 
     st.markdown('## Upload Data\n')
     col1, col1_ = st.columns(2)
@@ -142,12 +142,12 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     if toolkit['APP_MODE'] == 'Word Cloud':
         st.markdown('---')
-        st.markdown('# Word Cloud Generation\n'
+        st.markdown('## Word Cloud Generation\n'
                     'This module takes in a long list of documents and converts it into a WordCloud representation '
                     'of all the documents.\n\n'
                     'Note that the documents should not be tokenized, but it should be cleaned and lemmatized to '
                     'avoid double-counting words.')
-        st.markdown('## Options')
+        st.markdown('### Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
                                            'downloaded again, a unique file identifier is tacked onto the filename.')
@@ -182,12 +182,12 @@ def app():
                                contour_color='steelblue')
                 wc.generate(' '.join(toolkit['DATA'][toolkit['DATA_COLUMN']]))
 
-                st.markdown('## Wordcloud For Text Inputted')
+                st.markdown('### Wordcloud For Text Inputted')
                 st.image(wc.to_image(), width=None)
 
                 if toolkit['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Image')
+                    st.markdown('### Download Image')
                     buf = io.BytesIO()
                     wc.to_image().save(buf, format='png')
                     st.download_button(label=f'Download Word Cloud',
@@ -204,14 +204,14 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'Named Entity Recognition':
         st.markdown('---')
-        st.markdown('# Named Entity Recognition')
+        st.markdown('## Named Entity Recognition')
         st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
                     'large chunks of text, prepare to wait for hours for the NER Tagging process to finish. We are '
                     'looking to implement multiprocessing into the app to optimise it, but so far multiprocessing '
                     'does not seem to be fully supported in Streamlit.\n\n'
                     'In the meantime, it may be better to process your data in smaller batches to speed up your '
                     'workflow.')
-        st.markdown('## Options')
+        st.markdown('### Options')
         st.markdown('Due to limits imposed on the visualisation engine and to avoid cluttering of the page with '
                     'outputs, you will only be able to visualise the NER outputs for a single document. '
                     'However, you will still be able to download a text/html file containing '
@@ -297,14 +297,14 @@ def app():
                 toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
-                    st.markdown('## NER DataFrame')
+                    st.markdown('### NER DataFrame')
                     printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                    advanced=toolkit['ADVANCED_ANALYSIS'])
 
                     if toolkit['ONE_DATAPOINT']:
                         verbose_data_copy = toolkit['DATA'].copy()
                         temp_df = verbose_data_copy[toolkit['DATA_COLUMN']][toolkit['DATAPOINT_SELECTOR']]
-                        st.markdown('## DisplaCy Rendering')
+                        st.markdown('### DisplaCy Rendering')
                         st.info('If rendering is not clean, choose to save files generated and download the rendering '
                                 'in HTML format.')
                         toolkit['SVG'] = displacy.render(list(toolkit['NLP'](str(temp_df)).sents),
@@ -314,7 +314,7 @@ def app():
 
                 if toolkit['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Data')
+                    st.markdown('### Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'ner.{toolkit["OVERRIDE_FORMAT"].lower()}',
@@ -347,7 +347,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'POS Tagging':
         st.markdown('---')
-        st.markdown('# POS Tagging')
+        st.markdown('## POS Tagging')
         st.markdown('Note that this module takes a long time to process a long piece of text. If you intend to process '
                     'large chunks of text, prepare to wait for hours for the POS tagging process to finish. We are '
                     'looking to implement multiprocessing into the app to optimise it.\n\n'
@@ -388,6 +388,7 @@ def app():
             else:
                 st.info('**Accuracy Model** Loaded!')
 
+        st.markdown('### Options')
         toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
         if toolkit['VERBOSE']:
             toolkit['VERBOSITY'] = st.slider('Choose Number of Data Points to Display',
@@ -443,7 +444,7 @@ def app():
                 toolkit['DATA']['COMPILED_LABELS'] = lab
 
                 if toolkit['VERBOSE']:
-                    st.markdown('## POS DataFrame')
+                    st.markdown('### POS DataFrame')
                     printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                    advanced=toolkit['ADVANCED_ANALYSIS'])
 
@@ -462,7 +463,7 @@ def app():
 
                 if toolkit['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Data')
+                    st.markdown('### Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
                         st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                    download_filename=f'pos.{toolkit["OVERRIDE_FORMAT"].lower()}',
@@ -495,7 +496,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'Summarise':
         st.markdown('---')
-        st.markdown('# Summarization of Text')
+        st.markdown('## Summarization of Text')
         st.markdown('For this function, you are able to upload a piece of document or multiple pieces of documents '
                     'in a CSV file to create a summary for the documents of interest.\n\n'
                     'However, do note that this module takes a long time to process a long piece of text, '
@@ -505,7 +506,7 @@ def app():
                     ' we have implemented two modes of summarization in this function, namely Basic and Advanced '
                     'Mode.\n')
 
-        st.markdown('## Summary Complexity')
+        st.markdown('### Summary Complexity')
         st.markdown('**Basic Mode** uses the spaCy package to distill your documents into the specified number of '
                     'sentences. No machine learning model was used to produce a unique summary of the text.\n\n'
                     '**Advanced Mode** uses the PyTorch and Huggingface Transformers library to produce summaries '
@@ -514,7 +515,7 @@ def app():
 
         if toolkit['SUM_MODE'] == 'Basic':
             # FLAGS
-            st.markdown('## Options')
+            st.markdown('### Options')
             st.markdown('Select one model to use for your NLP Processing. Choose en_core_web_sm for a model that is '
                         'optimised for efficiency or en_core_web_lg for a model that is optimised for accuracy.')
             toolkit['NLP_MODEL'] = st.radio('Select spaCy model', ('en_core_web_sm', 'en_core_web_lg'),
@@ -579,7 +580,7 @@ def app():
                                                                 'it.')
         elif toolkit['SUM_MODE'] == 'Advanced':
             # FLAGS
-            st.markdown('## Options')
+            st.markdown('### Options')
             st.markdown('Choose the minimum and maximum number of words to summarise to below. If you are an '
                         'advanced user, you may choose to modify the number of input tensors for the model. If '
                         'you do not wish to modify the setting, a default value of 512 will be used for your '
@@ -670,14 +671,14 @@ def app():
 
                     # SHOW DATASETS
                     if toolkit['VERBOSE']:
-                        st.markdown('## Summary DataFrame')
+                        st.markdown('### Summary DataFrame')
                         printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                        advanced=toolkit['ADVANCED_ANALYSIS'])
 
                     # SAVE DATA
                     if toolkit['SAVE']:
                         st.markdown('---')
-                        st.markdown('## Download Data')
+                        st.markdown('### Download Data')
                         if toolkit['OVERRIDE_FORMAT'] is not None:
                             st.markdown(prettyDownload(
                                 object_to_download=toolkit['DATA'],
@@ -722,13 +723,13 @@ def app():
 
                     # SHOW DATA
                     if toolkit['VERBOSE']:
-                        st.markdown('## Summarised Text')
+                        st.markdown('### Summarised Text')
                         printDataFrame(toolkit['DATA'], toolkit['VERBOSITY'], toolkit['ADVANCED_ANALYSIS'])
 
                     # SAVE DATA
                     if toolkit['SAVE']:
                         st.markdown('---')
-                        st.markdown('## Download Summarised Data')
+                        st.markdown('### Download Summarised Data')
                         if toolkit['OVERRIDE_FORMAT'] is not None:
                             st.markdown(prettyDownload(object_to_download=toolkit['DATA'],
                                                        download_filename=f'summarised.'
@@ -752,10 +753,10 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'Analyse Sentiment':
         st.markdown('---')
-        st.markdown('# Sentiment Analysis\n'
+        st.markdown('## Sentiment Analysis\n'
                     'For this module, both the VADER and TextBlob models will be used to analyse the sentiment of the '
                     'text you upload.\n')
-        st.markdown('## Options')
+        st.markdown('### Options')
         toolkit['BACKEND_ANALYSER'] = st.selectbox('Choose the Backend Engine Used to Conduct Sentiment Analysis',
                                                    ('VADER', 'TextBlob'),
                                                    help='VADER is more optimised for texts extracted from Social Media '
@@ -870,11 +871,11 @@ def app():
                     if toolkit['BACKEND_ANALYSER'] == 'VADER':
                         toolkit['HAC_PLOT1'] = None
                         if 'VADER OVERALL SENTIMENT' or 'VADER OVERALL SCORE' in toolkit['DATA'].columns:
-                            st.markdown('## Sentiment DataFrame')
+                            st.markdown('### Sentiment DataFrame')
                             printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                            advanced=toolkit['ADVANCED_ANALYSIS'])
 
-                            st.markdown('## VADER Score')
+                            st.markdown('### VADER Score')
                             toolkit['HAC_PLOT'] = ff.create_distplot([toolkit['DATA']['VADER OVERALL SCORE'].tolist()],
                                                                      ['VADER'],
                                                                      colors=[toolkit['COLOUR']],
@@ -892,11 +893,11 @@ def app():
 
                     elif toolkit['BACKEND_ANALYSER'] == 'TextBlob':
                         if 'POLARITY SCORE' or 'SUBJECTIVITY SCORE' in toolkit['DATA'].columns:
-                            st.markdown('## Sentiment DataFrame')
+                            st.markdown('### Sentiment DataFrame')
                             printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                            advanced=toolkit['ADVANCED_ANALYSIS'])
 
-                            st.markdown('## Polarity VS Subjectivity')
+                            st.markdown('### Polarity VS Subjectivity')
                             toolkit['HAC_PLOT'] = px.scatter(toolkit['DATA'][['SUBJECTIVITY SCORE', 'POLARITY SCORE']],
                                                              x='SUBJECTIVITY SCORE',
                                                              y='POLARITY SCORE',
@@ -906,7 +907,7 @@ def app():
                                                              })
                             st.plotly_chart(toolkit['HAC_PLOT'], use_container_width=True)
 
-                            st.markdown('### Normal Distribution Plots of Subjectivity and Polarity')
+                            st.markdown('#### Normal Distribution Plots of Subjectivity and Polarity')
                             toolkit['HAC_PLOT1'] = ff.create_distplot([toolkit['DATA']['SUBJECTIVITY SCORE'].tolist(),
                                                                        toolkit['DATA']['POLARITY SCORE'].tolist()],
                                                                       ['Subjectivity', 'Polarity'],
@@ -920,7 +921,7 @@ def app():
                 # SAVE DATA
                 if toolkit['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Data')
+                    st.markdown('### Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
                         st.markdown(prettyDownload(
                             object_to_download=toolkit['DATA'],
@@ -938,7 +939,7 @@ def app():
                                     unsafe_allow_html=True)
 
                     if toolkit['HAC_PLOT'] is not None:
-                        st.markdown('## Graphs')
+                        st.markdown('### Graphs')
                         st.markdown(prettyDownload(
                             object_to_download=toolkit['HAC_PLOT'],
                             download_filename='plot.png',
@@ -963,11 +964,11 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'Topic Modelling':
         st.markdown('---')
-        st.markdown('# Topic Modelling')
+        st.markdown('## Topic Modelling')
         st.markdown('Ensure that your data is **lemmatized and properly cleaned**; data **should not be tokenized** '
                     'for this step. Use the Load, Clean and Visualise module to clean and lemmatize your data if you '
                     'have not done so already.\n\n')
-        st.markdown('## Topic Modelling Model Selection')
+        st.markdown('### Topic Modelling Model Selection')
         toolkit['NLP_TOPIC_MODEL'] = st.selectbox('Choose Model to use', ('Latent Dirichlet Allocation',
                                                                           'Non-Negative Matrix Factorization',
                                                                           'Latent Semantic Indexing'))
@@ -991,7 +992,7 @@ def app():
                 'a set of concepts related to the documents and terms.')
 
         # FLAGS
-        st.markdown('## Options')
+        st.markdown('### Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?')
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
@@ -1137,13 +1138,13 @@ def app():
                                                                       toolkit['CV'], mds='tsne')
 
                         if toolkit['VERBOSE']:
-                            st.markdown('## Topic Label\n'
+                            st.markdown('### Topic Label\n'
                                         'The following frame will show you the words that are associated with a '
                                         'certain topic.')
                             printDataFrame(data=toolkit['KW'], verbose_level=toolkit['NUM_TOPICS'],
                                            advanced=toolkit['ADVANCED_ANALYSIS'])
 
-                            st.markdown('## LDA\n'
+                            st.markdown('### LDA\n'
                                         f'The following HTML render displays the top {toolkit["NUM_TOPICS"]} of '
                                         f'Topics generated from all the text provided in your dataset.')
                             toolkit['LDA_VIS_STR'] = pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS'])
@@ -1151,8 +1152,8 @@ def app():
 
                         if toolkit['SAVE']:
                             st.markdown('---')
-                            st.markdown('## Save Data\n'
-                                        '### Topics')
+                            st.markdown('### Save Data\n'
+                                        '#### Topics')
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
@@ -1171,7 +1172,7 @@ def app():
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
-                            st.markdown('### Topic/Word List')
+                            st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
                                 st.markdown(prettyDownload(
                                     object_to_download=toolkit['KW'],
@@ -1189,7 +1190,7 @@ def app():
                                     format_=toolkit['MODE']),
                                     unsafe_allow_html=True)
 
-                            st.markdown('### Other Requested Data')
+                            st.markdown('#### Other Requested Data')
                             st.markdown(prettyDownload(
                                 object_to_download=pyLDAvis.prepared_data_to_html(toolkit['LDA_VIS']),
                                 download_filename='lda.html',
@@ -1214,7 +1215,7 @@ def app():
                                                    l1_ratio=toolkit['L1_RATIO']).fit(toolkit['TFIDF_VECTORISED'])
 
                         if toolkit['VERBOSE']:
-                            st.markdown('## Model Data')
+                            st.markdown('### Model Data')
                             toolkit['TOPIC_TEXT'] = modelIterator(toolkit['NMF_MODEL'], toolkit['TFIDF_MODEL'],
                                                                   top_n=toolkit['NUM_TOPICS'])
                         else:
@@ -1230,15 +1231,15 @@ def app():
                         toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit['KW'].shape[0])]
 
                         if toolkit['VERBOSE']:
-                            st.markdown('## NMF Topic DataFrame')
+                            st.markdown('### NMF Topic DataFrame')
                             printDataFrame(data=toolkit['KW'],
                                            verbose_level=toolkit['NUM_TOPICS'],
                                            advanced=toolkit['ADVANCED_ANALYSIS'])
 
                         if toolkit['SAVE']:
                             st.markdown('---')
-                            st.markdown('## Save Data\n'
-                                        '### Topics')
+                            st.markdown('### Save Data\n'
+                                        '#### Topics')
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
@@ -1257,7 +1258,7 @@ def app():
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
-                            st.markdown('### Topic/Word List')
+                            st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
                                 st.markdown(prettyDownload(
                                     object_to_download=toolkit['KW'],
@@ -1282,7 +1283,7 @@ def app():
                         toolkit['LSI_DATA'] = toolkit['LSI_MODEL'].fit_transform(toolkit['VECTORISED'])
 
                         if toolkit['VERBOSE']:
-                            st.markdown('## Model Data')
+                            st.markdown('### Model Data')
                             toolkit['TOPIC_TEXT'] = modelIterator(toolkit['LSI_MODEL'], toolkit['CV'],
                                                                   top_n=toolkit['NUM_TOPICS'])
                         else:
@@ -1295,7 +1296,7 @@ def app():
                         toolkit['KW'].index = [f'topic_{i}' for i in range(toolkit['KW'].shape[0])]
 
                         if toolkit['VERBOSE']:
-                            st.markdown('## LSI Topic DataFrame')
+                            st.markdown('### LSI Topic DataFrame')
                             printDataFrame(data=toolkit['KW'],
                                            verbose_level=toolkit['VERBOSITY'],
                                            advanced=toolkit['ADVANCED_ANALYSIS'])
@@ -1351,8 +1352,8 @@ def app():
 
                         if toolkit['SAVE']:
                             st.markdown('---')
-                            st.markdown('## Save Data\n'
-                                        '### Topics')
+                            st.markdown('### Save Data\n'
+                                        '#### Topics')
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
                                     st.markdown(prettyDownload(
@@ -1371,7 +1372,7 @@ def app():
                                         format_=toolkit['MODE']),
                                         unsafe_allow_html=True)
 
-                            st.markdown('### Topic/Word List')
+                            st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
                                 st.markdown(prettyDownload(
                                     object_to_download=toolkit['KW'],
@@ -1413,7 +1414,7 @@ def app():
 # -------------------------------------------------------------------------------------------------------------------- #
     elif toolkit['APP_MODE'] == 'Topic Classification':
         st.markdown('---')
-        st.markdown('# Topic Classification')
+        st.markdown('## Topic Classification')
         st.markdown('This function expands on the Topic Modelling function within the NLP Toolkit, but allowing users '
                     'to use pretrained ML models to classify the news articles into the list of topics you input '
                     'into the app. For nw, only the Zero-Shot Classification model from Huggingface is implemented.\n\n'
@@ -1443,7 +1444,7 @@ def app():
                 except Exception as ex:
                     st.error(ex)
 
-        st.markdown('## Options')
+        st.markdown('### Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
                                                             'and content being downloaded again, a unique file '
                                                             'identifier is tacked onto the filename.')
@@ -1495,13 +1496,13 @@ def app():
                     apply(lambda x: max(x, key=itemgetter(1))[0])
 
                 if toolkit['VERBOSE']:
-                    st.markdown('## Classified Data')
+                    st.markdown('### Classified Data')
                     printDataFrame(data=toolkit['DATA'], verbose_level=toolkit['VERBOSITY'],
                                    advanced=toolkit['ADVANCED_ANALYSIS'])
 
                 if toolkit['SAVE']:
                     st.markdown('---')
-                    st.markdown('## Download Data')
+                    st.markdown('### Download Data')
                     if toolkit['OVERRIDE_FORMAT'] is not None:
                         st.markdown(prettyDownload(
                             object_to_download=toolkit['DATA'],

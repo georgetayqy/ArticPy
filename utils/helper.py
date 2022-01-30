@@ -62,11 +62,6 @@ def readFile(filepath: str or os.path, fformat: str):
             return pd.read_json(filepath)
         except Exception as e:
             st.error(f'Error: {e}')
-    elif fformat == 'HDF5':
-        try:
-            return pd.read_hdf(filepath)
-        except Exception as e:
-            st.error(f'Error: {e}')
 
 
 def lemmatizeText(text):
@@ -322,9 +317,6 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                     object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
                 elif format_.lower() == 'json':
                     object_to_download = object_to_download.to_json(index=override_index)
-                elif format_.lower() == 'hdf5':
-                    st.warning('Output to HDF5 format is not currently supported. Defaulting to CSV instead...')
-                    object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
                 elif format_.lower() == 'pkl':
                     out = io.BytesIO()
                     pickle.dump(object_to_download, out)

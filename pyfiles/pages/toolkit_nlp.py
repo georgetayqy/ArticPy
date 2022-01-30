@@ -62,7 +62,7 @@ def app():
                                      help='Choose "Local" if you wish to upload a file from your machine or choose '
                                           '"Online" if you wish to pull a file from any one of the supported Cloud '
                                           'Service Providers.')
-    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+    toolkit['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -271,7 +271,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -415,7 +415,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -558,7 +558,7 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON'))
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -616,7 +616,7 @@ def app():
             if toolkit['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                              ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                              ('CSV', 'XLSX', 'PKL', 'JSON'))
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -768,7 +768,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -997,7 +997,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -1451,7 +1451,7 @@ def app():
         if toolkit['SAVE']:
             if st.checkbox('Override Output Format?'):
                 toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:

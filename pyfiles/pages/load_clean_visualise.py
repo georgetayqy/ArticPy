@@ -68,7 +68,7 @@ def app():
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
                                       'Service Providers.')
-    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -150,7 +150,7 @@ def app():
         if lcv['SAVE']:
             if st.checkbox('Override Output Format?'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -221,7 +221,7 @@ def app():
             if lcv['SAVE']:
                 if st.checkbox('Override Output Format?'):
                     lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
                     if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -262,7 +262,7 @@ def app():
         if lcv['SAVE']:
             if st.checkbox('Override Output Format?'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON'))
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:

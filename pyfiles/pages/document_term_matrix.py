@@ -76,7 +76,7 @@ def app():
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
                                       'Service Providers.')
-    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'H5'))
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
@@ -149,7 +149,7 @@ def app():
                                                     'file format by default but this behaviour can be overridden.')
     if dtm['SAVE']:
         if st.checkbox('Override Output Format?'):
-            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON', 'HDF5'))
+            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
             if dtm['OVERRIDE_FORMAT'] == dtm['MODE']:
                 st.warning('Warning: Overridden Format is the same as Input Format')
         else:

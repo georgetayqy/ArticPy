@@ -75,18 +75,20 @@ def app():
     dtm['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.')
-    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
+                                      'Service Providers.',
+                                 key='dtm-file')
+    dtm['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'), key='dtm-mode')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if dtm['FILE'] == 'Local':
-        dtm['DATA_PATH'] = st.file_uploader(f'Load {dtm["MODE"]} File', type=[dtm['MODE']])
+        dtm['DATA_PATH'] = st.file_uploader(f'Load {dtm["MODE"]} File', type=[dtm['MODE']], key='dtm-fp')
         if dtm['DATA_PATH'] is not None:
             dtm['DATA'] = readFile(dtm['DATA_PATH'], dtm['MODE'])
             if not dtm['DATA'].empty or not dtm['DATA']:
-                dtm['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns))
+                dtm['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns),
+                                                  key='dtm-dc')
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
         else:
             # RESET
@@ -95,7 +97,7 @@ def app():
 
     elif dtm['FILE'] == 'Online':
         st.info(f'File Format Selected: **{dtm["MODE"]}**')
-        dtm['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+        dtm['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'), key='dtm-csp')
 
         if dtm['CSP'] == 'Azure':
             azure = csp_downloaders.AzureDownloader()
@@ -108,7 +110,8 @@ def app():
                     st.error(f'Error: {ex}. Try again.')
 
             if not dtm['DATA'].empty:
-                dtm['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns))
+                dtm['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns),
+                                                  key='dtm-az')
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
 
         elif dtm['CSP'] == 'Amazon':
@@ -122,7 +125,8 @@ def app():
                     st.error(f'Error: {ex}. Try again.')
 
             if not dtm['DATA'].empty:
-                dtm["DATA_COLUMN"] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns))
+                dtm["DATA_COLUMN"] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns),
+                                                  key='dtm-aws')
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
 
         elif dtm['CSP'] == 'Google':
@@ -136,7 +140,8 @@ def app():
                     st.error(f'Error: {ex}. Try again.')
 
             if not dtm['DATA'].empty:
-                dtm["DATA_COLUMN"] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns))
+                dtm["DATA_COLUMN"] = st.selectbox('Choose Column where Data is Stored', list(dtm['DATA'].columns),
+                                                  key='dtm-gcs')
                 st.success(f'Data Loaded from {dtm["DATA_COLUMN"]}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -146,10 +151,12 @@ def app():
                 'The following section contains options you can use to better define the outputs of this module and to '
                 'modify what the app prints out to screen.\n\n')
     dtm['SAVE'] = st.checkbox('Save Outputs?', help='The files outputted will be in the same format as the input '
-                                                    'file format by default but this behaviour can be overridden.')
+                                                    'file format by default but this behaviour can be overridden.',
+                              key='dtm-save')
     if dtm['SAVE']:
-        if st.checkbox('Override Output Format?'):
-            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
+        if st.checkbox('Override Output Format?', key='override'):
+            dtm['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format', ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                                  key='override-format')
             if dtm['OVERRIDE_FORMAT'] == dtm['MODE']:
                 st.warning('Warning: Overridden Format is the same as Input Format')
         else:
@@ -160,7 +167,8 @@ def app():
                                           'printed to screen. If you get an error telling you that the DataFrame size '
                                           'is too large to proceed, kindly lower the number of data points you wish '
                                           'to visualise or increase the maximum size of items to print to screen '
-                                          'through the maxMessageSize setting in the Streamlit config file.')
+                                          'through the maxMessageSize setting in the Streamlit config file.',
+                                     key='vb')
     if dtm['VERBOSE_DTM']:
         dtm['VERBOSITY_DTM'] = st.slider('Data Points to Display for Document-Term Matrix?',
                                          min_value=1,
@@ -169,10 +177,12 @@ def app():
                                          help='Note that this parameter defines the number of points to print out '
                                               'for the raw DTM produced by the app. You can only display up to a '
                                               'maximum of 1000 data points and a minimum of 1 data point at any one '
-                                              'time.')
+                                              'time.',
+                                         key='vbsity')
         dtm['VERBOSE_ANALYSIS'] = st.checkbox('Display top N words in Document-Term Matrix?',
                                               help='This sorts the DTM and shows you the top number of words you '
-                                                   'select.')
+                                                   'select.',
+                                              key='vbanalysis')
         if dtm['VERBOSE_ANALYSIS']:
             dtm['N'] = st.slider('Key in the top N number of words to display',
                                  key='N',
@@ -187,7 +197,8 @@ def app():
                                                help='This option will analyse your DataFrame and display advanced '
                                                'statistics on it. Note that this will require some time and '
                                                'processing power to complete. Deselect this option if this if '
-                                               'you do not require it.')
+                                               'you do not require it.',
+                                               key='dtm-advanced-df')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                            DOCUMENT-TERM MATRIX CREATION                                         | #

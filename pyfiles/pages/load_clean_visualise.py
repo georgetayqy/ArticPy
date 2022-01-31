@@ -59,7 +59,7 @@ def app():
                                              'adding in new information or to change existing information.\n\n'
                                              '**Data Query**: \tThis mode allows users to query their data for '
                                              'specific keywords of interest.',
-                                        key='analysis_mode_data')
+                                        key='lcv-mode')
     st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected')
 
     st.markdown('## Upload Data\n')
@@ -67,21 +67,24 @@ def app():
     lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
                                  help='Choose "Local" if you wish to upload a file from your machine or choose '
                                       '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.')
-    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'))
+                                      'Service Providers.',
+                                 key='lcv-origin')
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                  key='lcv-mode')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                 FILE UPLOADING                                                   | #
 # -------------------------------------------------------------------------------------------------------------------- #
     if lcv['FILE'] == 'Local':
-        lcv['DATA_PATH'] = st.file_uploader(f'Load {lcv["MODE"]} File', type=[lcv["MODE"]])
+        lcv['DATA_PATH'] = st.file_uploader(f'Load {lcv["MODE"]} File', type=[lcv["MODE"]], key='lcv-fp')
         if lcv['DATA_PATH'] is not None:
             lcv['DATA'] = readFile(lcv['DATA_PATH'], lcv["MODE"])
             if not lcv['DATA'].empty:
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns),
                                                   help='Note that if you select Data Modification, this field is '
-                                                       'rendered invalid and the entire DataFrame will be used .')
+                                                       'rendered invalid and the entire DataFrame will be used .',
+                                                  key='lcv-dc')
                 st.success(f'Data Loaded from **{lcv["DATA_COLUMN"]}**!')
         else:
             # RESET
@@ -90,7 +93,7 @@ def app():
 
     elif lcv['FILE'] == 'Online':
         st.info(f'File Format Selected: **{lcv["MODE"]}**')
-        lcv['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'))
+        lcv['CSP'] = st.selectbox('CSP', ('Select a CSP', 'Azure', 'Amazon', 'Google'), key='lcv-csp')
 
         if lcv['CSP'] == 'Azure':
             azure = csp_downloaders.AzureDownloader()
@@ -105,7 +108,8 @@ def app():
                 st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
-                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
+                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns),
+                                                  key='lcv-az')
                 st.success(f'Data Loaded from {lcv["DATA_COLUMN"]}!')
 
         elif lcv['CSP'] == 'Amazon':
@@ -121,7 +125,8 @@ def app():
                 st.error('Error establishing connection with Azure and pulling data...')
 
             if not lcv['DATA'].empty and lcv['MOD_MODE'] != 'Inplace Data Modification':
-                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
+                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns),
+                                                  key='lcv-aws')
                 st.success(f'Data Loaded from {lcv["DATA_COLUMN"]}!')
 
         elif lcv['CSP'] == 'Google':
@@ -135,7 +140,8 @@ def app():
                     st.error(f'Error: {ex}. Try again.')
 
             if not lcv['DATA'].empty:
-                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns))
+                lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns),
+                                                  key='lcv-gcs')
                 st.success(f'Data Loaded from {lcv["DATA_COLUMN"]}!')
 
 # -------------------------------------------------------------------------------------------------------------------- #

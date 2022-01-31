@@ -137,29 +137,34 @@ def app():
                                         'Word Cloud', 'Named Entity Recognition', 'POS Tagging', 'Summarise'))
     st.info(f'**{toolkit["APP_MODE"]}** Selected')
 
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                            WORD CLOUD VISUALISATION                                              | #
+# -------------------------------------------------------------------------------------------------------------------- #
     if toolkit['APP_MODE'] == 'Word Cloud':
+        st.markdown('---')
+        st.markdown('## Word Cloud Generation\n'
+                    'This module takes in a long list of documents and converts it into a WordCloud representation '
+                    'of all the documents.\n\n'
+                    'Note that the documents should not be tokenized, but it should be cleaned and lemmatized to '
+                    'avoid double-counting words.')
         st.markdown('### Options')
         toolkit['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Due to the possibility of files with the same file name and content being '
-                                           'downloaded again, a unique file identifier is tacked onto the filename.',
-                                      key='wc-save')
+                                           'downloaded again, a unique file identifier is tacked onto the filename.')
 
         col1, col1_ = st.columns(2)
         toolkit['MAX_WORDS'] = col1.number_input('Key in the maximum number of words to display',
                                                  min_value=2,
                                                  max_value=1000,
-                                                 value=200,
-                                                 key='wc-max-words')
+                                                 value=200)
         toolkit['CONTOUR_WIDTH'] = col1_.number_input('Key in the contour width of your WordCloud',
                                                       min_value=1,
                                                       max_value=10,
-                                                      value=3,
-                                                      key='wc-contour')
+                                                      value=3)
         toolkit['WIDTH'] = col1.number_input('Key in the Width of the WordCloud image generated',
                                              min_value=1,
                                              max_value=100000,
-                                             value=800,
-                                             key='wc-width')
+                                             value=800)
         toolkit['HEIGHT'] = col1_.number_input('Key in the Height of the WordCloud image generated',
                                                min_value=1,
                                                max_value=100000,
@@ -1416,13 +1421,13 @@ def app():
                     'This function performs best when GPU is enabled. To enable your GPU to run the classification '
                     'process, click on the following expander and download and install the required packages.')
         with st.expander('GPU-enabled Features'):
-            class1, class2 = st.columns(2)
-            with class1:
+            col1, col2 = st.columns(2)
+            with col1:
                 st.markdown('### PyTorch for CUDA 10.2')
-                if st.button('Install Relevant Packages', key='10.2-classification'):
+                if st.button('Install Relevant Packages', key='10.2'):
                     os.system('pip3 install torch==1.10.0+cu102 torchvision==0.11.1+cu102 torchaudio===0.10.0+cu102'
                               ' -f https://download.pytorch.org/whl/cu102/torch_stable.html')
-            with class2:
+            with col2:
                 st.markdown('### PyTorch for CUDA 11.3')
                 if st.button('Install Relevant Packages', key='11.3'):
                     os.system('pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+cu113'
@@ -1438,6 +1443,46 @@ def app():
                              'supported GPU-enabled PyTorch versions to use your GPU and silence this error.')
                 except Exception as ex:
                     st.error(ex)
+
+        st.markdown('### Options')
+        toolkit['SAVE'] = st.checkbox('Save Outputs?', help='Due to the possibility of files with the same file name '
+                                                            'and content being downloaded again, a unique file '
+                                                            'identifier is tacked onto the filename.')
+        if toolkit['SAVE']:
+            if st.checkbox('Override Output Format?'):
+                toolkit['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
+                if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
+                    st.warning('Warning: Overridden Format is the same as Input Format')
+            else:
+                toolkit['OVERRIDE_FORMAT'] = None
+        toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
+
+        if toolkit['VERBOSE']:
+            toolkit['VERBOSITY'] = st.slider('Data points',
+                                             key='Data points to display?',
+                                             min_value=0,
+                                             max_value=1000,
+                                             value=20,
+                                             help='Select 0 to display all Data Points')
+            toolkit['ADVANCED_ANALYSIS'] = st.checkbox('Display Advanced DataFrame Statistics?',
+                                                       help='This option will analyse your DataFrame and display '
+                                                            'advanced statistics on it. Note that this will require '
+                                                            'some time and processing power to complete. Deselect this '
+                                                            'option if this if you do not require it.')
+        toolkit['CLASSIFY_TOPIC'] = st_tags(label='**Topics**',
+                                            text='Press Enter to extend list...',
+                                            maxtags=9999999,
+                                            key='classify_topics',
+                                            suggestions=['Arts', 'Business', 'Data', 'Entertainment', 'Environment',
+                                                         'Fashion', 'Medicine', 'Music', 'Politics', 'Science',
+                                                         'Sports', 'Technology', 'Trade', 'Traffic', 'Weather',
+                                                         'World'])
+
+        if len(toolkit['CLASSIFY_TOPIC']) != 0:
+            st.info(f'**{toolkit["CLASSIFY_TOPIC"]}** Topics are Detected!')
+        else:
+            st.info('No Topics Detected.')
 
         if st.button('Classify Text', key='classify'):
             if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:

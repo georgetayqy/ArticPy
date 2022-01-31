@@ -25,7 +25,7 @@ created pre-made Docker images hosted on Github Packages for you to use. To do s
 system and run the following commands on Terminal or Powershell:
 
 ```shell
-docker pull docker pull ghcr.io/asdfghjkxd/app:main
+docker pull ghcr.io/asdfghjkxd/app:main
 
 docker run -it -p 5000:8501 --name news ghcr.io/asdfghjkxd/app:main
 ```

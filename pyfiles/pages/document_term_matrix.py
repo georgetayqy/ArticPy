@@ -59,8 +59,8 @@ def app():
             else:
                 st.warning('NLTK Data Not Detected')
         elif platform.system() == 'Darwin':
-            if pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').is_dir():
-                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data').iterdir()):
+            if pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data').is_dir():
+                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data').iterdir()):
                     st.info('NTLK Data Detected')
                 else:
                     st.warning('NLTK Data Not Detected')

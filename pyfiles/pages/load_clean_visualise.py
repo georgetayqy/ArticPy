@@ -152,11 +152,13 @@ def app():
         lcv['SAVE'] = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any '
                                                         'saved outputs. If None mode is chosen, you will not be able '
                                                         'to download the outputs as it is assumed that you already '
-                                                        'possess that.\n\n')
+                                                        'possess that.\n\n',
+                                  key='lcv-save-cleaning')
         if lcv['SAVE']:
-            if st.checkbox('Override Output Format?'):
+            if st.checkbox('Override Output Format?', key='override-cleaning'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                                      key='lcv-override-cleaning')
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -167,7 +169,8 @@ def app():
                                           'printed to screen. If you get an error telling you that the DataFrame size '
                                           'is too large to proceed, kindly lower the number of data points you wish '
                                           'to visualise or increase the maximum size of items to print to screen '
-                                          'through the maxMessageSize setting in the Streamlit config file.')
+                                          'through the maxMessageSize setting in the Streamlit config file.',
+                                     key='lcv-vb-cleaning')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -179,7 +182,8 @@ def app():
                                                    help='This option will analyse your DataFrame and display advanced '
                                                         'statistics on it. Note that this will require some time and '
                                                         'processing power to complete. Deselect this option if this '
-                                                        'if you do not require it.')
+                                                        'if you do not require it.',
+                                                   key='lcv-advanced-cleaning')
         lcv['CLEAN_MODE'] = st.selectbox('Select Preprocessing Pipelines', ('None', 'Simple', 'Complex'),
                                          help='None mode will return the raw data passed into the app. This mode is '
                                               'recommended for purely visualising data without modifying it in any '
@@ -192,20 +196,23 @@ def app():
                                               'Files created from simple cleaning may be used for Summarization in NLP '
                                               'Toolkit while files created from complex cleaning may be used for '
                                               'Document-Term Matrix Creation in Document-Term Matrix. Note that for '
-                                              'most NLP Processes, the complex cleaning process is recommended.')
+                                              'most NLP Processes, the complex cleaning process is recommended.',
+                                         key='lcv-pipeline-cleaning')
         lcv['TOKENIZE'] = st.checkbox('Tokenize Data?', value=True, help='This option is enabled by default. Deselect '
                                                                          'this option if you do not want to tokenize '
-                                                                         'your data.')
+                                                                         'your data.',
+                                      key='lcv-tokenize-cleaning')
 
         if lcv['CLEAN_MODE'] == 'Complex':
             lcv['EXTEND_STOPWORD'] = st.checkbox('Extend List of Stopwords?',
                                                  help='Select this option to extend the list of stopwords that will '
-                                                      'be used to clean your data.')
+                                                      'be used to clean your data.',
+                                                 key='lcv-extension-cleaning')
             if lcv['EXTEND_STOPWORD']:
                 lcv['STOPWORD_LIST'] = st_tags(label='**Keyword List**',
                                                text='Press Enter to extend list...',
                                                maxtags=9999999,
-                                               key='extender')
+                                               key='lcv-extended-cleaning')
                 if len(lcv['STOPWORD_LIST']) == 0:
                     st.info('**Alert**: No Words detected')
 
@@ -216,18 +223,21 @@ def app():
                                             'certain elementary analysis on the data. So far, we have implemented the '
                                             'ability to extract the countries mentioned in your data and to plot out '
                                             'the Data Points on a World Map and the ability to modify a single value '
-                                            'of the inputted DataFrame in place.')
+                                            'of the inputted DataFrame in place.',
+                                       key='lcv-mode-modification')
         if lcv['MOD_MODE'] == 'Country Extraction':
             st.markdown('## Options\n')
             lcv['SAVE'] = st.checkbox('Save Outputs?',
                                       help='Note: Only Simple and Complex Cleaning modes will produce any '
                                            'saved outputs. If None mode is chosen, you will not be able '
                                            'to download the outputs as it is assumed that you already '
-                                           'possess that.\n\n')
+                                           'possess that.\n\n',
+                                      key='lcv-save-modification')
             if lcv['SAVE']:
-                if st.checkbox('Override Output Format?'):
+                if st.checkbox('Override Output Format?', key='override-modification'):
                     lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                          ('CSV', 'XLSX', 'PKL', 'JSON'))
+                                                          ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                                          key='override-format-modification')
                     if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
                 else:
@@ -239,7 +249,8 @@ def app():
                                               'size is too large to proceed, kindly lower the number of data points '
                                               'you wish to visualise or increase the maximum size of items to print '
                                               'to screen through the maxMessageSize setting in the Streamlit config '
-                                              'file.')
+                                              'file.',
+                                         key='vb-modification')
             if lcv['VERBOSE']:
                 lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                              key='Data points to display?',
@@ -251,24 +262,28 @@ def app():
                                                        help='This option will analyse your DataFrame and display '
                                                             'advanced statistics on it. Note that this will require '
                                                             'some time and processing power to complete. Deselect this '
-                                                            'option if this if you do not require it.')
+                                                            'option if this if you do not require it.',
+                                                       key='vb-advanced')
             if lcv['VERBOSE']:
                 lcv['WORLD_MAP'] = st.checkbox('Generate a World Map Representation of the Countries Mentioned?',
-                                               value=True)
+                                               value=True, key='world-map')
         elif lcv['MOD_MODE'] == 'Inplace Data Modification':
-            lcv['FIXED_KEY'] = st.checkbox('Use Fixed Key for Editing Table?')
-            lcv['HEIGHT'] = st.number_input('Height of Table', min_value=100, max_value=800, value=400)
+            lcv['FIXED_KEY'] = st.checkbox('Use Fixed Key for Editing Table?', key='lcv-fixedkeys-modification')
+            lcv['HEIGHT'] = st.number_input('Height of Table', min_value=100, max_value=800, value=400,
+                                            key='lcv-height')
 
     elif lcv['ANALYSIS_MODE'] == 'Data Query':
         st.markdown('## Options\n')
         lcv['SAVE'] = st.checkbox('Save Outputs?', help='Note: Only Simple and Complex Cleaning modes will produce any '
                                                         'saved outputs. If None mode is chosen, you will not be able '
                                                         'to download the outputs as it is assumed that you already '
-                                                        'possess that.\n\n')
+                                                        'possess that.\n\n',
+                                  key='lcv-save-query')
         if lcv['SAVE']:
-            if st.checkbox('Override Output Format?'):
+            if st.checkbox('Override Output Format?', key='lcv-override-query'):
                 lcv['OVERRIDE_FORMAT'] = st.selectbox('Overridden Output Format',
-                                                      ('CSV', 'XLSX', 'PKL', 'JSON'))
+                                                      ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                                      key='lcv-override-format-query')
                 if lcv['OVERRIDE_FORMAT'] == lcv['MODE']:
                     st.warning('Warning: Overridden Format is the same as Input Format')
             else:
@@ -279,7 +294,8 @@ def app():
                                           'printed to screen. If you get an error telling you that the DataFrame size '
                                           'is too large to proceed, kindly lower the number of data points you wish '
                                           'to visualise or increase the maximum size of items to print to screen '
-                                          'through the maxMessageSize setting in the Streamlit config file.')
+                                          'through the maxMessageSize setting in the Streamlit config file.',
+                                     key='vb-query')
         if lcv['VERBOSE']:
             lcv['VERBOSITY'] = st.slider('Data Points To Print',
                                          key='Data points to display?',
@@ -291,9 +307,11 @@ def app():
                                                    help='This option will analyse your DataFrame and display advanced '
                                                         'statistics on it. Note that this will require some time and '
                                                         'processing power to complete. Deselect this option if this '
-                                                        'if you do not require it.')
+                                                        'if you do not require it.',
+                                                   key='lcv-advanced-query')
         lcv['MATCH'] = st.checkbox('Query Must Match Exactly?', help='Select this option if you want your query string/'
-                                                                     'condition to match exactly with your data.')
+                                                                     'condition to match exactly with your data.',
+                                   key='lcv-match-query')
 
         lcv['QUERY'] = st_tags(label='**Query**',
                                text='Press Enter to extend list...',

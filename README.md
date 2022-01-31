@@ -57,6 +57,8 @@ the app on the website https://share.streamlit.io/asdfghjkxd/articpy/main/app.py
 are unable to upload files that are larger than 200 MB in size; for the other methods, you are able to override this 
 limitation and upload files of sizes far larger than 200 MB to parse.
 
+![WebApp_QRcode](Assets-qrcode/qr-code.png)
+
 <hr>
 
 ## Usage

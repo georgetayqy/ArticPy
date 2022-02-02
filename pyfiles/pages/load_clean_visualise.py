@@ -429,7 +429,7 @@ def app():
                         lcv['DATA'].dropna(inplace=True)
                         lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].apply(lambda x: x.encode(
                             'ascii', 'ignore').decode('ascii'))
-                        lcv['DATA'] = pd.DataFrame(data=lcv['DATA'])
+                        lcv['DATA'] = pd.DataFrame(data=lcv['DATA']).astype(str)
 
                     except Exception as ex:
                         st.error(f'Error: {ex}')
@@ -437,6 +437,7 @@ def app():
                     if lcv['CLEAN_MODE'] == 'None':
                         # DO NOTHING
                         lcv['DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
+                        lcv['DATA'] = lcv['DATA'].astype(str)
 
                         if lcv['TOKENIZE']:
                             lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
@@ -445,6 +446,7 @@ def app():
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
                             lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
+                            lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
 
                             # PREPROCESSING AND CLEANING
                             lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA'][lcv['DATA_COLUMN']],
@@ -485,6 +487,7 @@ def app():
                         if lcv['FINALISE']:
                             try:
                                 lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
+                                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
 
                                 # PREPROCESSING AND CLEANING
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA']

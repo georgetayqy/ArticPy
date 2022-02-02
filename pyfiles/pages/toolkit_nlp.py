@@ -1550,7 +1550,11 @@ def app():
         if st.button('Classify Text', key='classify'):
             if len(toolkit['CLASSIFY_TOPIC']) != 0 and not toolkit['DATA'].empty:
                 toolkit['DATA'].dropna(inplace=True)  # REMOVE THE EMPTY VALUES
-                classifier = pipeline('zero-shot-classification')
+                # INIT GPU IF TORCH IS AVAILABLE
+                if torch.cuda.is_available():
+                    classifier = pipeline('zero-shot-classification', device=0)
+                else:
+                    classifier = pipeline('zero-shot-classification')
                 toolkit['DATA']['TEST'] = toolkit['DATA'][toolkit['DATA_COLUMN']]. \
                     apply(lambda x: classifier(x, toolkit['CLASSIFY_TOPIC']))
                 toolkit['DATA']['CLASSIFIED'] = toolkit['DATA']['TEST']. \

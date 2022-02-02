@@ -1,0 +1,379 @@
+"""
+This file is used to store some of the basic helper functions that are used frequently in the app
+"""
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                         IMPORT RELEVANT LIBRARIES                                                | #
+# -------------------------------------------------------------------------------------------------------------------- #
+import io
+import os
+import toml
+import typing
+import nltk
+import numpy as np
+import pandas
+import pandas as pd
+import plotly.utils
+import streamlit as st
+import pandas_profiling
+import base64
+import json
+import pickle
+import uuid
+import re
+
+from collections import Counter
+from heapq import nlargest
+from string import punctuation
+from nltk.stem import WordNetLemmatizer
+from streamlit_pandas_profiling import st_profile_report
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                               HELPER FUNCTIONS                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
+def readFile(filepath: str or os.path, fformat: str):
+    """
+    This is a helper function to read the data
+
+    Parameters
+    ----------
+    filepath:                           A path-like or file-like object
+    fformat:                            The format of the file to read
+    ----------
+    """
+    if fformat == 'CSV':
+        try:
+            return pd.read_csv(filepath, low_memory=False, encoding='latin1')
+        except Exception as e:
+            st.error(f'Error: {e}')
+    elif fformat == 'XLSX':
+        try:
+            return pd.read_excel(filepath, engine='openpyxl')
+        except Exception as e:
+            st.error(f'Error: {e}')
+    elif fformat == 'PKL':
+        try:
+            return pd.read_pickle(filepath)
+        except Exception as e:
+            st.error(f'Error: {e}')
+    elif fformat == 'JSON':
+        try:
+            return pd.read_json(filepath)
+        except Exception as e:
+            st.error(f'Error: {e}')
+
+
+def lemmatizeText(text):
+    """
+    This function iterates through the pandas dataframe and lemmatizes the words
+
+    Parameters
+    ----------
+    :param text:                        Text to lemmatize (string)
+    ----------
+    """
+    lemmatizer = WordNetLemmatizer()
+    return [lemmatizer.lemmatize(word) for word in text]
+
+
+def summarise(text: pd.DataFrame, stopwords: list or set, pos_tag, nlp, sent_count: int):
+    """
+    This function summarise the text dataframe
+
+    Parameters
+    ----------
+    text:                               DataFrame
+    nlp:                                NLP model
+    pos_tag:                            Text pos tag
+    stopwords:                          Stopwords
+    sent_count:                         Number of sentences to summarise to
+    ----------
+    """
+
+    try:
+        # DEFINE LISTS AND DICTS
+        keyword = []
+        sent_strength = {}
+        data = nlp(str(text))
+
+        # EXTRACT KEYWORDS FROM TEXT
+        for token in data:
+            if token.text in stopwords or token.text in punctuation:
+                continue
+            if token.pos_ in pos_tag:
+                keyword.append(token.text)
+
+        # COUNT THE FREQUENCY OF WORDS
+        freq_word = Counter(keyword)
+        max_freq = Counter(keyword).most_common(1)[0][1]
+        for word in freq_word.keys():
+            freq_word[word] = (freq_word[word] / max_freq)
+
+        # CALCULATE SENTENCE SCORES
+        for sent in data.sents:
+            for word in sent:
+                if word.text in freq_word.keys():
+                    if sent in sent_strength.keys():
+                        sent_strength[sent] += freq_word[word.text]
+                    else:
+                        sent_strength[sent] = freq_word[word.text]
+
+        # CONCATENATE THE STRINGS IN THE LIST TO A LARGER STRING
+        summarized_sentences = nlargest(sent_count, sent_strength, key=sent_strength.get)
+        final_sentences = [w.text for w in summarized_sentences]
+        summary = ' '.join(final_sentences)
+    except Exception:
+        return text
+    else:
+        return summary
+
+
+def modelIterator(model, vectoriser, top_n, vb=True):
+    """
+    This function prints out and returns the extracted topics for the NLP model passed on to it
+
+    Parameters
+    ----------
+    model:                              NLP Model
+    vectoriser:                         Vectorised text
+    top_n:                              Number of Topics to return
+    vb:                                 Verbose tag (will print out the topics if set to True
+    ---------
+    """
+    frame_list = []
+
+    for id_, topic in enumerate(model.components_):
+        lister = [(vectoriser.get_feature_names()[i], topic[i]) for i in topic.argsort()[:-top_n - 1:-1]]
+        df = pd.DataFrame(data=lister,
+                          index=range(len(lister)),
+                          columns=['word', 'weight'])
+
+        # if vb:
+        #     st.markdown(f'### Topic {id_}')
+        #     st.dataframe(df)
+
+        frame_list.append(df)
+
+    if vb:
+        colx, coly = st.columns(2)
+        for order, data in enumerate(frame_list):
+            if (order + 1) % 2 != 0:
+                colx.markdown(f'### Topic {order + 1}')
+                colx.dataframe(data)
+            else:
+                coly.markdown(f'### Topic {order + 1}')
+                coly.dataframe(data)
+
+    return frame_list
+
+
+def downloadCorpora(model: str):
+    """
+    This function allows users to quickly and iteratively download corpora for nltk processing
+
+    Parameter
+    ----------
+    models:                             A list of names of models the user is trying to download
+    ----------
+    """
+    usr_dir = os.path.expanduser(os.getcwd())
+    if not isinstance(model, str):
+        st.error('Error: Parameter passed in is not of type "str".')
+    else:
+        new_path = os.path.join(usr_dir, f'nltk_data/corpora/{model}')
+
+        if os.path.exists(new_path):
+            if not os.listdir(new_path):
+                try:
+                    nltk.download(model)
+                except Exception as ex:
+                    st.error(f'Error: {ex}')
+            else:
+                st.info('Corpora downloaded')
+        else:
+            try:
+                nltk.download(model)
+            except Exception as ex:
+                st.error(f'Error: {ex}')
+
+
+def printDataFrame(data: pandas.DataFrame, verbose_level: int, advanced: bool,
+                   extract_from: str or None = None):
+    """
+    Takes in a Pandas DataFrame and prints out the DataFrame
+
+    Maximum Message Size can now be altered through Streamlit config files, however, a sanity
+    check of the maximum size of the message is also done to ensure that the DataFrame can be
+    properly printed to screen
+
+    Parameter
+    ----------
+    data:                               Pandas DataFrame or Series object
+    extract_from:                       Name of column to extract data from
+    verbose_level:                      The number of rows of data to display
+    advanced:                           Conduct Advanced Analysis on the DataFrame
+    dtm:                                Special processing for DTMs
+    ----------
+    """
+
+    # READ STREAMLIT CONFIG TOML FILE
+    if os.path.exists(os.path.join(os.getcwd(), '.streamlit', 'config.toml')):
+        parsed = toml.load(f'{os.getcwd()}/.streamlit/config.toml')
+    else:
+        raise FileNotFoundError('Config File for Streamlit Server is missing. Kindly ensure that your source code '
+                                'is fully downloaded and that the important config files are downloaded.')
+
+    try:
+        if data.memory_usage(deep=True).sum() < (int(parsed['server']['maxMessageSize']) * 1000000):
+            if verbose_level != 0:
+                if extract_from is not None:
+                    st.dataframe(data[[extract_from]].head(verbose_level), height=600, width=800)
+                else:
+                    st.dataframe(data.head(verbose_level), height=600, width=800)
+            else:
+                if extract_from is not None:
+                    st.dataframe(data[[extract_from]], height=600, width=800)
+                else:
+                    st.dataframe(data, height=600, width=800)
+        else:
+            # REVERT T0 20 DATAPOINT IF DATAFRAME EXCEEDS LIMIT
+            st.warning('Warning: Size of DataFrame exceeds limits imposed. Defaulting to 20 data points of display...')
+            st.dataframe(data.head(20), height=600, width=800)
+    except KeyError:
+        st.error(f'Error: DataFrame Column with value {extract_from} does not exist. Try again.')
+    except Exception as ex:
+        st.error(f'Error: {ex}')
+    else:
+        if advanced:
+            if extract_from is not None:
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data[[extract_from]].profile_report(
+                        explorative=True,
+                        minimal=True))
+            else:
+                with st.expander('Advanced Profile Report'):
+                    st_profile_report(data.profile_report(
+                        explorative=True,
+                        minimal=True))
+
+
+def dominantTopic(vect, model, n_words):
+    """
+    Returns the topic text
+
+    Parameters
+    ----------
+    vect:                               Vectorizer used
+    model:                              NLP Model
+    n_words:                            Number of Topics to return
+    ----------
+    """
+    kw = np.array(vect.get_feature_names())
+    topic_kw = []
+    for weights in model.components_:
+        top_kw = (-weights).argsort()[:n_words]
+        topic_kw.append(kw.take(top_kw))
+
+    return topic_kw
+
+
+def prettyDownload(object_to_download: typing.Any, download_filename: str, button_text: str,
+                   override_index: bool, format_: typing.Optional[str] = None,
+                   pil_image: bool = False) -> str:
+    """
+    Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
+
+    Generates a link to download the given object_to_download.
+
+    :rtype: object
+    :param object_to_download:      The object to be downloaded, enter in a list to convert all dataframes into a final
+                                    Excel sheet to output
+    :param download_filename:       Filename and extension of file. e.g. mydata.csv, some_txt_output.txt
+    :param button_text:             Text to display on download button (e.g. 'click here to download file')
+    :param override_index:          Overrides Index
+    :param format_:                 Format of the output file
+    :param pil_image:               Defines whether or not input file is a PIL Image
+    :return:                        the anchor tag to download object_to_download
+    """
+
+    try:
+        if pil_image:
+            buffer = io.BytesIO()
+            object_to_download.save(buffer, format='png')
+            object_to_download = buffer.getvalue()
+        else:
+            if isinstance(object_to_download, bytes):
+                pass
+            elif isinstance(object_to_download, list):
+                out = io.BytesIO()
+                writer = pd.ExcelWriter(out, engine='openpyxl')
+
+                for dataframe in enumerate(object_to_download):
+                    dataframe[1].to_excel(writer, sheet_name=f'Sheet{dataframe[0]}', index=override_index)
+
+                writer.save()
+                object_to_download = out.getvalue()
+            elif isinstance(object_to_download, str):
+                object_to_download = bytes(object_to_download, 'utf-8')
+            elif isinstance(object_to_download, pd.DataFrame):
+                if format_.lower() == 'xlsx':
+                    out = io.BytesIO()
+                    writer = pd.ExcelWriter(out, engine='openpyxl')
+                    object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
+                    writer.save()
+                    object_to_download = out.getvalue()
+                elif format_.lower() == 'csv':
+                    object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+                elif format_.lower() == 'json':
+                    object_to_download = object_to_download.to_json(index=override_index)
+                elif format_.lower() == 'pkl':
+                    out = io.BytesIO()
+                    pickle.dump(object_to_download, out)
+                    object_to_download = out.getvalue()
+                else:
+                    raise ValueError('Error: Unrecognised File Format')
+            elif isinstance(object_to_download, plotly.graph_objs.Figure):
+                object_to_download = plotly.io.to_image(object_to_download)
+            else:
+                object_to_download = json.dumps(object_to_download)
+    except Exception as ex:
+        st.error(ex)
+    else:
+        try:
+            b64 = base64.b64encode(object_to_download.encode()).decode()
+        except AttributeError:
+            b64 = base64.b64encode(object_to_download).decode()
+
+        button_uuid = str(uuid.uuid4()).replace('-', '')
+        button_id = re.sub('\d+', '', button_uuid)
+
+        custom_css = f"""
+            <style>
+                #{button_id} {{
+                    background-color: rgb(255, 255, 255);
+                    color: rgb(38, 39, 48);
+                    padding: 0.40em 0.90em;
+                    position: relative;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    border-width: 1px;
+                    border-style: solid;
+                    border-color: rgb(230, 234, 241);
+                    border-image: initial;
+                }}
+                #{button_id}:hover {{
+                    border-color: rgb(79, 187, 255);
+                    color: rgb(79, 187, 255);
+                }}
+                #{button_id}:active {{
+                    box-shadow: none;
+                    background-color: rgb(79, 187, 255);
+                    color: white;
+                    }}
+            </style> """
+
+        dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" ' \
+                               f'href="data:file/txt;base64,{b64}"> {button_text}</a><br></br>'
+
+        return dl_link

@@ -1,0 +1,11 @@
+[global]
+disableWatchdogWarning = true
+dataFrameSerialization = "legacy"
+
+[server]
+maxUploadSize = 1024000
+maxMessageSize = 102400
+
+[theme]
+base = "light"
+primaryColor = "#4FBBFF"

@@ -118,6 +118,16 @@ def app():
         if st.button('Begin Download', key='download-model'):
             os.system('python -m nltk.downloader all')
 
+    st.markdown('## Upload Data\n')
+    col1, col1_ = st.columns(2)
+    lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
+                                 help='Choose "Local" if you wish to upload a file from your machine or choose '
+                                      '"Online" if you wish to pull a file from any one of the supported Cloud '
+                                      'Service Providers.',
+                                 key='lcv-origin')
+    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'),
+                                  key='lcv-mode')
+
     st.markdown('## Processing Mode\n\n'
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '
                 'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
@@ -130,16 +140,6 @@ def app():
                                              'specific keywords of interest.',
                                         key='lcv-mode')
     st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected')
-
-    st.markdown('## Upload Data\n')
-    col1, col1_ = st.columns(2)
-    lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
-                                 help='Choose "Local" if you wish to upload a file from your machine or choose '
-                                      '"Online" if you wish to pull a file from any one of the supported Cloud '
-                                      'Service Providers.',
-                                 key='lcv-origin')
-    lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'),
-                                  key='lcv-mode')
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

@@ -619,8 +619,6 @@ def app():
                                                               ('CSV', 'XLSX', 'PKL', 'JSON'))
                     if toolkit['OVERRIDE_FORMAT'] == toolkit['MODE']:
                         st.warning('Warning: Overridden Format is the same as Input Format')
-                else:
-                    st.error('Error: Data not loaded properly. Try again.')
 
             toolkit['VERBOSE'] = st.checkbox('Display Outputs?')
             if toolkit['VERBOSE']:
@@ -1480,8 +1478,8 @@ def app():
         st.markdown('## Topic Classification')
         st.markdown('This function expands on the Topic Modelling function within the NLP Toolkit, but allowing users '
                     'to use pretrained ML models to classify the news articles into the list of topics you input '
-                    'into the app. For nw, only the Zero-Shot Classification model from Huggingface is implemented.\n\n'
-                    'This function performs best when GPU is enabled. To enable your GPU to run the classification '
+                    'into the app. For now, only the Zero-Shot Classification model from Huggingface is implemented.\n'
+                    '\nThis function performs best when GPU is enabled. To enable your GPU to run the classification '
                     'process, click on the following expander and download and install the required packages.')
         with st.expander('GPU-enabled Features'):
             col1, col2 = st.columns(2)

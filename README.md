@@ -55,7 +55,7 @@ If you do not wish to set up your system at all, and you do not mind using the a
 the app on the website https://share.streamlit.io/asdfghjkxd/articpy/main/app.py! You can quickly access the website 
 by scanning the QR Code below too!
 
-![WebApp_QRcode](Assets-qrcode/qr-code.png)
+![WebApp_QRcode](.assets/qr-code.png)
 
 Do note that the performance of the app is restricted to the resources available for the container used to host 
 the app online. If you wish to use a GPU, or if your workflow requires greater computing power, kindly use the 

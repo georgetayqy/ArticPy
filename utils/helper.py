@@ -21,12 +21,22 @@ import json
 import pickle
 import uuid
 import re
+import pathlib
 
 from collections import Counter
 from heapq import nlargest
 from string import punctuation
 from nltk.stem import WordNetLemmatizer
 from streamlit_pandas_profiling import st_profile_report
+
+# INIT STATIC FILEPATHS TO STORE DOWNLOADS
+STATIC_PATH = pathlib.Path.joinpath(pathlib.Path.cwd(), '.static')
+
+if not STATIC_PATH.is_dir():
+    pathlib.Path.mkdir(STATIC_PATH)
+
+# INIT LEMMATIZER
+lemmatizer = WordNetLemmatizer()
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -73,7 +83,7 @@ def lemmatizeText(text):
     :param text:                        Text to lemmatize (string)
     ----------
     """
-    lemmatizer = WordNetLemmatizer()
+
     return [lemmatizer.lemmatize(word) for word in text]
 
 
@@ -282,11 +292,11 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                    override_index: bool, format_: typing.Optional[str] = None,
                    pil_image: bool = False) -> str:
     """
-    Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f
+    Taken from Gist: https://gist.github.com/chad-m/6be98ed6cf1c4f17d09b7f6e5ca2978f, merged with Issue #400 at
+    https://github.com/streamlit/streamlit/issues/400
 
     Generates a link to download the given object_to_download.
 
-    :rtype: object
     :param object_to_download:      The object to be downloaded, enter in a list to convert all dataframes into a final
                                     Excel sheet to output
     :param download_filename:       Filename and extension of file. e.g. mydata.csv, some_txt_output.txt
@@ -296,6 +306,11 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
     :param pil_image:               Defines whether or not input file is a PIL Image
     :return:                        the anchor tag to download object_to_download
     """
+    # POINT TO CORRECT PATH
+    file_path = pathlib.Path.joinpath(STATIC_PATH, download_filename)
+    # CHECK IF FILE ALREADY EXIST, IF SO, PURGE IT
+    if file_path.exists():
+        os.remove(file_path)
 
     try:
         if pil_image:
@@ -318,19 +333,41 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
                 object_to_download = bytes(object_to_download, 'utf-8')
             elif isinstance(object_to_download, pd.DataFrame):
                 if format_.lower() == 'xlsx':
-                    out = io.BytesIO()
-                    writer = pd.ExcelWriter(out, engine='openpyxl')
-                    object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
-                    writer.save()
-                    object_to_download = out.getvalue()
+                    if object_to_download.memory_usage(deep=True).sum() < 157286400:
+                        out = io.BytesIO()
+                        writer = pd.ExcelWriter(out, engine='openpyxl')
+                        object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
+                        writer.save()
+                        object_to_download = out.getvalue()
+                    else:
+                        st.warning(f'Warning: File {download_filename} saved to {file_path} as file size exceeds '
+                                   f'permissible size...')
+                        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                            object_to_download.to_excel(writer, sheet_name='Sheet1', index=override_index)
+
                 elif format_.lower() == 'csv':
-                    object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+                    if object_to_download.memory_usage(deep=True).sum() < 157286400:
+                        object_to_download = object_to_download.to_csv(index=override_index).encode('utf-8')
+                    else:
+                        st.warning(f'Warning: File {download_filename} saved to {file_path} as file size exceeds '
+                                   f'permissible size...')
+                        object_to_download.to_csv(file_path, encoding='utf-8', index=override_index)
                 elif format_.lower() == 'json':
-                    object_to_download = object_to_download.to_json(index=override_index)
+                    if object_to_download.memory_usage(deep=True).sum() < 157286400:
+                        object_to_download = object_to_download.to_json(index=override_index)
+                    else:
+                        st.warning(f'Warning: File {download_filename} saved to {file_path} as file size exceeds '
+                                   f'permissible size...')
+                        object_to_download.to_json(file_path, index=override_index)
                 elif format_.lower() == 'pkl':
-                    out = io.BytesIO()
-                    pickle.dump(object_to_download, out)
-                    object_to_download = out.getvalue()
+                    if object_to_download.memory_usage(deep=True).sum() < 157286400:
+                        out = io.BytesIO()
+                        pickle.dump(object_to_download, out)
+                        object_to_download = out.getvalue()
+                    else:
+                        st.warning(f'Warning: File {download_filename} saved to {file_path} as file size exceeds '
+                                   f'permissible size...')
+                        object_to_download.to_pickle(str(file_path))
                 else:
                     raise ValueError('Error: Unrecognised File Format')
             elif isinstance(object_to_download, plotly.graph_objs.Figure):
@@ -340,40 +377,42 @@ def prettyDownload(object_to_download: typing.Any, download_filename: str, butto
     except Exception as ex:
         st.error(ex)
     else:
-        try:
-            b64 = base64.b64encode(object_to_download.encode()).decode()
-        except AttributeError:
-            b64 = base64.b64encode(object_to_download).decode()
+        if not (isinstance(object_to_download, pd.DataFrame) and
+                object_to_download.memory_usage(deep=True).sum() >= 157286400):
+            try:
+                b64 = base64.b64encode(object_to_download.encode()).decode()
+            except AttributeError:
+                b64 = base64.b64encode(object_to_download).decode()
 
-        button_uuid = str(uuid.uuid4()).replace('-', '')
-        button_id = re.sub('\d+', '', button_uuid)
+            button_uuid = str(uuid.uuid4()).replace('-', '')
+            button_id = re.sub('\d+', '', button_uuid)
 
-        custom_css = f"""
-            <style>
-                #{button_id} {{
-                    background-color: rgb(255, 255, 255);
-                    color: rgb(38, 39, 48);
-                    padding: 0.40em 0.90em;
-                    position: relative;
-                    text-decoration: none;
-                    border-radius: 4px;
-                    border-width: 1px;
-                    border-style: solid;
-                    border-color: rgb(230, 234, 241);
-                    border-image: initial;
-                }}
-                #{button_id}:hover {{
-                    border-color: rgb(79, 187, 255);
-                    color: rgb(79, 187, 255);
-                }}
-                #{button_id}:active {{
-                    box-shadow: none;
-                    background-color: rgb(79, 187, 255);
-                    color: white;
+            custom_css = f"""
+                <style>
+                    #{button_id} {{
+                        background-color: rgb(255, 255, 255);
+                        color: rgb(38, 39, 48);
+                        padding: 0.40em 0.90em;
+                        position: relative;
+                        text-decoration: none;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-style: solid;
+                        border-color: rgb(230, 234, 241);
+                        border-image: initial;
                     }}
-            </style> """
+                    #{button_id}:hover {{
+                        border-color: rgb(79, 187, 255);
+                        color: rgb(79, 187, 255);
+                    }}
+                    #{button_id}:active {{
+                        box-shadow: none;
+                        background-color: rgb(79, 187, 255);
+                        color: white;
+                        }}
+                </style> """
 
-        dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" ' \
-                               f'href="data:file/txt;base64,{b64}"> {button_text}</a><br></br>'
+            dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" ' \
+                                   f'href="data:file/txt;base64,{b64}"> {button_text}</a><br></br>'
 
-        return dl_link
+            return dl_link

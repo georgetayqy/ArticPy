@@ -21,8 +21,9 @@ class MultiPage:
         # SAVE FUNCTIONS TO SESSION STATE TO PRESERVE FUNCTIONS ACROSS RERUNS
         if 'pages' not in st.session_state:
             st.session_state.pages = [{'title': 'Load, Clean and Visualise', 'function': load_clean_visualise.app},
-                                      {'title': 'Document-Term Matrix', 'function': document_term_matrix.app},
                                       {'title': 'NLP Toolkit', 'function': toolkit_nlp.app}]
+
+        # {'title': 'Document-Term Matrix', 'function': document_term_matrix.app} is deprecated
 
     def add_page(self, title, func) -> None:
         """

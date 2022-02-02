@@ -426,18 +426,16 @@ def app():
                     (lcv['FILE'] == 'Online' and not lcv['DATA'].empty):
                 if not lcv['DATA'].empty:
                     try:
-                        lcv['DATA'].dropna(inplace=True)
+                        lcv['DATA'] = lcv['DATA'].astype(str)
                         lcv['DATA'][lcv['DATA_COLUMN']] = lcv['DATA'][lcv['DATA_COLUMN']].apply(lambda x: x.encode(
                             'ascii', 'ignore').decode('ascii'))
-                        lcv['DATA'] = pd.DataFrame(data=lcv['DATA']).astype(str)
-
+                        lcv['DATA'].dropna(inplace=True)
                     except Exception as ex:
                         st.error(f'Error: {ex}')
 
                     if lcv['CLEAN_MODE'] == 'None':
                         # DO NOTHING
-                        lcv['DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
-                        lcv['DATA'] = lcv['DATA'].astype(str)
+                        lcv['DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]].astype(str)
 
                         if lcv['TOKENIZE']:
                             lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['DATA'][lcv['DATA_COLUMN']])
@@ -445,8 +443,7 @@ def app():
 
                     elif lcv['CLEAN_MODE'] == 'Simple':
                         try:
-                            lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
-                            lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+                            lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]].astype(str)
 
                             # PREPROCESSING AND CLEANING
                             lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA'][lcv['DATA_COLUMN']],
@@ -456,7 +453,7 @@ def app():
 
                             if lcv['TOKENIZE']:
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
                         except Exception as ex:
                             st.error(ex)
 
@@ -465,10 +462,9 @@ def app():
                         if lcv['EXTEND_STOPWORD']:
                             try:
                                 if len(lcv['STOPWORD_LIST']) != 0:
-                                    lcv['STOPWORD_LIST'] = set(word.strip().lower() for word in lcv['STOPWORD_LIST'].
-                                                               split(sep=','))
-                                    st.info(f'Stopwords accepted: {[word for word in lcv["STOPWORD_LIST"]]}!')
-                                    lcv['STOPWORD_LIST'] = stopwords.DEFAULT.union(lcv['STOPWORD_LIST'])
+                                    lcv['STOPWORD_LIST'] = [str(word) for word in lcv["STOPWORD_LIST"]]
+                                    st.info(f'Stopwords accepted: {lcv["STOPWORD_LIST"]}!')
+                                    lcv['STOPWORD_LIST'] = stopwords.DEFAULT.union(set(lcv['STOPWORD_LIST']))
                                     lcv['FINALISE'] = True
                                 else:
                                     lcv['FINALISE'] = False
@@ -486,8 +482,7 @@ def app():
                         # NO ELSE CONDITION AS ELSE CONDITION IS EXPLICITLY SPECIFIED IN THE PREVIOUS EXCEPTION/ERROR
                         if lcv['FINALISE']:
                             try:
-                                lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]]
-                                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+                                lcv['CLEANED_DATA'] = lcv['DATA'][[lcv['DATA_COLUMN']]].astype(str)
 
                                 # PREPROCESSING AND CLEANING
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.clean(lcv['CLEANED_DATA']
@@ -496,25 +491,34 @@ def app():
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.remove_digits(lcv['CLEANED_DATA']
                                                                                             ['CLEANED CONTENT'],
                                                                                             only_blocks=False)
+                                print(lcv['STOPWORD_LIST'])
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = hero.remove_stopwords(lcv['CLEANED_DATA']
-                                                                                               ['CLEANED CONTENT'],
+                                                                                               ['CLEANED CONTENT']
+                                                                                               .astype(str),
                                                                                                lcv["STOPWORD_LIST"])
+                                print('------------------3---------------\n', lcv['CLEANED_DATA'])
 
                                 lcv['CLEANED_DATA_TOKENIZED'] = hero.tokenize(lcv['CLEANED_DATA']['CLEANED CONTENT'])
+                                print('------------------4---------------\n', lcv['CLEANED_DATA'])
                                 lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].apply(lemmatizeText)
+                                print('------------------5---------------\n', lcv['CLEANED_DATA'])
 
                                 # ACCEPT ONLY ENGLISH WORDS
                                 fin_list = [[word for word in text if word.lower() in lcv['ENGLISH_WORDS'] or not
-                                            word.isalpha()] for text in lcv['CLEANED_DATA_TOKENIZED']]
+                                             word.isalpha()] for text in lcv['CLEANED_DATA_TOKENIZED']]
 
                                 # UPDATE TOKENS
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'] = [' '.join(text) for text in fin_list]
+                                print('------------------6---------------\n', lcv['CLEANED_DATA'])
                                 lcv['CLEANED_DATA_TOKENIZED'].update([str(text) for text in fin_list])
-                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame()
+                                lcv['CLEANED_DATA_TOKENIZED'] = lcv['CLEANED_DATA_TOKENIZED'].to_frame().astype(str)
                                 lcv['CLEANED_DATA']['CLEANED CONTENT'].replace('', np.nan, inplace=True)
                                 lcv['CLEANED_DATA'].dropna(subset=['CLEANED CONTENT'], inplace=True)
+                                lcv['CLEANED_DATA'] = lcv['CLEANED_DATA'].astype(str)
+                                print('------------------7---------------\n', lcv['CLEANED_DATA'])
                             except Exception as ex:
-                                st.error(ex)
+                                # st.error(ex)
+                                raise
 
                     if lcv['CLEAN_MODE'] == 'None':
                         if lcv['TOKENIZE']:

@@ -25,6 +25,7 @@ load_clean_visualise = {
     'CLEANED_DATA_TOKENIZED': pd.DataFrame(),
     'ADVANCED_ANALYSIS': False,
     'SIMPLE_PIPELINE': [
+        preprocessing.drop_no_content,
         preprocessing.remove_html_tags,
         preprocessing.remove_diacritics,
         preprocessing.remove_whitespace,
@@ -32,6 +33,7 @@ load_clean_visualise = {
         preprocessing.drop_no_content
     ],
     'PIPELINE': [
+        preprocessing.drop_no_content,
         preprocessing.fillna,
         preprocessing.lowercase,
         preprocessing.remove_punctuation,

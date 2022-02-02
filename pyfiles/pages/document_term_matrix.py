@@ -43,27 +43,60 @@ def app():
 
         # CHECK IF THE DATA HAS BEEN DOWNLOADED
         if platform.system() == 'Windows':
-            if pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').is_dir():
-                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data').iterdir()):
-                    st.info('NTLK Data Detected')
-                else:
-                    st.warning('NLTK Data Not Detected')
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data'),
+                           pathlib.Path(r'C:\nltk_data'),
+                           pathlib.Path(r'D:\nltk_data'),
+                           pathlib.Path(r'E:\nltk_data')]
+            path_flag = False
+            files_flag = False
+
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
             else:
                 st.warning('NLTK Data Not Detected')
+
         elif platform.system() == 'Linux':
-            if pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').is_dir():
-                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data').iterdir()):
-                    st.info('NTLK Data Detected')
-                else:
-                    st.warning('NLTK Data Not Detected')
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data')]
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
             else:
                 st.warning('NLTK Data Not Detected')
+
         elif platform.system() == 'Darwin':
-            if pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data').is_dir():
-                if any(pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data').iterdir()):
-                    st.info('NTLK Data Detected')
-                else:
-                    st.warning('NLTK Data Not Detected')
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data')]
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
             else:
                 st.warning('NLTK Data Not Detected')
 

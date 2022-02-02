@@ -15,6 +15,9 @@ import pandas as pd
 import pycountry
 import streamlit as st
 import texthero as hero
+import platform
+import pathlib
+import os
 from config import load_clean_visualise as lcv
 
 from streamlit_tags import st_tags
@@ -48,6 +51,72 @@ def app():
                     'device has sufficient space and is connected to the Internet.\n\n '
                     'For the cleaning process, all non-ASCII characters will be removed, and all non-English text '
                     'will be removed. Multi-language support has not been implemented into this module as of yet.\n\n')
+        st.markdown('Before proceeding, you will need to download the corpus needed to process your data. To do so, '
+                    'click on the "Begin Download" button below. Please ensure that you have at least 3 GB of free '
+                    'disk space available so that you are able to download the corpus onto your system and that your '
+                    'device is connected to the Internet.')
+
+        # CHECK IF THE DATA HAS BEEN DOWNLOADED
+        if platform.system() == 'Windows':
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data'),
+                           pathlib.Path(r'C:\nltk_data'),
+                           pathlib.Path(r'D:\nltk_data'),
+                           pathlib.Path(r'E:\nltk_data')]
+            path_flag = False
+            files_flag = False
+
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+
+        elif platform.system() == 'Linux':
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data')]
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+
+        elif platform.system() == 'Darwin':
+            possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'share', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'local', 'lib', 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.home(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
+                           pathlib.Path.joinpath(pathlib.Path.cwd(), 'lib', 'nltk_data')]
+            for paths in possible_fp:
+                if paths.is_dir():
+                    path_flag = True
+                    if any(paths.iterdir()):
+                        files_flag = True
+
+            if path_flag and files_flag:
+                st.info('NTLK Data Detected')
+            else:
+                st.warning('NLTK Data Not Detected')
+
+        if st.button('Begin Download', key='download-model'):
+            os.system('python -m nltk.downloader all')
 
     st.markdown('## Processing Mode\n\n'
                 'Choose the type of processing you want to apply to your dataset. You may choose between the three '

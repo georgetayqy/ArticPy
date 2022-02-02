@@ -6,7 +6,7 @@ This file also allows users to set the app config for the app
 
 # IMPORT STREAMLIT
 import streamlit as st
-from pyfiles.pages import load_clean_visualise, document_term_matrix, toolkit_nlp
+from pyfiles.pages import load_clean_visualise, toolkit_nlp  # , document_term_matrix
 
 
 # DEFINE THE MULTIPAGE CLASS TO MANAGE THE APPS
@@ -21,8 +21,9 @@ class MultiPage:
         # SAVE FUNCTIONS TO SESSION STATE TO PRESERVE FUNCTIONS ACROSS RERUNS
         if 'pages' not in st.session_state:
             st.session_state.pages = [{'title': 'Load, Clean and Visualise', 'function': load_clean_visualise.app},
-                                      {'title': 'Document-Term Matrix', 'function': document_term_matrix.app},
                                       {'title': 'NLP Toolkit', 'function': toolkit_nlp.app}]
+
+            # {'title': 'Document-Term Matrix', 'function': document_term_matrix.app} is deprecated
 
     def add_page(self, title, func) -> None:
         """

@@ -57,6 +57,9 @@ def app():
                     'device is connected to the Internet.')
 
         # CHECK IF THE DATA HAS BEEN DOWNLOADED
+        path_flag = False
+        files_flag = False
+
         if platform.system() == 'Windows':
             possible_fp = [pathlib.Path.joinpath(pathlib.Path.home(), 'AppData', 'Roaming', 'nltk_data'),
                            pathlib.Path.joinpath(pathlib.Path.cwd(), 'nltk_data'),
@@ -64,9 +67,6 @@ def app():
                            pathlib.Path(r'C:\nltk_data'),
                            pathlib.Path(r'D:\nltk_data'),
                            pathlib.Path(r'E:\nltk_data')]
-            path_flag = False
-            files_flag = False
-
             for paths in possible_fp:
                 if paths.is_dir():
                     path_flag = True

@@ -1154,23 +1154,44 @@ def app():
                             st.markdown('---')
                             st.markdown('### Save Data\n'
                                         '#### Topics')
+                            collda, collda2 = st.columns(2)
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'lda_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        collda.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lda_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        collda2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lda_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'lda_topics_{index}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        collda.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lda_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        collda2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lda_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html=True)
 
                             st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
@@ -1215,7 +1236,7 @@ def app():
                                                    l1_ratio=toolkit['L1_RATIO']).fit(toolkit['TFIDF_VECTORISED'])
 
                         if toolkit['VERBOSE']:
-                            st.markdown('### Model Data')
+                            st.markdown('## Model Data')
                             toolkit['TOPIC_TEXT'] = modelIterator(toolkit['NMF_MODEL'], toolkit['TFIDF_MODEL'],
                                                                   top_n=toolkit['NUM_TOPICS'])
                         else:
@@ -1240,23 +1261,44 @@ def app():
                             st.markdown('---')
                             st.markdown('### Save Data\n'
                                         '#### Topics')
+                            colnmf, colnmf2 = st.columns(2)
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'nmf_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        colnmf.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'nmf_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        colnmf2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'nmf_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'nmf_topics_{index}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        colnmf.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'nmf_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        colnmf2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'nmf_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html = True)
 
                             st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:
@@ -1283,7 +1325,7 @@ def app():
                         toolkit['LSI_DATA'] = toolkit['LSI_MODEL'].fit_transform(toolkit['VECTORISED'])
 
                         if toolkit['VERBOSE']:
-                            st.markdown('### Model Data')
+                            st.markdown('## Model Data')
                             toolkit['TOPIC_TEXT'] = modelIterator(toolkit['LSI_MODEL'], toolkit['CV'],
                                                                   top_n=toolkit['NUM_TOPICS'])
                         else:
@@ -1354,23 +1396,44 @@ def app():
                             st.markdown('---')
                             st.markdown('### Save Data\n'
                                         '#### Topics')
+                            collis, collis2 = st.columns(2)
                             for index, data in enumerate(toolkit['TOPIC_TEXT']):
                                 if toolkit['OVERRIDE_FORMAT'] is not None:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'lsi_topics_{index}.{toolkit["OVERRIDE_FORMAT"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['OVERRIDE_FORMAT']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        collis.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lsi_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        collis2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lsi_topics_{index + 1}.'
+                                                              f'{toolkit["OVERRIDE_FORMAT"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['OVERRIDE_FORMAT']),
+                                            unsafe_allow_html=True)
                                 else:
-                                    st.markdown(prettyDownload(
-                                        object_to_download=data,
-                                        download_filename=f'lsi_topics_{index}.{toolkit["MODE"].lower()}',
-                                        button_text=f'Download Topic List Data Entry {index}',
-                                        override_index=False,
-                                        format_=toolkit['MODE']),
-                                        unsafe_allow_html=True)
+                                    if (index + 1) % 2 != 0:
+                                        collis.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lsi_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html=True)
+                                    else:
+                                        collis2.markdown(prettyDownload(
+                                            object_to_download=data,
+                                            download_filename=f'lsi_topics_{index + 1}.{toolkit["MODE"].lower()}',
+                                            button_text=f'Download Topic List Data Entry {index + 1}',
+                                            override_index=False,
+                                            format_=toolkit['MODE']),
+                                            unsafe_allow_html=True)
 
                             st.markdown('#### Topic/Word List')
                             if toolkit['OVERRIDE_FORMAT'] is not None:

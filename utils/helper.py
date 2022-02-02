@@ -149,11 +149,21 @@ def modelIterator(model, vectoriser, top_n, vb=True):
                           index=range(len(lister)),
                           columns=['word', 'weight'])
 
-        if vb:
-            st.markdown(f'### Topic {id_}')
-            st.dataframe(df)
+        # if vb:
+        #     st.markdown(f'### Topic {id_}')
+        #     st.dataframe(df)
 
         frame_list.append(df)
+
+    if vb:
+        colx, coly = st.columns(2)
+        for order, data in enumerate(frame_list):
+            if (order + 1) % 2 != 0:
+                colx.markdown(f'### Topic {order + 1}')
+                colx.dataframe(data)
+            else:
+                coly.markdown(f'### Topic {order + 1}')
+                coly.dataframe(data)
 
     return frame_list
 

@@ -118,6 +118,9 @@ def app():
         if st.button('Begin Download', key='download-model'):
             os.system('python -m nltk.downloader all')
 
+# -------------------------------------------------------------------------------------------------------------------- #
+# |                                                 FILE UPLOADING                                                   | #
+# -------------------------------------------------------------------------------------------------------------------- #
     st.markdown('## Upload Data\n')
     col1, col1_ = st.columns(2)
     lcv['FILE'] = col1.selectbox('Origin of Data File', ('Local', 'Online'),
@@ -128,23 +131,6 @@ def app():
     lcv['MODE'] = col1_.selectbox('Define the Data Input Format', ('CSV', 'XLSX', 'PKL', 'JSON'),
                                   key='lcv-mode')
 
-    st.markdown('## Processing Mode\n\n'
-                'Choose the type of processing you want to apply to your dataset. You may choose between the three '
-                'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
-    lcv['ANALYSIS_MODE'] = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification',
-                                                                        'Data Query'),
-                                        help='**Data Cleaning**: \tThis mode cleans the data for further processing\n\n'
-                                             '**Data Modification**: \tThis mode allows users to modify their data by '
-                                             'adding in new information or to change existing information.\n\n'
-                                             '**Data Query**: \tThis mode allows users to query their data for '
-                                             'specific keywords of interest.',
-                                        key='lcv-mode')
-    st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected')
-
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# |                                                 FILE UPLOADING                                                   | #
-# -------------------------------------------------------------------------------------------------------------------- #
     if lcv['FILE'] == 'Local':
         lcv['DATA_PATH'] = st.file_uploader(f'Load {lcv["MODE"]} File', type=[lcv["MODE"]], key='lcv-fp')
         if lcv['DATA_PATH'] is not None:
@@ -212,6 +198,19 @@ def app():
                 lcv['DATA_COLUMN'] = st.selectbox('Choose Column where Data is Stored', list(lcv['DATA'].columns),
                                                   key='lcv-gcs')
                 st.success(f'Data Loaded from {lcv["DATA_COLUMN"]}!')
+
+    st.markdown('## Processing Mode\n\n'
+                'Choose the type of processing you want to apply to your dataset. You may choose between the three '
+                'processes: **Cleaning**, **Modification (Country Extraction)** and **Query**.')
+    lcv['ANALYSIS_MODE'] = st.selectbox('Choose Data Processing Mode', ('Data Cleaning', 'Data Modification',
+                                                                        'Data Query'),
+                                        help='**Data Cleaning**: \tThis mode cleans the data for further processing\n\n'
+                                             '**Data Modification**: \tThis mode allows users to modify their data by '
+                                             'adding in new information or to change existing information.\n\n'
+                                             '**Data Query**: \tThis mode allows users to query their data for '
+                                             'specific keywords of interest.',
+                                        key='lcv-mode')
+    st.info(f'**{lcv["ANALYSIS_MODE"]}** Mode Selected')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # |                                                      FLAGS                                                       | #

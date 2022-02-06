@@ -22,7 +22,6 @@ streamlit-aggrid==0.2.2.post4
 torch~=1.10.0
 transformers~=4.10.2
 pytorch-lightning==1.5.4
-pathlib~=1.0.1
 pyyaml~=5.4.1
 matplotlib~=3.4.3
 datetime~=4.3

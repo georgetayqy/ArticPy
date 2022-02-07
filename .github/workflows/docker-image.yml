@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - futures
 
     tags:
       - v*
@@ -40,5 +39,4 @@ jobs:
           
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
+          docker-compose push

@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  frontend:
+    build: .
+    image: ghcr.io/asdfghjkxd/articpy-streamlit:latest
+    ports:
+      - 8501:8501
+    depends_on:
+      - backend
+    volumes:
+      - ./storage:/storage
+
+  backend:
+    build: ./fastapi
+    image: ghcr.io/asdfghjkxd/articpy-backend:latest
+    ports:
+      - 8080:8080
+    volumes:
+      - ./storage:/storage

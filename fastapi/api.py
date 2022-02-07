@@ -14,10 +14,10 @@ def root():
 
 @app.get('/{file}')
 def getData(file: str):
-    # move one dir up
+    """Gets and returns the data file requested for from the .static directory"""
+
     one_dir_up = pathlib.Path(pathlib.Path.cwd()).parents[0]
-    # get joined filepaths
-    filepath = pathlib.Path.joinpath(one_dir_up, file)
+    filepath = pathlib.Path.joinpath(one_dir_up, '.static', file)
     if pathlib.Path.exists(filepath):
         return FileResponse(path=filepath, media_type='application/octet-stream', filename=file)
     else:
